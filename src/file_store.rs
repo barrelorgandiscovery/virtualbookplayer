@@ -4,10 +4,7 @@ use std::fs::metadata;
 
 use log::{debug, error, info};
 use std::fmt::{Debug, Display};
-use std::{
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{path::PathBuf, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub struct FileStoreError {
@@ -35,11 +32,11 @@ impl std::error::Error for FileStoreError {
 }
 
 pub struct FileNode {
-    name: String,
-    path: PathBuf,
-    is_folder: bool,
-    parent_folder: Option<Rc<RefCell<FileNode>>>,
-    folder_files: Vec<Rc<RefCell<FileNode>>>,
+    pub name: String,
+    pub path: PathBuf,
+    pub is_folder: bool,
+    pub parent_folder: Option<Rc<RefCell<FileNode>>>,
+    pub folder_files: Vec<Rc<RefCell<FileNode>>>,
 }
 
 impl Display for FileNode {
@@ -89,7 +86,9 @@ impl FileNode {
                 };
                 Ok(n)
             }
-            None => Err(FileStoreError::new("Filename not found")),
+            None => Err(FileStoreError::new(
+                format!("Filename {:?} not found", &path).as_str(),
+            )),
         }
     }
     pub fn set_parent(&mut self, parent: &Option<Rc<RefCell<FileNode>>>) {
@@ -113,8 +112,9 @@ pub trait Visitor {
 
 #[derive(Debug)]
 pub struct FileStore {
-    base_path: PathBuf,
-    root: Rc<RefCell<FileNode>>,
+    pub base_path: PathBuf,
+    pub root: Rc<RefCell<FileNode>>,
+    pub default_view: Option<FileView>,
 }
 
 impl FileStore {
@@ -126,7 +126,7 @@ impl FileStore {
         let file_node_result = FileNode::new(path);
         debug!("file node constructed : {:?}", &file_node_result);
         match file_node_result {
-            Ok(mut file_node) => {
+            Ok(file_node) => {
                 let r_file_node = Rc::new(RefCell::new(file_node));
                 let mut childs: Vec<Rc<RefCell<FileNode>>> = Vec::new();
                 {
@@ -164,10 +164,17 @@ impl FileStore {
     }
 
     pub fn new(path: &PathBuf) -> Result<FileStore, FileStoreError> {
-        let fs = FileStore {
-            base_path: path.parent().unwrap().to_path_buf(),
-            root: Self::recurse_construct(path, &None).unwrap(),
+        let p = path.parent().unwrap().to_path_buf();
+
+        let data_root: Rc<RefCell<FileNode>> = Self::recurse_construct(path, &None).unwrap();
+
+        let mut fs = FileStore {
+            base_path: p,
+            root: data_root,
+            default_view: None,
         };
+
+        fs.default_view = Some(fs.view(&None).unwrap());
 
         Ok(fs)
     }
@@ -250,8 +257,10 @@ fn test_file_store_and_view() {
 
 #[derive(Debug)]
 pub struct FileViewNode {
-    node: Rc<RefCell<FileNode>>,
-    childs: Vec<Rc<RefCell<FileViewNode>>>,
+    pub node: Rc<RefCell<FileNode>>,
+    pub childs: Vec<Rc<RefCell<FileViewNode>>>,
+    pub expanded: bool,
+    pub selected: bool,
 }
 
 impl FileViewNode {
@@ -262,12 +271,25 @@ impl FileViewNode {
         let fv = FileViewNode {
             node: Rc::clone(&datanode),
             childs,
+            expanded: true,
+            selected: false,
         };
         Rc::new(RefCell::new(fv))
+    }
+
+    /// get a new reference to the filenode
+    pub fn file_node(&self) -> Rc<RefCell<FileNode>> {
+        Rc::clone(&self.node)
+    }
+
+    /// get the node name
+    pub fn name(&self) -> String {
+        let n = &self.node.borrow();
+        n.name.clone()
     }
 }
 
 #[derive(Debug)]
 pub struct FileView {
-    root: Rc<RefCell<FileViewNode>>,
+    pub root: Rc<RefCell<FileViewNode>>,
 }

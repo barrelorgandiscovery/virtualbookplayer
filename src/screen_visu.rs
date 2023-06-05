@@ -1,1 +1,0 @@
-// Ecran de visualisation

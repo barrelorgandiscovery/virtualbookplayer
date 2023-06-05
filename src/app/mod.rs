@@ -1,15 +1,29 @@
 use std::fs::File;
 use std::io::{BufReader, Cursor};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use bookparsing::{read_book_stream, VirtualBook};
 use egui::epaint::*;
 use egui::*;
+use egui_extras::{Size, StripBuilder};
 
+use crate::file_store::*;
+use crate::playlist::PlayList;
 use crate::virtualbookcomponent::*;
+
+mod screen_playlist;
+mod screen_visu;
 
 #[path = "frame_history.rs"]
 mod frame_history;
+
+/// activated screen
+#[derive(PartialEq)]
+enum Screen {
+    PlayListConstruction,
+    Display,
+}
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -22,7 +36,16 @@ pub struct TemplateApp {
     offset: f32,
 
     #[serde(skip)]
+    screen: Screen,
+
+    #[serde(skip)]
     frame_history: frame_history::FrameHistory,
+
+    #[serde(skip)]
+    file_store: FileStore,
+
+    #[serde(skip)]
+    playlist: PlayList,
 }
 
 impl Default for TemplateApp {
@@ -37,11 +60,16 @@ impl Default for TemplateApp {
             vb,
             frame_history: frame_history::FrameHistory::default(),
             offset: 0.0,
-            xscale: 16_000f32,
+            xscale: 3_000f32,
+            screen: Screen::PlayListConstruction,
+            playlist: PlayList::new(),
+            file_store: FileStore::new(&PathBuf::from(
+                "/home/use/projets/2022-02_Orgue_Electronique/work/mpy-orgue/files",
+            ))
+            .unwrap(),
         }
     }
 }
-
 
 impl TemplateApp {
     /// Called once before the first frame.
@@ -76,9 +104,17 @@ impl eframe::App for TemplateApp {
         self.frame_history
             .on_new_frame(ctx.input(|i| i.time), _frame.info().cpu_usage);
 
-        let Self { vb, 
+        let Self {
+            vb,
             frame_history,
-        xscale,offset } = self;
+            xscale,
+            offset,
+            screen,
+            file_store,
+            playlist,
+        } = self;
+
+        ctx.set_pixels_per_point(2.0);
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -100,24 +136,44 @@ impl eframe::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
             // print fps
-            self.frame_history.ui(ui);
+            // self.frame_history.ui(ui);
 
-            egui::warn_if_debug_build(ui);
-            let Self {
-                vb,
-                frame_history,
-                offset,
-                xscale
-            } = self;
-            if let Some(vbc) = vb {
-                // draw canvas
+            // ui.group(|ui| {
+            if self.screen == Screen::Display {
+                StripBuilder::new(ui)
+                    .size(Size::relative(0.05))
+                    .size(Size::remainder())
+                    .horizontal(|mut strip| {
+                        strip.cell(|ui| {
+                            ui.centered_and_justified(|ui| {
+                                if ui.button("<").clicked() {
+                                    self.screen = Screen::PlayListConstruction
+                                }
+                            });
+                        });
+                        strip.cell(|ui| {
+                            screen_visu::ui_content(self, ctx, ui);
+                        });
+                    });
+            } else {
+                StripBuilder::new(ui)
+                    .size(Size::remainder())
+                    .size(Size::relative(0.05))
+                    .horizontal(|mut strip| {
+                        strip.cell(|ui| {
+                            screen_playlist::ui_content(self, ctx, ui);
+                        });
 
-                ui.add(egui::Slider::new(xscale, 1.0..=100_000.0));
-                ui.add(egui::Slider::new(offset, 0.0..=100000.0));
-
-
-                ui.add(VirtualBookComponent::from(vbc.clone()).offset(*offset).xscale(*xscale));
+                        strip.cell(|ui| {
+                            ui.centered_and_justified(|ui| {
+                                if ui.button(">").clicked() {
+                                    self.screen = Screen::Display
+                                }
+                            });
+                        });
+                    });
             }
+            //});
         });
     }
 }
