@@ -287,9 +287,24 @@ impl FileViewNode {
         let n = &self.node.borrow();
         n.name.clone()
     }
+
+    pub fn expand_all (&mut self) {
+        self.expanded = true;
+        for i in &self.childs {
+            let f = &mut i.borrow_mut();            
+            f.expand_all();
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct FileView {
     pub root: Rc<RefCell<FileViewNode>>,
+}
+
+impl FileView {
+    pub fn expand_all(&self) {
+        let e = &mut self.root.borrow_mut();
+        e.expand_all();
+    }
 }

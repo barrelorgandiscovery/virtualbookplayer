@@ -1,6 +1,6 @@
 use log::error;
 
-use std::{cell::RefCell, pin::Pin, rc::Rc};
+use std::{cell::RefCell, pin::Pin, rc::Rc, thread::current};
 
 use crate::{
     file_store::{FileStoreError, FileViewNode},
@@ -11,7 +11,10 @@ use egui::*;
 use egui_extras::{Size, StripBuilder};
 
 pub(crate) fn ui_button_panel(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui) {
-    ui.label("NO");
+    let file_store = &mut app.file_store;
+    let current_typed_no = &mut app.current_typed_no;
+
+    ui.label(current_typed_no.as_str());
 
     // button panel
     StripBuilder::new(ui)
@@ -24,11 +27,38 @@ pub(crate) fn ui_button_panel(app: &mut TemplateApp, ctx: &egui::Context, ui: &m
                         .horizontal(|mut strip| {
                             for j in 0..3 {
                                 strip.cell(|ui| {
-                                    let mut b = widgets::Button::new(i32::to_string(&(i * 3 + j)));
+                                    let no = i32::to_string(&(i * 3 + j));
+                                    let mut b = widgets::Button::new(&no);
                                     b = b.min_size(ui.available_rect_before_wrap().size());
 
                                     if ui.add(b).clicked() {
                                         // button clicked
+                                        match no.as_str() {
+                                            "10" => {
+                                                if !current_typed_no.is_empty() {
+                                                    *current_typed_no = current_typed_no
+                                                        [0..current_typed_no.len() - 1]
+                                                        .to_string();
+                                                }
+                                            }
+                                            "11" => {
+                                                // select file
+                                            }
+
+                                            e => {
+                                                *current_typed_no =
+                                                    format!("{}{}", current_typed_no, e);
+                                            }
+                                        }
+
+                                        if let Ok(new_view) =
+                                            file_store.view(&Some(current_typed_no.clone()))
+                                        {
+                                            new_view.expand_all();
+                                            file_store.default_view = Some(new_view);
+                                        } else {
+                                            file_store.default_view = None;
+                                        }
                                     }
                                 });
                             }
@@ -59,23 +89,40 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                                 strip.cell(|ui| {
                                                     ui.label("Playlist");
                                                     ui.separator();
-                                                    for i in &app.playlist.file_list {
-                                                        let n = i.borrow();
-                                                        ui.label(&n.name);
-                                                    }
+
+                                                    egui::ScrollArea::both().show(ui, |ui| {
+                                                        StripBuilder::new(ui)
+                                                            .size(Size::remainder())
+                                                            .horizontal(|mut strip| {
+                                                                strip.cell(|ui| {
+                                                                    for i in &app.playlist.file_list
+                                                                    {
+                                                                        let n = i.borrow();
+                                                                        ui.label(&n.name);
+                                                                    }
+                                                                });
+                                                            });
+                                                    });
                                                 });
                                             },
                                         );
                                     });
                                 });
-                                strip.cell(|ui| {
-                                    ui.horizontal_centered(|ui| {
-                                        ui.button("Play");
-                                        if ui.button("Next").clicked() {
-                                            app.playlist.skip();
+                                strip.strip(|mut strip| {
+                                    strip.size(Size::remainder()).horizontal(|mut strip| {
+                                        strip.cell(|ui| {
+                                            ui.horizontal(|ui| {
+                                                if ui.button("Play").clicked() {
+                                                    // play
+                                                }
+                                                ui.spacing();
+                                                if ui.button("Next").clicked() {
+                                                    app.playlist.skip();
 
-                                            // inform the element has been stopped to player
-                                        }
+                                                    // inform the element has been stopped to player
+                                                }
+                                            });
+                                        });
                                     });
                                 });
                             });
@@ -112,17 +159,23 @@ fn display_tree(
         }
 
         if node_is_folder {
-            let r = ui.collapsing(element_name, |ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-
-                if let Err(e) = display_tree(pl, &mut ele, ui) {
-                    error!("error in displaying sub tree {}", e);
-                }
-            });
-            let bele = &ele.borrow_mut();
-            if r.fully_open() && !bele.expanded {
-                //  &bele.expanded = true;
+            let default_opened: bool;
+            {
+                default_opened = ele.borrow().expanded;
             }
+            let r = CollapsingHeader::new(&element_name)
+                .default_open(default_opened)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+
+                    if let Err(e) = display_tree(pl, &mut ele, ui) {
+                        error!("error in displaying sub tree {}", e);
+                    }
+                });
+
+            // let r = ui.add(ch);
+            let bele = &mut ele.borrow_mut();
+            bele.expanded = r.fully_open();
         } else {
             let clicked: bool;
             {

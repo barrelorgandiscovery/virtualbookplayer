@@ -13,7 +13,8 @@ pub(crate) fn ui_content(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui
         xscale,
         screen,
         file_store,
-        playlist
+        playlist,
+        current_typed_no
     } = app;
 
     if let Some(vbc) = vb {

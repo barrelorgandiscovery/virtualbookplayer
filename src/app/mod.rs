@@ -46,6 +46,8 @@ pub struct TemplateApp {
 
     #[serde(skip)]
     playlist: PlayList,
+
+    current_typed_no: String,
 }
 
 impl Default for TemplateApp {
@@ -63,9 +65,13 @@ impl Default for TemplateApp {
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
             playlist: PlayList::new(),
+            current_typed_no: "".into(),
             file_store: FileStore::new(&PathBuf::from(
                 "/home/use/projets/2022-02_Orgue_Electronique/work/mpy-orgue/files",
-            ))
+            )
+            
+        
+        )
             .unwrap(),
         }
     }
@@ -112,6 +118,7 @@ impl eframe::App for TemplateApp {
             screen,
             file_store,
             playlist,
+            current_typed_no
         } = self;
 
         ctx.set_pixels_per_point(2.0);
