@@ -17,13 +17,16 @@ eframe = { version = "0.22.0", default-features = false, features = [
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
-midir = "0.9.1"
+
 
 bookparsing = { path = "../book-lib-rs" }
 
 env_logger = "0.10.0"
 log = "0.4.8"
 
+player= { path = "../player" }
+midir = { version = "0.9.1" }
+nodi= { version = "0.19.2" , features=["midir-jack"]}
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

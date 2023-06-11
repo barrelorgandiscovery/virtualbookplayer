@@ -3,6 +3,7 @@ use log::error;
 use std::{cell::RefCell, pin::Pin, rc::Rc, thread::current};
 
 use crate::{
+    appplayer::AppPlayer,
     file_store::{FileStoreError, FileViewNode},
     playlist::PlayList,
     TemplateApp,
@@ -26,26 +27,39 @@ pub(crate) fn ui_button_panel(app: &mut TemplateApp, ctx: &egui::Context, ui: &m
                         .sizes(Size::remainder(), 3)
                         .horizontal(|mut strip| {
                             for j in 0..3 {
+                                const BACKSPACE: &'static str = "<-";
+                                const ENTER: &'static str = "Enter";
+
                                 strip.cell(|ui| {
-                                    let no = i32::to_string(&(i * 3 + j));
+                                    let mut no = i32::to_string(&(i * 3 + j));
+                                    no = match no.as_str() {
+                                        "10" => BACKSPACE.into(),
+                                        "11" => ENTER.into(),
+                                        e => e.into(),
+                                    };
+
                                     let mut b = widgets::Button::new(&no);
                                     b = b.min_size(ui.available_rect_before_wrap().size());
 
                                     if ui.add(b).clicked() {
+                                        println!("clicked");
                                         // button clicked
                                         match no.as_str() {
-                                            "10" => {
+                                            BACKSPACE => {
+                                                println!("clicked on backspace");
                                                 if !current_typed_no.is_empty() {
                                                     *current_typed_no = current_typed_no
                                                         [0..current_typed_no.len() - 1]
                                                         .to_string();
                                                 }
                                             }
-                                            "11" => {
+                                            ENTER => {
                                                 // select file
+                                                println!("clicked on enter");
                                             }
 
                                             e => {
+                                                println!("clicked on button {}", e);
                                                 *current_typed_no =
                                                     format!("{}{}", current_typed_no, e);
                                             }
@@ -87,7 +101,10 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                         StripBuilder::new(ui).size(Size::remainder()).vertical(
                                             |mut strip| {
                                                 strip.cell(|ui| {
-                                                    ui.label("Playlist");
+                                                    ui.horizontal( |ui| {
+                                                        ui.label("Currently On AIR ..");
+                                                        ui.label(format!(" - {:?}",&app.current_duration));    
+                                                    });
                                                     ui.separator();
 
                                                     egui::ScrollArea::both().show(ui, |ui| {
@@ -95,10 +112,22 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                                             .size(Size::remainder())
                                                             .horizontal(|mut strip| {
                                                                 strip.cell(|ui| {
-                                                                    for i in &app.playlist.file_list
+
+                                                                    let isplaying = app.appplayer.is_playing();
+                                                                    for (index,i) in app
+                                                                        .appplayer
+                                                                        .playlist
+                                                                        .file_list.iter_mut().enumerate()
                                                                     {
                                                                         let n = i.borrow();
-                                                                        ui.label(&n.name);
+                                                                        let mut rt = RichText::new (&n.name);
+                                                                        if  isplaying {                                                                          
+                                                                           if index == 0 {
+                                                                                rt = rt.font(FontId::proportional(30.0));
+                                                                                rt = rt.color(Color32::RED);
+                                                                           }
+                                                                        }
+                                                                       ui.label(rt);
                                                                     }
                                                                 });
                                                             });
@@ -112,12 +141,24 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                     strip.size(Size::remainder()).horizontal(|mut strip| {
                                         strip.cell(|ui| {
                                             ui.horizontal(|ui| {
-                                                if ui.button("Play").clicked() {
-                                                    // play
+                                                if ui
+                                                    .toggle_value(
+                                                        &mut app.appplayer.play_mod,
+                                                        "Play",
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    if app.appplayer.play_mod {
+                                                        // play
+                                                        app.appplayer.play_file_on_top();
+                                                    } else {
+                                                        app.appplayer.stop();
+                                                    }
                                                 }
+
                                                 ui.spacing();
                                                 if ui.button("Next").clicked() {
-                                                    app.playlist.skip();
+                                                    app.appplayer.next();
 
                                                     // inform the element has been stopped to player
                                                 }
@@ -141,7 +182,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
 
 /// recursive function to display files
 fn display_tree(
-    pl: &mut PlayList,
+    app_player: &mut AppPlayer,
     files_folder: &mut Rc<RefCell<FileViewNode>>,
     ui: &mut Ui,
 ) -> Result<(), FileStoreError> {
@@ -164,11 +205,11 @@ fn display_tree(
                 default_opened = ele.borrow().expanded;
             }
             let r = CollapsingHeader::new(&element_name)
-                .default_open(default_opened)
+                //.default_open(default_opened)
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.x = 0.0;
 
-                    if let Err(e) = display_tree(pl, &mut ele, ui) {
+                    if let Err(e) = display_tree(app_player, &mut ele, ui) {
                         error!("error in displaying sub tree {}", e);
                     }
                 });
@@ -182,12 +223,19 @@ fn display_tree(
                 let mut bele = ele.borrow_mut();
                 if ui.checkbox(&mut bele.selected, element_name).clicked() {
                     clicked = true;
+                    // reset the selected point
+                    bele.selected = false;
                 } else {
                     clicked = false;
                 }
             }
             if clicked {
-                pl.add_fileviewnode(ele);
+                app_player.playlist.add_fileviewnode(ele);
+                if app_player.play_mod {
+                    if !app_player.is_playing() {
+                        app_player.play_file_on_top();
+                    }
+                }
             }
         }
     }
@@ -215,7 +263,7 @@ pub(crate) fn ui_content(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui
                             strip.cell(|ui| {
                                 if let Some(view) = &mut app.file_store.default_view {
                                     if let Err(e) =
-                                        display_tree(&mut app.playlist, &mut view.root, ui)
+                                        display_tree(&mut app.appplayer, &mut view.root, ui)
                                     {
                                         error!("error in display tree: {}", e);
                                     }

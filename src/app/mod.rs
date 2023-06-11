@@ -1,13 +1,19 @@
+use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::PathBuf;
+use std::sync::mpsc::channel;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bookparsing::{read_book_stream, VirtualBook};
 use egui::epaint::*;
 use egui::*;
 use egui_extras::{Size, StripBuilder};
+use player::midiio::{MidiPlayer, MidiPlayerFactory};
+use player::{Player, PlayerFactory, Response};
 
+use crate::appplayer::AppPlayer;
 use crate::file_store::*;
 use crate::playlist::PlayList;
 use crate::virtualbookcomponent::*;
@@ -32,6 +38,8 @@ pub struct TemplateApp {
     #[serde(skip)]
     vb: Option<Arc<Box<VirtualBook>>>,
 
+    screen_zoom_factor: f32,
+
     xscale: f32,
     offset: f32,
 
@@ -44,10 +52,12 @@ pub struct TemplateApp {
     #[serde(skip)]
     file_store: FileStore,
 
-    #[serde(skip)]
-    playlist: PlayList,
-
     current_typed_no: String,
+
+    #[serde(skip)]
+    appplayer: AppPlayer,
+
+    current_duration: Duration,
 }
 
 impl Default for TemplateApp {
@@ -57,6 +67,16 @@ impl Default for TemplateApp {
             bookparsing::read_book_stream(&mut r).unwrap(),
         )));
 
+        let factory = MidiPlayerFactory { device_no: 2 };
+
+        let (scmd, rcmd) = channel();
+        let (s, r) = channel();
+
+        let player = factory.create(s, rcmd).unwrap();
+
+        let mut appplayer = AppPlayer::new();
+        appplayer.player(Some((player, r)));
+
         //let vb = VirtualBookComponent::default();
         Self {
             vb,
@@ -64,15 +84,15 @@ impl Default for TemplateApp {
             offset: 0.0,
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
-            playlist: PlayList::new(),
+            screen_zoom_factor: 2.0,
+
             current_typed_no: "".into(),
             file_store: FileStore::new(&PathBuf::from(
                 "/home/use/projets/2022-02_Orgue_Electronique/work/mpy-orgue/files",
-            )
-            
-        
-        )
+            ))
             .unwrap(),
+            appplayer,
+            current_duration: Duration::new(0,0)
         }
     }
 }
@@ -117,11 +137,33 @@ impl eframe::App for TemplateApp {
             offset,
             screen,
             file_store,
-            playlist,
-            current_typed_no
+            current_typed_no,
+            appplayer,
+            screen_zoom_factor,
+            current_duration,
         } = self;
 
-        ctx.set_pixels_per_point(2.0);
+        let last_response_arc = Arc::clone(&self.appplayer.last_response);
+        // handling messages
+        if let Ok(mut opt_last_response) = last_response_arc.lock() {
+            if opt_last_response.is_some() {
+                let last_response = opt_last_response.as_mut().unwrap();
+                // println!("command received : {:?}", &last_response);
+                match *last_response {
+                    Response::EndOfFile => {
+                        &self.appplayer.next();
+                    }
+                    Response::Current_Play_Time(duration) => {
+                        self.current_duration = duration;    
+                        ctx.request_repaint_after(Duration::new(1,0));                   
+                    }
+                    Response::EndOfTrack => {}
+                    Response::StartOfTrack => {}
+                    Response::FileCancelled => {}
+                }
+                *opt_last_response = None;
+            }
+        }
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -137,8 +179,11 @@ impl eframe::App for TemplateApp {
                         _frame.close();
                     }
                 });
+                ui.label("Zoom :");
+                ui.add(egui::Slider::new(screen_zoom_factor, 0.5..=4.0));
             });
         });
+        ctx.set_pixels_per_point(*screen_zoom_factor);
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
