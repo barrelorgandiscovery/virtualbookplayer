@@ -7,19 +7,13 @@ use crate::{virtualbookcomponent::VirtualBookComponent, TemplateApp};
 pub(crate) fn ui_content(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui) {
     egui::warn_if_debug_build(ui);
     let TemplateApp {
-        vb,
-        frame_history,
         offset,
         xscale,
-        screen,
-        file_store,
-        current_typed_no,
         appplayer,
-        screen_zoom_factor,
-        current_duration,
+        ..
     } = app;
 
-    if let Some(vbc) = vb {
+    if let Some(vbc) = &appplayer.vb {
         // draw canvas
 
         ui.add(egui::Slider::new(xscale, 1.0..=100_000.0));

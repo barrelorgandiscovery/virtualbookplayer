@@ -288,10 +288,10 @@ impl FileViewNode {
         n.name.clone()
     }
 
-    pub fn expand_all (&mut self) {
+    pub fn expand_all(&mut self) {
         self.expanded = true;
         for i in &self.childs {
-            let f = &mut i.borrow_mut();            
+            let f = &mut i.borrow_mut();
             f.expand_all();
         }
     }
@@ -306,5 +306,26 @@ impl FileView {
     pub fn expand_all(&self) {
         let e = &mut self.root.borrow_mut();
         e.expand_all();
+    }
+
+    fn recurse_find_first(node: &Rc<RefCell<FileViewNode>>) -> Option<Rc<RefCell<FileViewNode>>> {
+        let view_node = node.borrow();
+        let file_node = view_node.node.borrow();
+        if !file_node.is_folder {
+            return Some(Rc::clone(node));
+        }
+
+        for n in &view_node.childs {
+            let result = FileView::recurse_find_first(&n);
+            if result.is_some() {
+                return result;
+            }
+        }
+
+        None
+    }
+
+    pub fn find_first_file(&self) -> Option<Rc<RefCell<FileViewNode>>> {
+        FileView::recurse_find_first(&self.root)
     }
 }

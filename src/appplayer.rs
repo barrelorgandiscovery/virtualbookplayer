@@ -6,9 +6,10 @@ use std::{
     thread,
 };
 
+use bookparsing::{Hole, VirtualBook};
 use midir::MidiOutputConnection;
 use nodi::{midly::live::SystemRealtime, Connection, MidiEvent};
-use player::{Command, Player, Response};
+use player::{Command, Note, Player, Response};
 
 use crate::playlist::PlayList;
 
@@ -31,6 +32,8 @@ pub struct AppPlayer {
 
     /// play mod,
     pub play_mod: bool,
+
+    pub vb: Option<Arc<Box<VirtualBook>>>,
 }
 
 impl AppPlayer {
@@ -43,6 +46,7 @@ impl AppPlayer {
             playlist: PlayList::new(),
             play_mod: false,
             last_response: Arc::new(Mutex::new(None)),
+            vb: None,
         }
     }
 
@@ -81,8 +85,30 @@ impl AppPlayer {
                     }
                 }
             }
-            return;
         }
+        let notes = self.notes();
+
+        let mut virt = VirtualBook::midi_scale();
+        virt.holes.holes = notes
+            .iter()
+            .map(|n| Hole {
+                timestamp: u64::try_from(n.start.as_micros()).unwrap(),
+                length: u64::try_from(n.length.as_micros()).unwrap(),
+                track: n.note.into(),
+            })
+            .collect();
+
+        self.vb = Some(Arc::new(Box::new(virt)));
+
+    }
+
+    /// get visual notes of the current played file
+    pub fn notes(&self) -> Arc<Vec<Note>> {
+        if let Some(player) = &self.player {
+            let p = player.lock().unwrap();
+            return p.associated_notes();
+        }
+        return Arc::new(vec![]);
     }
 
     /// stop the play

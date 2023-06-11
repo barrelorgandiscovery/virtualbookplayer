@@ -4,7 +4,7 @@ use std::{cell::RefCell, pin::Pin, rc::Rc, thread::current};
 
 use crate::{
     appplayer::AppPlayer,
-    file_store::{FileStoreError, FileViewNode},
+    file_store::{FileStoreError, FileViewNode, FileStore},
     playlist::PlayList,
     TemplateApp,
 };
@@ -15,7 +15,11 @@ pub(crate) fn ui_button_panel(app: &mut TemplateApp, ctx: &egui::Context, ui: &m
     let file_store = &mut app.file_store;
     let current_typed_no = &mut app.current_typed_no;
 
-    ui.label(current_typed_no.as_str());
+    let mut rt = RichText::new (current_typed_no.clone());
+    rt = rt.font(FontId::proportional(30.0));
+    rt = rt.color(Color32::BLUE);
+
+    ui.label(rt);
 
     // button panel
     StripBuilder::new(ui)
@@ -42,11 +46,9 @@ pub(crate) fn ui_button_panel(app: &mut TemplateApp, ctx: &egui::Context, ui: &m
                                     b = b.min_size(ui.available_rect_before_wrap().size());
 
                                     if ui.add(b).clicked() {
-                                        println!("clicked");
-                                        // button clicked
+
                                         match no.as_str() {
                                             BACKSPACE => {
-                                                println!("clicked on backspace");
                                                 if !current_typed_no.is_empty() {
                                                     *current_typed_no = current_typed_no
                                                         [0..current_typed_no.len() - 1]
@@ -55,11 +57,26 @@ pub(crate) fn ui_button_panel(app: &mut TemplateApp, ctx: &egui::Context, ui: &m
                                             }
                                             ENTER => {
                                                 // select file
-                                                println!("clicked on enter");
+
+                                                if let Some(view) = &file_store.default_view {
+                                                    let result = view.find_first_file();
+                                                    if result.is_some() {
+                                                        let view_node = result.unwrap();
+                                                        let file_node = Rc::clone(&view_node.borrow().node);
+                                                        let was_empty = app.appplayer.playlist.file_list.is_empty();
+                                                        app.appplayer.playlist.add(&file_node);
+                                                        if was_empty && app.appplayer.play_mod {
+                                                            app.appplayer.play_file_on_top();
+                                                        }
+
+                                                        *current_typed_no = "".into();
+                                                    }
+                                                }
+
+
                                             }
 
                                             e => {
-                                                println!("clicked on button {}", e);
                                                 *current_typed_no =
                                                     format!("{}{}", current_typed_no, e);
                                             }
@@ -102,8 +119,24 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                             |mut strip| {
                                                 strip.cell(|ui| {
                                                     ui.horizontal( |ui| {
+                                                        if ui.toggle_value(&mut app.appplayer.play_mod, "Play").clicked() {
+                                                            if app.appplayer.play_mod {
+                                                                // play
+                                                                app.appplayer.play_file_on_top();
+                                                            } else {
+                                                                app.appplayer.stop();
+                                                            }
+                                                        }
+
                                                         ui.label("Currently On AIR ..");
-                                                        ui.label(format!(" - {:?}",&app.current_duration));    
+                                                        ui.label(format!("{:.0}s",&app.current_duration.as_secs_f32()));    
+                                                       
+                                                       
+                                                        if ui.button("Next").clicked() {
+                                                            app.appplayer.next();
+                                                        }
+
+                                                        ui.ctx().request_repaint();
                                                     });
                                                     ui.separator();
 
@@ -114,6 +147,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                                                 strip.cell(|ui| {
 
                                                                     let isplaying = app.appplayer.is_playing();
+                                                                    let mut deleted: Option<usize> = None;
                                                                     for (index,i) in app
                                                                         .appplayer
                                                                         .playlist
@@ -121,14 +155,30 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                                                     {
                                                                         let n = i.borrow();
                                                                         let mut rt = RichText::new (&n.name);
-                                                                        if  isplaying {                                                                          
-                                                                           if index == 0 {
-                                                                                rt = rt.font(FontId::proportional(30.0));
-                                                                                rt = rt.color(Color32::RED);
-                                                                           }
+                                                                        if index == 0 {
+                                                                            if isplaying {                                                                          
+                                                                            
+                                                                                    rt = rt.font(FontId::proportional(20.0));
+                                                                                    rt = rt.color(Color32::RED);
+                                                                                
+                                                                            
+                                                                            } else {
+
+                                                                            }
+                                                                        ui.label(rt);
+                                                                       } else {
+                                                                        let mut checked = false;
+                                                                        if ui.checkbox(&mut checked, &n.name).clicked() {
+                                                                            deleted = Some(index);
                                                                         }
-                                                                       ui.label(rt);
+                                                                       }
+                                                                       
                                                                     }
+
+                                                                    if let Some(index) = deleted {
+                                                                        app.appplayer.playlist.file_list.swap_remove(index);
+                                                                    }
+
                                                                 });
                                                             });
                                                     });
@@ -141,27 +191,10 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
                                     strip.size(Size::remainder()).horizontal(|mut strip| {
                                         strip.cell(|ui| {
                                             ui.horizontal(|ui| {
-                                                if ui
-                                                    .toggle_value(
-                                                        &mut app.appplayer.play_mod,
-                                                        "Play",
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    if app.appplayer.play_mod {
-                                                        // play
-                                                        app.appplayer.play_file_on_top();
-                                                    } else {
-                                                        app.appplayer.stop();
-                                                    }
-                                                }
+                                                
 
                                                 ui.spacing();
-                                                if ui.button("Next").clicked() {
-                                                    app.appplayer.next();
-
-                                                    // inform the element has been stopped to player
-                                                }
+                                               
                                             });
                                         });
                                     });
@@ -182,10 +215,13 @@ pub(crate) fn ui_playlist_right_panel(app: &mut TemplateApp, ctx: &egui::Context
 
 /// recursive function to display files
 fn display_tree(
-    app_player: &mut AppPlayer,
+    appplayer: &mut AppPlayer,
+    number_selected: &mut String,
     files_folder: &mut Rc<RefCell<FileViewNode>>,
     ui: &mut Ui,
-) -> Result<(), FileStoreError> {
+) -> Result<bool, FileStoreError> {
+
+    let mut file_selected = false;
     let mut bfile_folder = files_folder.borrow_mut();
     for mut ele in bfile_folder.childs.iter_mut() {
         let node_is_folder;
@@ -209,9 +245,12 @@ fn display_tree(
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.x = 0.0;
 
-                    if let Err(e) = display_tree(app_player, &mut ele, ui) {
-                        error!("error in displaying sub tree {}", e);
-                    }
+                    match display_tree(appplayer,  number_selected, &mut ele, ui) {
+                        Err(e) =>  {
+                                error!("error in displaying sub tree {}", e);
+                        },
+                        Ok(returned_value) => {file_selected = true}
+                }
                 });
 
             // let r = ui.add(ch);
@@ -230,23 +269,25 @@ fn display_tree(
                 }
             }
             if clicked {
-                app_player.playlist.add_fileviewnode(ele);
-                if app_player.play_mod {
-                    if !app_player.is_playing() {
-                        app_player.play_file_on_top();
+                appplayer.playlist.add_fileviewnode(ele);
+                if appplayer.play_mod {
+                    if !appplayer.is_playing() {
+                        appplayer.play_file_on_top();
                     }
                 }
+                *number_selected = "".into();
+                file_selected = true;
+                
             }
         }
     }
-    Ok(())
+    Ok(file_selected)
 }
 
 pub(crate) fn ui_content(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui) {
     let dark_mode = ui.visuals().dark_mode;
     let faded_color = ui.visuals().window_fill();
-    let faded_color = |color: Color32| -> Color32 {
-        use egui::Rgba;
+    let _faded_color = |color: Color32| -> Color32 {
         let t = if dark_mode { 0.95 } else { 0.8 };
         egui::lerp(Rgba::from(color)..=Rgba::from(faded_color), t).into()
     };
@@ -261,12 +302,37 @@ pub(crate) fn ui_content(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui
                         .size(Size::remainder())
                         .horizontal(|mut strip| {
                             strip.cell(|ui| {
-                                if let Some(view) = &mut app.file_store.default_view {
-                                    if let Err(e) =
-                                        display_tree(&mut app.appplayer, &mut view.root, ui)
-                                    {
-                                        error!("error in display tree: {}", e);
-                                    }
+
+                                let filestore = &mut app.file_store;
+                                if let Some(view) = &mut filestore.default_view {
+                                    
+                                    match display_tree(&mut app.appplayer,  &mut app.current_typed_no, &mut view.root, ui) {
+                                        Err(e) =>
+                                        
+                                        {
+                                            error!("error in display tree: {}", e);
+                                        },
+                                        Ok(returned_value) => {
+                                            if returned_value {
+                                                    if let Ok(new_view) =
+                                                    filestore.view(&Some(app.current_typed_no.clone()))
+                                                {
+                                                    new_view.expand_all();
+                                                    filestore.default_view = Some(new_view);
+                                                } else {
+                                                    filestore.default_view = None;
+                                                }
+                                            }
+                                        }
+    
+                                    } 
+                                    
+
+
+
+
+
+                                    
                                 } else {
                                     ui.label("no files");
                                 }

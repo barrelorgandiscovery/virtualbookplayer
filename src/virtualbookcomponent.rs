@@ -51,10 +51,12 @@ impl VirtualBookComponent {
         self
     }
 
+    /// percentage of the display
     pub fn offset(mut self, offset: f32) -> Self {
         self.offset = offset;
         self
     }
+
 
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let Self {
@@ -73,6 +75,7 @@ impl VirtualBookComponent {
 
         egui::ScrollArea::horizontal()
             .show(ui, |ui| {
+
                 let mut book_screen_width: f32 = ui.available_width() as f32;
 
                 if let Some(current_vb) = &self.vb {
@@ -133,7 +136,7 @@ impl VirtualBookComponent {
                         .map(|(i, h)| {
                             let points_in_screen: Vec<Pos2> = h
                                 .iter()
-                                .map(|p| &to_screen * (*p - Vec2 { x: *offset, y: 0.0 }))
+                                .map(|p| &to_screen * (*p - Vec2 { x: *offset * book_screen_width, y: 0.0 }))
                                 .collect();
 
                             let rect = Rect::from_points(&points_in_screen);
@@ -154,6 +157,7 @@ impl VirtualBookComponent {
                         painter.add(RectShape::filled(*r, Rounding::default(), *c));
                     }
                 }
+                ui.ctx().request_repaint();
                 response
             })
             .inner
