@@ -1,5 +1,5 @@
 [package]
-name = "eframe_template"
+name = "virtualbookplayerapp"
 version = "0.1.0"
 authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 edition = "2021"
@@ -7,7 +7,9 @@ rust-version = "1.65"
 
 [dependencies]
 egui = "0.22.0"
-egui_extras = "0.22.0"
+egui_extras = {version = "0.22.0" ,  features = ["image"]}
+image = { version = "0.22", default-features = false, features = ["png"] }
+
 eframe = { version = "0.22.0", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
@@ -18,19 +20,22 @@ eframe = { version = "0.22.0", default-features = false, features = [
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 
+chrono = "0.4.26"
 
-bookparsing = { path = "../book-lib-rs" }
+bookparsing = { path = "depends/book-lib-rs" }
 
 env_logger = "0.10.0"
 log = "0.4.8"
 
-player= { path = "../player" }
+player= { path = "depends/player" }
 midir = { version = "0.9.1" }
 nodi= { version = "0.19.2" , features=["midir-jack"]}
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = "0.3"
+im-native-dialog = "0.3.0"
+
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]

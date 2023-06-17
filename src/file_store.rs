@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::fs::metadata;
+use std::rc::Weak;
 
 use log::{debug, error, info};
 use std::fmt::{Debug, Display};
@@ -35,7 +36,7 @@ pub struct FileNode {
     pub name: String,
     pub path: PathBuf,
     pub is_folder: bool,
-    pub parent_folder: Option<Rc<RefCell<FileNode>>>,
+    pub parent_folder: Option<Weak<RefCell<FileNode>>>,
     pub folder_files: Vec<Rc<RefCell<FileNode>>>,
 }
 
@@ -94,7 +95,7 @@ impl FileNode {
     pub fn set_parent(&mut self, parent: &Option<Rc<RefCell<FileNode>>>) {
         match parent {
             None => self.parent_folder = None,
-            Some(p) => self.parent_folder = Some(Rc::clone(p)),
+            Some(p) => self.parent_folder = Some(Rc::downgrade(p)),
         }
     }
     pub fn folder(&self) -> bool {
@@ -152,6 +153,13 @@ impl FileStore {
                                 }
                             }
                         }
+
+                        childs.sort_by(|a, b| {
+                            let ab = a.borrow();
+                            let bb = b.borrow();
+                            ab.name.partial_cmp(&bb.name).unwrap()
+                        });
+
                         bn.folder_files = childs;
                         bn.set_parent(parent);
                     }
@@ -205,7 +213,6 @@ impl FileStore {
             }
         } else {
             // go to sub elements
-
             let mut v: Vec<Rc<RefCell<FileViewNode>>> = Vec::new();
             for i in &bn.folder_files {
                 let r = self.recurse_construct_view(&i, filter);
@@ -260,6 +267,7 @@ pub struct FileViewNode {
     pub node: Rc<RefCell<FileNode>>,
     pub childs: Vec<Rc<RefCell<FileViewNode>>>,
     pub expanded: bool,
+    pub clicked_for_open: Option<bool>,
     pub selected: bool,
 }
 
@@ -271,8 +279,9 @@ impl FileViewNode {
         let fv = FileViewNode {
             node: Rc::clone(&datanode),
             childs,
-            expanded: true,
+            expanded: false,
             selected: false,
+            clicked_for_open: None,
         };
         Rc::new(RefCell::new(fv))
     }
@@ -289,11 +298,15 @@ impl FileViewNode {
     }
 
     pub fn expand_all(&mut self) {
-        self.expanded = true;
+        self.expand();
         for i in &self.childs {
             let f = &mut i.borrow_mut();
             f.expand_all();
         }
+    }
+    pub fn expand(&mut self) {
+        self.expanded = true;
+        self.clicked_for_open = Some(true);
     }
 }
 
@@ -306,6 +319,11 @@ impl FileView {
     pub fn expand_all(&self) {
         let e = &mut self.root.borrow_mut();
         e.expand_all();
+    }
+
+    pub fn expand(&self) {
+        let e = &mut self.root.borrow_mut();
+        e.expand();
     }
 
     fn recurse_find_first(node: &Rc<RefCell<FileViewNode>>) -> Option<Rc<RefCell<FileViewNode>>> {

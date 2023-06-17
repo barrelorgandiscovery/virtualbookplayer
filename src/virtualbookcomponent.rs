@@ -13,6 +13,7 @@ pub struct VirtualBookComponent {
     offset: f32,
     xscale: f32,
     yfactor: f32,
+    fit_to_height: bool,
 
     // holes: Vec<[Pos2; 2]>,
     vb: Option<Arc<Box<VirtualBook>>>,
@@ -28,6 +29,7 @@ impl Default for VirtualBookComponent {
             //     [pos2(10.0, 60.0), pos2(100.0, 80.0)],
             // ],
             yfactor: 3.0f32,
+            fit_to_height: true,
             vb: None,
         }
     }
@@ -65,6 +67,7 @@ impl VirtualBookComponent {
             yfactor,
             // holes,
             vb,
+            fit_to_height,
         } = self;
 
         let mut style = ui.style_mut().clone();
@@ -73,6 +76,8 @@ impl VirtualBookComponent {
 
         ui.set_style(style);
 
+        let width_container = ui.available_width();
+        
         egui::ScrollArea::horizontal()
             .show(ui, |ui| {
 
@@ -84,16 +89,29 @@ impl VirtualBookComponent {
                     }
                 }
 
+                let offset_with_bar = *offset * book_screen_width - width_container / 2.0;
+
+
                 let (response, painter) = ui.allocate_painter(
                     Vec2::new(book_screen_width, ui.available_height()),
                     Sense::hover(),
                 );
 
+                let midx = width_container / 2.0f32;
+                let maxy = response.rect.height() ;
+                // println!("midx {}, maxy {}", midx,maxy);
+
                 if let Some(current_vb) = &mut self.vb {
+
                     let to_screen = emath::RectTransform::from_to(
                         Rect::from_min_size(Pos2::ZERO, response.rect.size()),
                         response.rect,
                     );
+
+                    if *fit_to_height {
+                        *yfactor = response.rect.size().y / (current_vb.scale.definition.width as f32);
+                    }
+    
 
                     let book_background = Rect::from_points(&[
                         pos2(0.0, 0.0),
@@ -136,7 +154,7 @@ impl VirtualBookComponent {
                         .map(|(i, h)| {
                             let points_in_screen: Vec<Pos2> = h
                                 .iter()
-                                .map(|p| &to_screen * (*p - Vec2 { x: *offset * book_screen_width, y: 0.0 }))
+                                .map(|p| &to_screen * (*p - Vec2 { x: offset_with_bar, y: 0.0 }))
                                 .collect();
 
                             let rect = Rect::from_points(&points_in_screen);
@@ -156,6 +174,12 @@ impl VirtualBookComponent {
                     for (r, c) in rects.iter() {
                         painter.add(RectShape::filled(*r, Rounding::default(), *c));
                     }
+
+
+                    let bar = Rect::from_points(&vec![&to_screen * pos2(midx-1.0,0.0),&to_screen * pos2(midx+1.0,maxy+10.0)]);
+                    painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
+                    
+
                 }
                 ui.ctx().request_repaint();
                 response

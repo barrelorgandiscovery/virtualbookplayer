@@ -2,11 +2,11 @@
 
 use egui::Ui;
 
-use crate::{virtualbookcomponent::VirtualBookComponent, TemplateApp};
+use crate::{virtualbookcomponent::VirtualBookComponent, VirtualBookApp};
 
-pub(crate) fn ui_content(app: &mut TemplateApp, ctx: &egui::Context, ui: &mut Ui) {
-    egui::warn_if_debug_build(ui);
-    let TemplateApp {
+pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
+    // egui::warn_if_debug_build(ui);
+    let VirtualBookApp {
         offset,
         xscale,
         appplayer,

@@ -3,12 +3,10 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
     },
-    thread,
+    thread, time::Instant, time::Duration
 };
 
 use bookparsing::{Hole, VirtualBook};
-use midir::MidiOutputConnection;
-use nodi::{midly::live::SystemRealtime, Connection, MidiEvent};
 use player::{Command, Note, Player, Response};
 
 use crate::playlist::PlayList;
@@ -33,6 +31,8 @@ pub struct AppPlayer {
     /// play mod,
     pub play_mod: bool,
 
+    pub start_play_time: Instant, 
+
     pub vb: Option<Arc<Box<VirtualBook>>>,
 }
 
@@ -47,13 +47,22 @@ impl AppPlayer {
             play_mod: false,
             last_response: Arc::new(Mutex::new(None)),
             vb: None,
+            start_play_time: Instant::now()-Duration::from_millis(10_000),
         }
     }
 
     pub fn player(&mut self, player: Option<(Box<dyn Player>, Receiver<Response>)>) {
+
+        if let Some(old_player_mutex) = &self.player {
+            let mut old_player = old_player_mutex.lock().unwrap();
+            old_player.stop();
+            drop(old_player);
+        }
+
         self.player = match player {
             None => None,
             Some(p) => {
+
                 let player_reference = Arc::new(Mutex::new(p.0));
                 let last_response = Arc::clone(&self.last_response);
 
@@ -79,9 +88,11 @@ impl AppPlayer {
 
             if self.playlist.file_list.len() > 0 {
                 if let Some(n) = self.playlist.file_list.get(0) {
-                    let f = n.borrow();
-                    if let Err(e) = p.play(&f.path) {
+                    self.start_play_time = Instant::now(); // before play
+                    if let Err(e) = p.play(&n.path) {
                         error!("error in playing file : {}", e);
+                    } else {
+                       
                     }
                 }
             }
@@ -94,12 +105,16 @@ impl AppPlayer {
             .map(|n| Hole {
                 timestamp: u64::try_from(n.start.as_micros()).unwrap(),
                 length: u64::try_from(n.length.as_micros()).unwrap(),
-                track: n.note.into(),
+                track: (127 - n.note).into(),
             })
             .collect();
 
         self.vb = Some(Arc::new(Box::new(virt)));
 
+    }
+
+    pub fn start_play_time(&self) -> Instant {
+        self.start_play_time
     }
 
     /// get visual notes of the current played file

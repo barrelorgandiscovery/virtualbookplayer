@@ -6,5 +6,5 @@ mod file_store;
 mod playlist;
 mod appplayer;
 
-pub use app::TemplateApp;
+pub use app::VirtualBookApp;
 
