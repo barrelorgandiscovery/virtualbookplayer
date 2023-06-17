@@ -24,6 +24,8 @@ jobs:
             override: true
             components: rustfmt, clippy
       - uses: actions/checkout@v2
+        with:
+            submodules: recursive
 
 
       - name: Cache rust compilations
@@ -62,6 +64,8 @@ jobs:
             override: true
             components: rustfmt, clippy
       - uses: actions/checkout@v2
+        with:
+            submodules: recursive
 
 
       - name: Cache rust compilations
