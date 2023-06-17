@@ -2,7 +2,9 @@
 
 A Cross plateform midi and virtual book, jukebox player. Only the needed functionnalities to easily making midified instrument play.
 
-![](sc1.png) 
-![](sc2.png) 
-![](sc3.png) 
+![](ss1.png) 
+
+![](ss2.png) 
+
+![](ss3.png) 
 
