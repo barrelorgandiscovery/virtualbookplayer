@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 // When compiling natively:
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_arch = "windows"))]
 fn main() -> eframe::Result<()> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
@@ -14,6 +14,13 @@ fn main() -> eframe::Result<()> {
         Box::new(|cc| Box::new(virtualbookplayerapp::VirtualBookApp::new(cc))),
     )
 }
+
+#[cfg(target_arch = "windows")]
+fn main() {
+
+}
+
+
 
 // when compiling to web using trunk.
 #[cfg(target_arch = "wasm32")]

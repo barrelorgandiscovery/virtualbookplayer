@@ -5,7 +5,8 @@ use std::time::{Duration, Instant};
 
 use egui::epaint::*;
 use egui::*;
-use egui_extras::image::load_image_bytes;
+// use egui_extras::image::load_image_bytes;
+use egui_extras::image::{*};
 use egui_extras::{Size, StripBuilder};
 use im_native_dialog::ImNativeFileDialog;
 use player::midiio::{DeviceInformation, MidiPlayerFactory};
@@ -88,13 +89,15 @@ pub struct VirtualBookApp {
     i18n: Box<I18NMessages>,
 }
 
+
 impl Default for VirtualBookApp {
     fn default() -> Self {
         let mut appplayer = AppPlayer::new();
 
         appplayer.player(None);
 
-        let img = load_image_bytes(include_bytes!("bg2.png")).unwrap();
+
+        let img : ColorImage = load_image_bytes(include_bytes!("bg2.png")).unwrap();
 
         Self {
             frame_history: frame_history::FrameHistory::default(),
