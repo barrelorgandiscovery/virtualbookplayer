@@ -1,19 +1,70 @@
 use log::error;
 
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use chrono::Local;
 
 use crate::{
     appplayer::AppPlayer,
-    file_store::{FileStoreError, FileViewNode},
+    file_store::{FileStore, FileStoreError, FileViewNode},
     playlist, VirtualBookApp,
 };
 use egui::*;
 use egui_extras::{Size, StripBuilder};
+
+pub const BACKSPACE: &'static str = "<-";
+pub const ENTER: &'static str = "Enter";
+
+pub fn handling_key(
+    no: &String,
+    current_typed_no: &mut String,
+    file_store: &mut Option<FileStore>,
+    appplayer: &mut AppPlayer,
+) {
+    match no.as_str() {
+        BACKSPACE => {
+            if !current_typed_no.is_empty() {
+                *current_typed_no = current_typed_no[0..current_typed_no.len() - 1].to_string();
+            }
+        }
+        ENTER => {
+            // select file
+            if let Some(filestore) = &file_store {
+                if let Some(view) = &filestore.default_view {
+                    let result = view.find_first_file();
+                    if result.is_some() {
+                        let view_node = result.unwrap();
+                        let file_node = Rc::clone(&view_node.borrow().node);
+                        let was_empty = appplayer.playlist.file_list.is_empty();
+
+                        appplayer
+                            .playlist
+                            .add_from_path_and_expand_playlists(&file_node.borrow().path);
+
+                        if was_empty && appplayer.play_mod {
+                            appplayer.play_file_on_top();
+                        }
+
+                        *current_typed_no = "".into();
+                    }
+                }
+            }
+        }
+
+        e => {
+            *current_typed_no = format!("{}{}", current_typed_no, e);
+        }
+    }
+
+    if let Some(filestore) = file_store {
+        if let Ok(new_view) = filestore.view(&Some(current_typed_no.clone())) {
+            new_view.expand();
+            filestore.default_view = Some(new_view);
+        } else {
+            filestore.default_view = None;
+        }
+    }
+}
 
 pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
     let mut file_store = &mut app.file_store;
@@ -38,9 +89,6 @@ pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, ctx: &egui::Context, ui:
                         .sizes(Size::remainder(), 3)
                         .horizontal(|mut strip| {
                             for j in 0..3 {
-                                const BACKSPACE: &'static str = "<-";
-                                const ENTER: &str = "Enter";
-
                                 strip.cell(|ui| {
                                     let mut no = i32::to_string(&(i * 3 + j));
                                     no = match no.as_str() {
@@ -54,68 +102,9 @@ pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, ctx: &egui::Context, ui:
 
                                     ui.centered_and_justified(|ui| {
                                         if ui.add(b).clicked() {
-                                            match no.as_str() {
-                                                BACKSPACE => {
-                                                    if !current_typed_no.is_empty() {
-                                                        *current_typed_no = current_typed_no
-                                                            [0..current_typed_no.len() - 1]
-                                                            .to_string();
-                                                    }
-                                                }
-                                                ENTER => {
-                                                    // select file
-                                                    if let Some(filestore) = &file_store {
-                                                        if let Some(view) = &filestore.default_view
-                                                        {
-                                                            let result = view.find_first_file();
-                                                            if result.is_some() {
-                                                                let view_node = result.unwrap();
-                                                                let file_node = Rc::clone(
-                                                                    &view_node.borrow().node,
-                                                                );
-                                                                let was_empty = app
-                                                                    .appplayer
-                                                                    .playlist
-                                                                    .file_list
-                                                                    .is_empty();
 
-
-                                                                app.appplayer
-                                                                    .playlist
-                                                                    .add_from_path_and_expand_playlists(
-                                                                            &file_node.borrow().path
-                                                                    );
-                                                                    
-                            
-                                                                if was_empty
-                                                                    && app.appplayer.play_mod
-                                                                {
-                                                                    app.appplayer
-                                                                        .play_file_on_top();
-                                                                }
-
-                                                                *current_typed_no = "".into();
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                e => {
-                                                    *current_typed_no =
-                                                        format!("{}{}", current_typed_no, e);
-                                                }
-                                            }
-
-                                            if let Some(filestore) = &mut file_store {
-                                                if let Ok(new_view) =
-                                                    filestore.view(&Some(current_typed_no.clone()))
-                                                {
-                                                    new_view.expand();
-                                                    filestore.default_view = Some(new_view);
-                                                } else {
-                                                    filestore.default_view = None;
-                                                }
-                                            }
+                                            // Handling NO
+                                            handling_key(&no, current_typed_no, file_store, &mut app.appplayer);
                                         }
                                     });
                                 });
@@ -300,7 +289,9 @@ fn display_tree(
                 }
             }
             if clicked {
-                appplayer.playlist.add_fileviewnode_and_read_playlists(element);
+                appplayer
+                    .playlist
+                    .add_fileviewnode_and_read_playlists(element);
                 if appplayer.play_mod {
                     if !appplayer.is_playing() {
                         appplayer.play_file_on_top();

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use egui::epaint::*;
 use egui::*;
 // use egui_extras::image::load_image_bytes;
-use egui_extras::image::{*};
+use egui_extras::image::*;
 use egui_extras::{Size, StripBuilder};
 use im_native_dialog::ImNativeFileDialog;
 use player::midiio::{DeviceInformation, MidiPlayerFactory};
@@ -17,12 +17,11 @@ use crate::file_store::*;
 
 use log::error;
 
-use self::i18n::{I18NMessages, create_i18n_fr_message};
+use self::i18n::{create_i18n_fr_message, I18NMessages};
 
+mod i18n;
 mod screen_playlist;
 mod screen_visu;
-mod i18n;
-
 
 #[path = "frame_history.rs"]
 mod frame_history;
@@ -51,10 +50,9 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     frame_history: frame_history::FrameHistory,
 
-
     #[serde(skip)]
     file_path_dialog: ImNativeFileDialog<Option<PathBuf>>,
-    
+
     file_store_path: Option<PathBuf>,
 
     #[serde(skip)]
@@ -89,15 +87,13 @@ pub struct VirtualBookApp {
     i18n: Box<I18NMessages>,
 }
 
-
 impl Default for VirtualBookApp {
     fn default() -> Self {
         let mut appplayer = AppPlayer::new();
 
         appplayer.player(None);
 
-
-        let img : ColorImage = load_image_bytes(include_bytes!("bg2.png")).unwrap();
+        let img: ColorImage = load_image_bytes(include_bytes!("bg2.png")).unwrap();
 
         Self {
             frame_history: frame_history::FrameHistory::default(),
@@ -108,7 +104,6 @@ impl Default for VirtualBookApp {
 
             current_typed_no: "".into(),
 
-            
             file_path_dialog: im_native_dialog::ImNativeFileDialog::default(),
             file_store_path: None,
             file_store: None,
@@ -230,6 +225,7 @@ impl eframe::App for VirtualBookApp {
             file_store,
             file_path_dialog,
             i18n,
+            current_typed_no,
             ..
         } = self;
 
@@ -277,10 +273,7 @@ impl eframe::App for VirtualBookApp {
                 if let Ok(fs) = FileStore::new(&r) {
                     *file_store = Some(fs);
                 } else {
-                    error!(
-                        "fail to create file store with path {:?}",
-                        r.clone()
-                    )
+                    error!("fail to create file store with path {:?}", r.clone())
                 }
             }
         }
@@ -302,15 +295,13 @@ impl eframe::App for VirtualBookApp {
                 if ui
                     .menu_button(&i18n.file, |ui| {
                         if ui.button(&i18n.open_folder).clicked() {
-                            
                             let location: Option<PathBuf> = self.file_store_path.clone();
 
-                           
                             //let repaint_signal = ctx.repaint_signal();
                             if let Err(_result_open_signle_dir) =
                                 file_path_dialog.open_single_dir(location)
                             {
-                                error!("fail to open dir dialog");                                
+                                error!("fail to open dir dialog");
                             }
 
                             ui.close_menu();
@@ -321,11 +312,7 @@ impl eframe::App for VirtualBookApp {
                         for device in &self.current_devices {
                             let selected = *selected_device == device.no;
                             if ui.radio(selected, &device.label).clicked() {
-
-                                if let Some(old_player) = &appplayer.player {
-                                    
-                                }
-
+                                if let Some(old_player) = &appplayer.player {}
 
                                 println!("Open the device");
                                 *selected_device = device.no;
@@ -367,7 +354,10 @@ impl eframe::App for VirtualBookApp {
                     ui.add(egui::Slider::new(screen_zoom_factor, 0.5..=4.0));
                 });
 
-                if ui.toggle_value(&mut appplayer.play_mod, &i18n.play).clicked() {
+                if ui
+                    .toggle_value(&mut appplayer.play_mod, &i18n.play)
+                    .clicked()
+                {
                     if appplayer.play_mod {
                         appplayer.play_file_on_top();
                     } else {
@@ -396,23 +386,59 @@ impl eframe::App for VirtualBookApp {
             ctx.set_visuals(old);
         });
 
-        if appplayer.player.is_some() {
+        let present = appplayer.player.is_some();
+
+        if present {
             egui::CentralPanel::default().show(ctx, |ui| {
+                // borrow checker clarification for the closure
+                let self1 = self;
+                let file_store1 = &mut self1.file_store;
+                let current_typed_no1 = &mut self1.current_typed_no;
+                {
+                    let appplayer = &mut self1.appplayer;
+
+                    ui.input(|i| {
+                        for k in vec![
+                            (Key::Num0, String::from("0")),
+                            (Key::Num1, String::from("1")),
+                            (Key::Num2, String::from("2")),
+                            (Key::Num3, String::from("3")),
+                            (Key::Num4, String::from("4")),
+                            (Key::Num5, String::from("5")),
+                            (Key::Num6, String::from("6")),
+                            (Key::Num7, String::from("7")),
+                            (Key::Num8, String::from("8")),
+                            (Key::Num9, String::from("9")),
+                            (Key::Backspace, String::from(screen_playlist::BACKSPACE)),
+                            (Key::Enter, String::from(screen_playlist::ENTER)),
+                        ] {
+                            if i.key_pressed(k.0) {
+                                let no = k.1;
+                                screen_playlist::handling_key(
+                                    &no,
+                                    current_typed_no1,
+                                    file_store1,
+                                    appplayer,
+                                );
+                            }
+                        }
+                    });
+                }
                 let p = ctx.layer_painter(LayerId {
                     order: Order::Background,
                     id: Id::new("source"),
                 });
 
-                if self.texture_handle.is_none() {
+                if self1.texture_handle.is_none() {
                     let textureid = ctx.load_texture(
                         "bgimage",
-                        self.bg_image.clone(),
+                        self1.bg_image.clone(),
                         TextureOptions {
                             magnification: TextureFilter::Nearest,
                             minification: TextureFilter::Linear,
                         },
                     );
-                    self.texture_handle = Some(textureid);
+                    self1.texture_handle = Some(textureid);
                 }
 
                 let uv = Rect {
@@ -423,7 +449,7 @@ impl eframe::App for VirtualBookApp {
                 let mut displayed_image = ctx.screen_rect();
                 *displayed_image.top_mut() += top_response.response.rect.bottom();
 
-                if let Some(t) = &self.texture_handle {
+                if let Some(t) = &self1.texture_handle {
                     p.image(t.id(), displayed_image, uv, Color32::WHITE);
                 }
                 let mut rect = ctx.screen_rect().clone();
@@ -437,7 +463,7 @@ impl eframe::App for VirtualBookApp {
                     .fixed_rect(rect)
                     .show(ctx, |ui| {
                         // ui.group(|ui| {
-                        if self.screen == Screen::Display {
+                        if self1.screen == Screen::Display {
                             // The central panel the region left after adding TopPanel's and SidePanel's
                             // print fps
                             // self.frame_history.ui(ui);
@@ -449,12 +475,12 @@ impl eframe::App for VirtualBookApp {
                                     strip.cell(|ui| {
                                         ui.centered_and_justified(|ui| {
                                             if ui.button("<").clicked() {
-                                                self.screen = Screen::PlayListConstruction
+                                                self1.screen = Screen::PlayListConstruction
                                             }
                                         });
                                     });
                                     strip.cell(|ui| {
-                                        screen_visu::ui_content(self, ctx, ui);
+                                        screen_visu::ui_content(self1, ctx, ui);
                                     });
                                 });
                         } else {
@@ -467,13 +493,13 @@ impl eframe::App for VirtualBookApp {
                                 .size(Size::relative(0.05))
                                 .horizontal(|mut strip| {
                                     strip.cell(|ui| {
-                                        screen_playlist::ui_content(self, ctx, ui);
+                                        screen_playlist::ui_content(self1, ctx, ui);
                                     });
 
                                     strip.cell(|ui| {
                                         ui.centered_and_justified(|ui| {
                                             if ui.button(">").clicked() {
-                                                self.screen = Screen::Display
+                                                self1.screen = Screen::Display
                                             }
                                         });
                                     });
