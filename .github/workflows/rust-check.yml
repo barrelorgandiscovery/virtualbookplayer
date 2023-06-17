@@ -1,4 +1,7 @@
-
+on: 
+  push:
+    branch:
+      - 'main'
 
 name: CI
 
@@ -11,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+            submodules: recursive      
 
       - name: Cache rust compilations
         uses: actions/cache@v3
@@ -26,12 +31,19 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt
+
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
           components: clippy
+
+      - name: Installing needed Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y -qq libasound2-dev libssl-dev libpulse-dev libdbus-1-dev portaudio19-dev
+
       - uses: actions-rs/cargo@v1
         with:
           command: check
