@@ -52,7 +52,7 @@ pub enum Response {
     StartOfTrack,
     EndOfFile,
     FileCancelled,
-    Current_Play_Time(Duration),
+    CurrentPlayTime(Duration),
 }
 
 #[derive(Debug)]

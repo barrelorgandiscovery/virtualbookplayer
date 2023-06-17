@@ -255,7 +255,7 @@ impl eframe::App for VirtualBookApp {
                     Response::EndOfFile => {
                         appplayer.next();
                     }
-                    Response::Current_Play_Time(duration) => {
+                    Response::CurrentPlayTime(duration) => {
                         *latest_duration_time = duration;
                         *adjusted_start_time = Instant::now() - duration;
                     }

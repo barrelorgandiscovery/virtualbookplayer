@@ -1,9 +1,8 @@
 use std::{
-    borrow::BorrowMut,
     error::Error,
     path::PathBuf,
     sync::{
-        mpsc::{self, channel, Receiver, Sender, SyncSender},
+        mpsc::{channel, Receiver, Sender},
         Arc, Mutex, MutexGuard,
     },
     thread,
@@ -14,14 +13,14 @@ use midir::{MidiOutput, MidiOutputConnection};
 use nodi::{
     midly::{Format, MidiMessage, Smf},
     timers::Ticker,
-    Connection, Event, MidiEvent, Sheet, Timer,
+    Event, MidiEvent, Sheet, Timer,
 };
 
 use crate::{
     Command, FileInformations, FileInformationsConstructor, Note, Player, PlayerFactory, Response,
 };
 
-use std::{convert::TryFrom, fs};
+use std::{convert::TryFrom};
 
 /// Midi device player factory
 pub struct MidiPlayerFactory {
@@ -32,7 +31,7 @@ impl PlayerFactory for MidiPlayerFactory {
     fn create(
         &self,
         sender: Sender<Response>,
-        receiver: Receiver<Command>,
+        _receiver: Receiver<Command>,
     ) -> Result<Box<dyn Player>, Box<dyn Error>> {
         println!("List connections");
 
@@ -279,7 +278,7 @@ impl Player for MidiPlayer {
 
                         if let Ok(output_locked) = output_reference.lock() {
                             output_locked
-                                .send(Response::Current_Play_Time(total_duration.clone()))
+                                .send(Response::CurrentPlayTime(total_duration.clone()))
                                 .unwrap();
                         }
                     }
