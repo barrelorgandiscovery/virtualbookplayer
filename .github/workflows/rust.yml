@@ -1,74 +1,151 @@
-on: [push, pull_request]
+on: 
+  push:
+    tags:
+      - 'v*'
 
-name: CI
+name: CI prerelease
 
 env:
-  # This is required to enable the web_sys clipboard API which egui_web uses
-  # https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.Clipboard.html
-  # https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html
   RUSTFLAGS: --cfg=web_sys_unstable_apis
 
 jobs:
-  check:
-    name: Check
+  
+  linuxbuild:
+    name: Linux Build
     runs-on: ubuntu-latest
+    permissions: write-all
+    strategy:
+      fail-fast: false
     steps:
+      - name: Install latest stable
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt, clippy
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features
 
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --lib
 
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Cache rust compilations
+        uses: actions/cache@v3
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt
-      - uses: actions-rs/cargo@v1
+          path: |
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-cargo
+          
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
         with:
-          command: fmt
-          args: --all -- --check
+          command: build
+          args: --release
+  # SAVE INSTALLER
+      - id: upload-installer
+        name: Upload installer
+        uses: actions/upload-artifact@v2
+        with:
+          path: ./target/release/virtualbookplayer
+          name: ubuntu-virtualbookplayer
+          retention-days: 1
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
+  winbuild:
+    name: Windows Build
+    runs-on: windows-latest
+    permissions: write-all
+    strategy:
+      fail-fast: false
     steps:
+      - name: Install latest stable
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt, clippy
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+
+
+      - name: Cache rust compilations
+        uses: actions/cache@v3
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: clippy
-      - uses: actions-rs/cargo@v1
+          path: |
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-cargo
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
         with:
-          command: clippy
-          args: -- -D warnings
+          command: build
+          args: --release
+
+      # SAVE INSTALLER
+      - id: upload-installer-win
+        name: Upload installer windows
+        uses: actions/upload-artifact@v2
+        with:
+          path: target/release/virtualbookplayer.exe
+          name: windows-virtualbookplayer.exe
+          retention-days: 1
+
+
+          
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions: write-all
+    needs: [linuxbuild, winbuild]
+    steps:
+
+# DOWNLOAD INSTALLERS
+    - id: download-linux-appimage
+      name: Download Linux appimage
+      uses: actions/download-artifact@v2
+      with:
+        name: ubuntu-encrypter
+
+    - id: download-windows-image
+      name: Download Windows appimage
+      uses: actions/download-artifact@v2
+      with:
+        name: windows-encrypter.exe
+
+    - id: display-downloaded-files
+      name: display downloaded files
+      run: |
+        ls -alR .
+
+# CREATE GITHUB RELEASE AND ADD ASSETS
+    - id: create-release
+      name: Create GitHub release
+      uses: actions/create-release@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: prerelease-${{ github.ref_name }}
+        release_name: prerelease-${{ github.ref_name }}
+        draft: true
+        prerelease: true
+
+    - id: release-linux-appimage
+      name: Release Linux appimage
+      uses: actions/upload-release-asset@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: virtualbookplayer
+        asset_name: ubuntu-virtualbookplayer
+        asset_content_type: application/x-binary
+
+
+    - id: release-windows-appimage
+      name: Release Windows appimage
+      uses: actions/upload-release-asset@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: virtualbookplayer.exe
+        asset_name: windows-virtualbookplayer.exe
+        asset_content_type: application/x-binary
 
