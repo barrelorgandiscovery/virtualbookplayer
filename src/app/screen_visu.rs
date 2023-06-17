@@ -13,7 +13,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
         ..
     } = app;
 
-    if let Some(vbc) = &appplayer.vb {
+    if let Some(vbc) = &appplayer.virtual_book {
         // draw canvas
 
         ui.add(egui::Slider::new(xscale, 1.0..=100_000.0));

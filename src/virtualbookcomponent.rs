@@ -7,16 +7,13 @@ use bookparsing::{read_book_stream, VirtualBook};
 
 pub struct VirtualBookComponentViewPort {}
 
-// #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-// #[cfg_attr(feature = "serde", serde(default))]
 pub struct VirtualBookComponent {
     offset: f32,
     xscale: f32,
     yfactor: f32,
     fit_to_height: bool,
 
-    // holes: Vec<[Pos2; 2]>,
-    vb: Option<Arc<Box<VirtualBook>>>,
+    virtual_book: Option<Arc<Box<VirtualBook>>>,
 }
 
 impl Default for VirtualBookComponent {
@@ -24,27 +21,25 @@ impl Default for VirtualBookComponent {
         Self {
             offset: 0.0,
             xscale: 3_000f32,
-            // holes: vec![
-            //     [pos2(10.0, 10.0), pos2(100.0, 20.0)],
-            //     [pos2(10.0, 60.0), pos2(100.0, 80.0)],
-            // ],
             yfactor: 3.0f32,
             fit_to_height: true,
-            vb: None,
+            virtual_book: None,
         }
     }
 }
 
 impl VirtualBookComponent {
-    pub fn from(vb: Arc<Box<VirtualBook>>) -> VirtualBookComponent {
+
+    /// create the component state from the virtual book
+    pub fn from(virtual_book: Arc<Box<VirtualBook>>) -> VirtualBookComponent {
         let mut v = VirtualBookComponent::default();
-        v.vb = Some(vb);
+        v.virtual_book = Some(virtual_book);
         v
     }
 
     pub fn open_from_string_content(&mut self, file_string_content: String) -> std::io::Result<()> {
         let mut c = Cursor::new(file_string_content.as_bytes().to_vec());
-        self.vb = Some(Arc::new(Box::new(read_book_stream(&mut c)?)));
+        self.virtual_book = Some(Arc::new(Box::new(read_book_stream(&mut c)?)));
         Ok(())
     }
 
@@ -66,7 +61,7 @@ impl VirtualBookComponent {
             xscale,
             yfactor,
             // holes,
-            vb,
+            virtual_book,
             fit_to_height,
         } = self;
 
@@ -83,7 +78,7 @@ impl VirtualBookComponent {
 
                 let mut book_screen_width: f32 = ui.available_width() as f32;
 
-                if let Some(current_vb) = &self.vb {
+                if let Some(current_vb) = &self.virtual_book {
                     if let Some(maxtime) = current_vb.max_time() {
                         book_screen_width = ((maxtime as f64) / *xscale as f64) as f32;
                     }
@@ -101,7 +96,7 @@ impl VirtualBookComponent {
                 let maxy = response.rect.height() ;
                 // println!("midx {}, maxy {}", midx,maxy);
 
-                if let Some(current_vb) = &mut self.vb {
+                if let Some(current_vb) = &mut self.virtual_book {
 
                     let to_screen = emath::RectTransform::from_to(
                         Rect::from_min_size(Pos2::ZERO, response.rect.size()),

@@ -32,8 +32,8 @@ pub struct AppPlayer {
     pub play_mod: bool,
 
     pub start_play_time: Instant, 
-
-    pub vb: Option<Arc<Box<VirtualBook>>>,
+    /// virtual book
+    pub virtual_book: Option<Arc<Box<VirtualBook>>>,
 }
 
 impl AppPlayer {
@@ -46,7 +46,7 @@ impl AppPlayer {
             playlist: PlayList::new(),
             play_mod: false,
             last_response: Arc::new(Mutex::new(None)),
-            vb: None,
+            virtual_book: None,
             start_play_time: Instant::now()-Duration::from_millis(10_000),
         }
     }
@@ -109,7 +109,7 @@ impl AppPlayer {
             })
             .collect();
 
-        self.vb = Some(Arc::new(Box::new(virt)));
+        self.virtual_book = Some(Arc::new(Box::new(virt)));
 
     }
 
