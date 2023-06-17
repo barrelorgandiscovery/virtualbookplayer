@@ -23,7 +23,7 @@ jobs:
             toolchain: stable
             override: true
             components: rustfmt, clippy
-            
+
       - name: Installing needed Ubuntu dependencies
         run: |
           sudo apt-get update
@@ -52,8 +52,8 @@ jobs:
         name: Upload installer
         uses: actions/upload-artifact@v2
         with:
-          path: ./target/release/virtualbookplayer
-          name: ubuntu-virtualbookplayer
+          path: ./target/release/virtualbookplayerapp
+          name: ubuntu-virtualbookplayerapp
           retention-days: 1
 
   winbuild:
@@ -93,8 +93,8 @@ jobs:
         name: Upload installer windows
         uses: actions/upload-artifact@v2
         with:
-          path: target/release/virtualbookplayer.exe
-          name: windows-virtualbookplayer.exe
+          path: target/release/virtualbookplayerapp.exe
+          name: windows-virtualbookplayerapp.exe
           retention-days: 1
 
 
@@ -111,13 +111,13 @@ jobs:
       name: Download Linux appimage
       uses: actions/download-artifact@v2
       with:
-        name: ubuntu-encrypter
+        name: ubuntu-virtualbookplayerapp
 
     - id: download-windows-image
       name: Download Windows appimage
       uses: actions/download-artifact@v2
       with:
-        name: windows-encrypter.exe
+        name: windows-virtualbookplayerapp.exe
 
     - id: display-downloaded-files
       name: display downloaded files
@@ -143,8 +143,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create-release.outputs.upload_url }}
-        asset_path: virtualbookplayer
-        asset_name: ubuntu-virtualbookplayer
+        asset_path: virtualbookplayerapp
+        asset_name: ubuntu-virtualbookplayerapp
         asset_content_type: application/x-binary
 
 
@@ -155,7 +155,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create-release.outputs.upload_url }}
-        asset_path: virtualbookplayer.exe
-        asset_name: windows-virtualbookplayer.exe
+        asset_path: virtualbookplayerapp.exe
+        asset_name: windows-virtualbookplayerapp.exe
         asset_content_type: application/x-binary
 
