@@ -3,7 +3,9 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
     },
-    thread, time::Instant, time::Duration
+    thread,
+    time::Duration,
+    time::Instant,
 };
 
 use bookparsing::{Hole, VirtualBook};
@@ -31,9 +33,9 @@ pub struct AppPlayer {
     /// play mod,
     pub play_mod: bool,
 
-    pub start_play_time: Instant, 
+    pub start_play_time: Instant,
     /// virtual book
-    pub virtual_book: Option<Arc<Box<VirtualBook>>>,
+    pub virtual_book: Option<Arc<VirtualBook>>,
 }
 
 impl AppPlayer {
@@ -47,12 +49,11 @@ impl AppPlayer {
             play_mod: false,
             last_response: Arc::new(Mutex::new(None)),
             virtual_book: None,
-            start_play_time: Instant::now()-Duration::from_millis(10_000),
+            start_play_time: Instant::now() - Duration::from_millis(10_000),
         }
     }
 
     pub fn player(&mut self, player: Option<(Box<dyn Player>, Receiver<Response>)>) {
-
         if let Some(old_player_mutex) = &self.player {
             let mut old_player = old_player_mutex.lock().unwrap();
             old_player.stop();
@@ -62,7 +63,6 @@ impl AppPlayer {
         self.player = match player {
             None => None,
             Some(p) => {
-
                 let player_reference = Arc::new(Mutex::new(p.0));
                 let last_response = Arc::clone(&self.last_response);
 
@@ -86,13 +86,12 @@ impl AppPlayer {
             let mut p = player.lock().unwrap();
             p.stop();
 
-            if self.playlist.file_list.len() > 0 {
+            if !self.playlist.file_list.is_empty() {
                 if let Some(n) = self.playlist.file_list.get(0) {
                     self.start_play_time = Instant::now(); // before play
                     if let Err(e) = p.play(&n.path) {
                         error!("error in playing file : {}", e);
                     } else {
-                       
                     }
                 }
             }
@@ -109,10 +108,10 @@ impl AppPlayer {
             })
             .collect();
 
-        self.virtual_book = Some(Arc::new(Box::new(virt)));
-
+        self.virtual_book = Some(Arc::new(virt));
     }
 
+    #[allow(dead_code)]
     pub fn start_play_time(&self) -> Instant {
         self.start_play_time
     }
@@ -123,7 +122,7 @@ impl AppPlayer {
             let p = player.lock().unwrap();
             return p.associated_notes();
         }
-        return Arc::new(vec![]);
+        Arc::new(vec![])
     }
 
     /// stop the play

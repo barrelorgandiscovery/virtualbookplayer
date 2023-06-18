@@ -38,10 +38,7 @@ eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", d
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 
-[target.'cfg(macos)'.build-dependencies]
-nodi= { version = "0.19.2" }
-
-[target.'cfg(not(macos))'.build-dependencies]
+# all plateforms support jack
 nodi= { version = "0.19.2" , features=["midir-jack"]}
 
 

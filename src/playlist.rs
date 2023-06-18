@@ -1,5 +1,4 @@
 use std::{cell::RefCell, error::Error, fs, path::PathBuf, rc::Rc, time::Duration};
-use log::error;
 
 use crate::file_store::{FileNode, FileViewNode};
 
@@ -49,6 +48,7 @@ impl PlayList {
         }
     }
 
+    #[allow(dead_code)]
     pub fn add(&mut self, node: &Rc<RefCell<FileNode>>) {
         let cell = node.borrow();
         self.add_from_path(&cell.path);
@@ -59,7 +59,7 @@ impl PlayList {
 
         if let Some(ext) = extension_result {
             if ext == "playlist" {
-                if let Ok(result) = load(&path) {
+                if let Ok(result) = load(path) {
                     self.file_list.extend(result.file_list);
                 }
             } else {
@@ -78,10 +78,8 @@ impl PlayList {
     pub fn add_fileviewnode_and_read_playlists(&mut self, node: &Rc<RefCell<FileViewNode>>) {
         let filenode = node.borrow();
         let path = &filenode.node.borrow().path;
-        self.add_from_path_and_expand_playlists(&path);
+        self.add_from_path_and_expand_playlists(path);
     }
-
-    
 }
 
 pub fn save(p: &PlayList, filepath: &PathBuf) -> Result<(), Box<dyn Error>> {

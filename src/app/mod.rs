@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -164,7 +164,7 @@ impl VirtualBookApp {
                 device_no: old_storage.selected_device,
             };
 
-            let (scmd, rcmd) = channel();
+            let (_scmd, rcmd) = channel();
             let (s, r) = channel();
 
             match factory.create(s, rcmd) {
@@ -225,7 +225,6 @@ impl eframe::App for VirtualBookApp {
             file_store,
             file_path_dialog,
             i18n,
-            current_typed_no,
             ..
         } = self;
 
@@ -292,6 +291,7 @@ impl eframe::App for VirtualBookApp {
             ctx.set_visuals(visual_mut);
 
             egui::menu::bar(ui, |ui| {
+                #[allow(clippy::blocks_in_if_conditions)]
                 if ui
                     .menu_button(&i18n.file, |ui| {
                         if ui.button(&i18n.open_folder).clicked() {
@@ -312,7 +312,7 @@ impl eframe::App for VirtualBookApp {
                         for device in &self.current_devices {
                             let selected = *selected_device == device.no;
                             if ui.radio(selected, &device.label).clicked() {
-                                if let Some(old_player) = &appplayer.player {}
+                                if let Some(_old_player) = &appplayer.player {}
 
                                 println!("Open the device");
                                 *selected_device = device.no;
@@ -321,7 +321,7 @@ impl eframe::App for VirtualBookApp {
                                     device_no: *selected_device,
                                 };
 
-                                let (scmd, rcmd) = channel();
+                                let (_scmd, rcmd) = channel();
                                 let (s, r) = channel();
 
                                 match factory.create(s, rcmd) {
@@ -452,7 +452,7 @@ impl eframe::App for VirtualBookApp {
                 if let Some(t) = &self1.texture_handle {
                     p.image(t.id(), displayed_image, uv, Color32::WHITE);
                 }
-                let mut rect = ctx.screen_rect().clone();
+                let mut rect = ctx.screen_rect();
                 *rect.top_mut() += top_response.response.rect.bottom();
                 *rect.bottom_mut() -= top_response.response.rect.bottom()
                     - (ui.style().spacing.window_margin.bottom

@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 nodi= { version = "0.19.2" , features=["midir-jack"]}
 midir = { version = "0.9.1" }
+
+env_logger = "0.10.0"
+log = "0.4.8"
+

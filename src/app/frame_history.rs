@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use egui::util::History;
 
 pub struct FrameHistory {

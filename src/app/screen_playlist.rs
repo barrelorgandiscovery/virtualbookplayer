@@ -16,7 +16,7 @@ pub const BACKSPACE: &'static str = "<-";
 pub const ENTER: &'static str = "Enter";
 
 pub fn handling_key(
-    no: &String,
+    no: &str,
     current_typed_no: &mut String,
     file_store: &mut Option<FileStore>,
     appplayer: &mut AppPlayer,
@@ -32,8 +32,7 @@ pub fn handling_key(
             if let Some(filestore) = &file_store {
                 if let Some(view) = &filestore.default_view {
                     let result = view.find_first_file();
-                    if result.is_some() {
-                        let view_node = result.unwrap();
+                    if let Some(view_node) = result {
                         let file_node = Rc::clone(&view_node.borrow().node);
                         let was_empty = appplayer.playlist.file_list.is_empty();
 
@@ -66,11 +65,9 @@ pub fn handling_key(
     }
 }
 
-pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
-    let mut file_store = &mut app.file_store;
+pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mut Ui) {
+    let file_store = &mut app.file_store;
     let current_typed_no = &mut app.current_typed_no;
-
-    let messages_i18n = &app.i18n;
 
     // button panel
     StripBuilder::new(ui)
@@ -102,9 +99,13 @@ pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, ctx: &egui::Context, ui:
 
                                     ui.centered_and_justified(|ui| {
                                         if ui.add(b).clicked() {
-
                                             // Handling NO
-                                            handling_key(&no, current_typed_no, file_store, &mut app.appplayer);
+                                            handling_key(
+                                                &no,
+                                                current_typed_no,
+                                                file_store,
+                                                &mut app.appplayer,
+                                            );
                                         }
                                     });
                                 });
@@ -152,10 +153,12 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                     "playlist_{}.playlist",
                                                                     formatted_date
                                                                 ));
-                                                                playlist::save(
+                                                                if let Err(e) = playlist::save(
                                                                     &app.appplayer.playlist,
                                                                     &pb,
-                                                                );
+                                                                ) {
+                                                                    error!("error in saving playlist in {}, {}", pb.display(), e);
+                                                                }
                                                             }
                                                         }
                                                     });
@@ -232,7 +235,7 @@ fn display_tree(
 ) -> Result<bool, FileStoreError> {
     let mut file_selected = false;
     let mut bfile_folder = files_folder.borrow_mut();
-    for mut element in bfile_folder.childs.iter_mut() {
+    for element in bfile_folder.childs.iter_mut() {
         let node_is_folder;
         let element_name;
         {
@@ -246,7 +249,7 @@ fn display_tree(
 
         if node_is_folder {
             let default_opened: bool;
-            let mut clicked = None;
+            let clicked;
             {
                 let e = element.borrow();
                 default_opened = e.expanded;
@@ -260,7 +263,7 @@ fn display_tree(
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.x = 0.0;
 
-                    match display_tree(appplayer, number_selected, &mut element, ui) {
+                    match display_tree(appplayer, number_selected, element, ui) {
                         Err(e) => {
                             error!("error in displaying sub tree {}", e);
                             // continue

@@ -1,10 +1,9 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
-mod virtualbookcomponent;
+mod appplayer;
 mod file_store;
 mod playlist;
-mod appplayer;
+mod virtualbookcomponent;
 
 pub use app::VirtualBookApp;
-

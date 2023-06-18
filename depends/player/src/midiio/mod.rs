@@ -22,6 +22,8 @@ use crate::{
 
 use std::{convert::TryFrom};
 
+use log::error;
+
 /// Midi device player factory
 pub struct MidiPlayerFactory {
     pub device_no: usize,
@@ -167,12 +169,15 @@ impl Drop for MidiPlayer {
     }
 }
 
+#[allow(dead_code)]
 fn send_panic(con: &mut MutexGuard<MidiOutputConnection>) {
     // panic
     let mut buf = Vec::new();
     buf.push(0xcc);
     buf.push(123);
-    con.send(&buf);
+    if let Err(e) = con.send(&buf) {
+        error!("error in sending panic code :{}", e);
+    }
 }
 
 fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
@@ -304,7 +309,9 @@ impl Player for MidiPlayer {
     }
 
     fn stop(&mut self) {
-        self.cancel.send(true);
+        if let Err(e) = self.cancel.send(true) {
+            error!("fail to send cancel order : {}", e);
+        }
     }
 
     fn is_playing(&self) -> bool {
@@ -335,45 +342,12 @@ impl MidiPlayer {
         }
     }
 
-    // pub fn start(mut self, commands: Receiver<Command>) {
-    //     let mut last_sender: Option<SyncSender<_>> = None;
-    //     let mut last_played = 0_usize;
-    //     for c in &commands {
-    //         if let Some(ch) = &last_sender {
-    //             ch.send(true).ok();
-    //         }
-    //         let (cancel_send, cancel) = mpsc::sync_channel(0);
-    //         last_sender = Some(cancel_send);
-
-    //         match c {
-    //             Command::Next => {
-    //                 if let Some(n) = self.play_next(cancel) {
-    //                     last_played = n;
-    //                 } else {
-    //                     self.output.send(Response::EndOfTrack).unwrap();
-    //                 }
-    //             }
-    //             Command::Replay => self.play(last_played, cancel),
-    //             Command::Silence => self.silence(),
-
-    //             Command::Solo => (), // self.solo_on = !self.solo_on,
-
-    //             Command::Speed(f) => {
-    //                 self.change_speed(f);
-    //             }
-    //         };
-    //     }
-    // }
-
     fn silence(&self) {
         let mut con = self.midi_output_connection.lock().unwrap();
         let _ = con.send(&[0xb0, 123]);
         let _ = con.send(&[0xb0, 120]);
     }
 
-    // pub fn close(self) {
-    //     self.midi_output_connection.close();
-    // }
 }
 
 pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
@@ -402,7 +376,7 @@ pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
                     Event::Tempo(val) => timer.change_tempo(*val),
 
                     Event::Midi(msg) => match msg.message {
-                        MidiMessage::NoteOff { key, vel } => {
+                        MidiMessage::NoteOff { key, vel : _ } => {
                             let uchannel: u16 = msg.channel.as_int().into();
                             let key = key.as_int();
                             let index: usize = (uchannel as usize) * 128 + key as usize;

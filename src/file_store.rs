@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fs::metadata;
 use std::rc::Weak;
 
-use log::{debug, error, info};
+use log::{debug, error};
 use std::fmt::{Debug, Display};
 use std::{path::PathBuf, rc::Rc};
 
@@ -102,8 +102,9 @@ impl FileNode {
         self.is_folder
     }
 
+    #[allow(unused)]
     pub fn accept(&self, visitor: &dyn Visitor) {
-        visitor.visit(&self);
+        visitor.visit(self);
     }
 }
 
@@ -187,6 +188,7 @@ impl FileStore {
         Ok(fs)
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     pub fn recurse_construct_view(
         &self,
         node: &Rc<RefCell<FileNode>>,
@@ -198,7 +200,7 @@ impl FileStore {
             // this is file
             match filter {
                 Some(f) => {
-                    if bn.name.find(f).is_some() {
+                    if bn.name.contains(f) {
                         debug!("match filter");
                         Some(FileViewNode::new(Rc::clone(node), vec![]))
                     } else {
@@ -215,7 +217,7 @@ impl FileStore {
             // go to sub elements
             let mut v: Vec<Rc<RefCell<FileViewNode>>> = Vec::new();
             for i in &bn.folder_files {
-                let r = self.recurse_construct_view(&i, filter);
+                let r = self.recurse_construct_view(i, filter);
                 if let Some(element_found) = r {
                     v.push(element_found);
                 }
@@ -271,6 +273,7 @@ pub struct FileViewNode {
     pub selected: bool,
 }
 
+#[allow(dead_code)]
 impl FileViewNode {
     pub fn new(
         datanode: Rc<RefCell<FileNode>>,
@@ -287,6 +290,7 @@ impl FileViewNode {
     }
 
     /// get a new reference to the filenode
+    #[allow(dead_code)]
     pub fn file_node(&self) -> Rc<RefCell<FileNode>> {
         Rc::clone(&self.node)
     }
@@ -304,6 +308,7 @@ impl FileViewNode {
             f.expand_all();
         }
     }
+
     pub fn expand(&mut self) {
         self.expanded = true;
         self.clicked_for_open = Some(true);
@@ -316,6 +321,7 @@ pub struct FileView {
 }
 
 impl FileView {
+    #[allow(dead_code)]
     pub fn expand_all(&self) {
         let e = &mut self.root.borrow_mut();
         e.expand_all();
@@ -334,7 +340,7 @@ impl FileView {
         }
 
         for n in &view_node.childs {
-            let result = FileView::recurse_find_first(&n);
+            let result = FileView::recurse_find_first(n);
             if result.is_some() {
                 return result;
             }

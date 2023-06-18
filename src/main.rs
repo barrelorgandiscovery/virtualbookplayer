@@ -16,11 +16,7 @@ fn main() -> eframe::Result<()> {
 }
 
 #[cfg(target_arch = "windows")]
-fn main() {
-
-}
-
-
+fn main() {}
 
 // when compiling to web using trunk.
 #[cfg(target_arch = "wasm32")]

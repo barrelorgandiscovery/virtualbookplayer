@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub struct I18NMessages {
     pub play: String,
     pub next: String,
