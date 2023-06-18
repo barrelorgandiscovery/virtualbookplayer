@@ -12,8 +12,8 @@ use crate::{
 use egui::*;
 use egui_extras::{Size, StripBuilder};
 
-pub const BACKSPACE: &'static str = "<-";
-pub const ENTER: &'static str = "Enter";
+pub const BACKSPACE: &str = "<-";
+pub const ENTER: &str = "Enter";
 
 pub fn handling_key(
     no: &str,
@@ -295,11 +295,10 @@ fn display_tree(
                 appplayer
                     .playlist
                     .add_fileviewnode_and_read_playlists(element);
-                if appplayer.play_mod {
-                    if !appplayer.is_playing() {
-                        appplayer.play_file_on_top();
-                    }
+                if appplayer.play_mod && !appplayer.is_playing() {
+                    appplayer.play_file_on_top();
                 }
+
                 *number_selected = "".into();
                 file_selected = true;
             }

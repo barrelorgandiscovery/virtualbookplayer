@@ -22,7 +22,7 @@ impl From<&PathBuf> for PlaylistElement {
         }
 
         PlaylistElement {
-            name: name,
+            name,
             path: value.clone(),
             duration: None,
         }

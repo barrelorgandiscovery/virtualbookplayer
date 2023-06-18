@@ -233,14 +233,14 @@ impl eframe::App for VirtualBookApp {
         let last_response_arc = Arc::clone(&appplayer.last_response);
 
         // handling smooth
-        if appplayer.is_playing() {
-            if *adjusted_start_time + Duration::from_millis(100) < Instant::now() {
-                let delta = Instant::now().duration_since(*adjusted_start_time);
-                if let Some(vb) = &appplayer.virtual_book {
-                    if let Some(max_time) = vb.max_time() {
-                        *current_duration = delta;
-                        self.offset = delta.as_micros() as f32 / max_time as f32;
-                    }
+        if appplayer.is_playing()
+            && *adjusted_start_time + Duration::from_millis(100) < Instant::now()
+        {
+            let delta = Instant::now().duration_since(*adjusted_start_time);
+            if let Some(vb) = &appplayer.virtual_book {
+                if let Some(max_time) = vb.max_time() {
+                    *current_duration = delta;
+                    self.offset = delta.as_micros() as f32 / max_time as f32;
                 }
             }
         }
