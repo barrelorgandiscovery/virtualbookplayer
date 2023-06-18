@@ -20,12 +20,21 @@ long_description = """
 A cross-platform MIDI and virtual book jukebox player. It only includes the necessary functionalities to play MIDIfied instruments, such as Yamaha pianos and barrel/fair/dance organs. This program transforms a standard x64 touch PC tablet into a playback screen device.
 """
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 env_logger = "0.10.0"
 eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
     "skia",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+env_logger = "0.10.0"
+eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
+    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 

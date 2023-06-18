@@ -2,6 +2,11 @@
 # notes for android build
 
 For the moment midi output needs a rewrite for ndk
+https://github.com/android/ndk-samples/blob/main/native-midi/README.md
+
+Voir en fonction des besoins et engouement pour le logiciel pour avoir un portage sur android
+
+
 
 export ANDROID_HOME=~/Android/sdk
 export NDK_HOME=$ANDROID_HOME/ndk
