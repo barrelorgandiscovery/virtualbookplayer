@@ -3,7 +3,7 @@ on:
     branch:
       - 'main'
 
-name: CI prerelease
+name: CI eval prerelease macos
 
 env:
   RUSTFLAGS: --cfg=web_sys_unstable_apis

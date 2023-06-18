@@ -1,8 +1,12 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+
+#[cfg(target_os = "android")]
+use winit::platform::android::activity::AndroidApp;
+
 // When compiling natively:
-#[cfg(not(target_arch = "windows"))]
+#[cfg(not(target_os = "android"))]
 fn main() -> eframe::Result<()> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
@@ -15,30 +19,26 @@ fn main() -> eframe::Result<()> {
     )
 }
 
-#[cfg(target_arch = "windows")]
-fn main() {}
+#[cfg(target_os = "android")]
+fn _main(mut options: NativeOptions) {
+    options.renderer = Renderer::Wgpu;
+    eframe::run_native(
+        "VirtualBook Player",
+        native_options,
+        Box::new(|cc| Box::new(virtualbookplayerapp::VirtualBookApp::new(cc))),
+    )
+}
 
-// when compiling to web using trunk.
-#[cfg(target_arch = "wasm32")]
-fn main() {
-    // Make sure panics are logged using `console.error`.
+#[cfg(target_os = "android")]
+#[no_mangle]
+fn android_main(app: AndroidApp) {
+    use winit::platform::android::EventLoopBuilderExtAndroid;
 
-    use eframe_template::TemplateApp;
-    console_error_panic_hook::set_once();
+    android_logger::init_once(android_logger::Config::default().with_min_level(log::Level::Info));
 
-    // Redirect tracing to console.log and friends:
-    tracing_wasm::set_as_global_default();
-
-    let web_options = eframe::WebOptions::default();
-
-    wasm_bindgen_futures::spawn_local(async {
-        let apprunnerref = eframe::start_web(
-            "the_canvas_id", // hardcode it
-            web_options,
-            Box::new(|cc| Box::new(TemplateApp::new(cc))),
-        )
-        .await;
-
-        let app = apprunnerref.expect("failed to start eframe");
-    });
+    let mut options = NativeOptions::default();
+    options.event_loop_builder = Some(Box::new(move |builder| {
+        builder.with_android_app(app);
+    }));
+    _main(options);
 }
