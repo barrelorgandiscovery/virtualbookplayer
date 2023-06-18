@@ -4,24 +4,24 @@ A Cross plateform midi and virtual book, jukebox player. __Only the needed funct
 
 Key features :
 - Play Midi file only (for the moment)
-- Send panic, or notes off on all channels, when starting / stoping playing
-- Add files to current playlist using a number + enter key
-- revoke a file in the list
-- skip current play file
 - View the play (piano roll)
-- Large treeview of the music folder files
+- Large and clear treeview for files
+- Load prepopulates playlists (text file containing list of files)
+- Add files to current playlist using a number + enter key
+- Revoke a file in the list in clicking it
+- Skip current play file for exploration
+- Send panic, or notes off on all channels, when starting / stoping playing
 - Adjust zoom factor for touch and far away reading
-- Load prepopulates playlists (text file with list of files)
 
-Typical setup :
+## Typical setup :
 
 ![](doc/tablet.png)
 
-Other setup :
+## Other setup :
 
 ![](doc/20230617_194321.jpg)
 
-Screen shots :
+## Screen shots :
 
 Fileview, and playlist construction :
 ![](doc/ss1.png) 
