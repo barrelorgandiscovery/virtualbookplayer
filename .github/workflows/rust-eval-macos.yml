@@ -23,12 +23,7 @@ jobs:
             toolchain: stable
             override: true
             components: rustfmt, clippy
-
-      - name: Installing needed Ubuntu dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y -qq libasound2-dev libssl-dev libpulse-dev libdbus-1-dev portaudio19-dev
-
+            
       - uses: actions/checkout@v2
         with:
             submodules: recursive
