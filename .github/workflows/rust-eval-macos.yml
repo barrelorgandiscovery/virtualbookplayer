@@ -12,7 +12,7 @@ jobs:
   
   macosbuild:
     name: Macos Build
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: write-all
     strategy:
       fail-fast: false
