@@ -26,7 +26,8 @@ jobs:
 
       - name: Installing needed macos dependencies
         run: |
-          sudo brew install jack
+          brew update
+          brew install jack
 
       - uses: actions/checkout@v2
         with:
