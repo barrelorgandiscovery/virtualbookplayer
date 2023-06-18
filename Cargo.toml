@@ -19,7 +19,7 @@ log = "0.4.8"
 
 player= { path = "depends/player" }
 midir = { version = "0.9.1" }
-nodi= { version = "0.19.2" , features=["midir-jack"]}
+
 
 
 tracing-subscriber = "0.3"
@@ -38,6 +38,11 @@ eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", d
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 
+[target.'cfg(macos)'.build-dependencies]
+nodi= { version = "0.19.2" }
+
+[target.'cfg(not(macos))'.build-dependencies]
+nodi= { version = "0.19.2" , features=["midir-jack"]}
 
 
 [profile.release]
