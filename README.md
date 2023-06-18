@@ -1,21 +1,20 @@
 # Midi and Virtual Book jukebox Player
 
-A Cross plateform midi and virtual book, jukebox player. __Only the needed functionnalities to play MIDIfied instruments__. As Yamaha piano, barrel / fair / dance organs. This program transform a standard x64 touch PC tablet into a play screen device.
-
-Key features :
-- Play Midi file only (for the moment)
-- View the play (piano roll)
-- Large and clear treeview for files
-- Load prepopulates playlists (text file containing list of files)
-- Add files to current playlist using a number + enter key
-- Revoke a file in the list in clicking it
-- Skip current play file for exploration
-- Send panic, or notes off on all channels, when starting / stoping playing
-- Adjust zoom factor for touch and far away reading
-
-## Typical setup :
+A cross-platform MIDI and virtual book jukebox player. It only includes the necessary functionalities to play MIDIfied instruments, such as Yamaha pianos and barrel/fair/dance organs. This program transforms a standard x64 touch PC tablet into a playback screen device.
 
 ![](doc/tablet.png)
+
+## Features:
+
+- Play MIDI files only (for now).
+- View the playback in piano roll format.
+- Large and clear tree view for files.
+- Load prepopulated playlists (text files containing lists of files).
+- Add files to the current playlist using a number and the enter key.
+- Remove a file from the playlist by clicking on it.
+- Skip the current playing file for exploration.
+- Send panic or note-off messages to all channels when starting/stopping playback.
+- Adjust zoom factor for touch and reading from a distance.
 
 ## Other setup :
 
