@@ -20,9 +20,12 @@ Other setup :
 
 Screen shots :
 
+Fileview, and playlist construction :
 ![](doc/ss1.png) 
 
+Piano Roll display :
 ![](doc/ss2.png) 
 
+Midi output selection : (don't need to restart the application, plug and choose the output port)
 ![](doc/ss3.png) 
 
