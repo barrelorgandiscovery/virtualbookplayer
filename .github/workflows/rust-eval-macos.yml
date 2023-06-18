@@ -23,10 +23,16 @@ jobs:
             toolchain: stable
             override: true
             components: rustfmt, clippy
-            
+
+      - name: Installing needed macos dependencies
+        run: |
+          sudo brew install jack
+
       - uses: actions/checkout@v2
         with:
             submodules: recursive
+
+
 
 
       - name: Cache rust compilations
