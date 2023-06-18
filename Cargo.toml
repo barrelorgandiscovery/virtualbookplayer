@@ -7,7 +7,6 @@ rust-version = "1.65"
 
 [dependencies]
 
-
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 
@@ -35,7 +34,7 @@ image = { version = "0.22.0", default-features = false, features = ["png"] }
 eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
-    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "skia",          # Use the glow rendering backend. Alternative: "wgpu".
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 

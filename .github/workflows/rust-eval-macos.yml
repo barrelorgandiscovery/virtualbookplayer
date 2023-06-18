@@ -1,0 +1,57 @@
+on: 
+  push:
+    branch:
+      - 'main'
+
+name: CI prerelease
+
+env:
+  RUSTFLAGS: --cfg=web_sys_unstable_apis
+
+jobs:
+  
+  macosbuild:
+    name: Macos Build
+    runs-on: ubuntu-latest
+    permissions: write-all
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Install latest stable
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt, clippy
+
+      - name: Installing needed Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y -qq libasound2-dev libssl-dev libpulse-dev libdbus-1-dev portaudio19-dev
+
+      - uses: actions/checkout@v2
+        with:
+            submodules: recursive
+
+
+      - name: Cache rust compilations
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-cargo
+          
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+  # SAVE INSTALLER
+      - id: upload-installer
+        name: Upload installer
+        uses: actions/upload-artifact@v2
+        with:
+          path: ./target/release/virtualbookplayerapp
+          name: ubuntu-virtualbookplayerapp
+          retention-days: 1
