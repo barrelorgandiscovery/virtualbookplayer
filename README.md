@@ -1,6 +1,6 @@
 # Midi and Virtual Book jukebox Player
 
-A Cross plateform midi and virtual book, jukebox player. __Only the needed functionnalities to play MIDIfied instruments__. As Yamaha piano, barrel / fair / dance organs
+A Cross plateform midi and virtual book, jukebox player. __Only the needed functionnalities to play MIDIfied instruments__. As Yamaha piano, barrel / fair / dance organs. This program transform a standard x64 touch PC tablet into a play screen device.
 
 Key features :
 - Play Midi file only (for the moment)
