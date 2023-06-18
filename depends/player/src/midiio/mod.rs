@@ -20,7 +20,7 @@ use crate::{
     Command, FileInformations, FileInformationsConstructor, Note, Player, PlayerFactory, Response,
 };
 
-use std::{convert::TryFrom};
+use std::convert::TryFrom;
 
 use log::error;
 
@@ -347,7 +347,6 @@ impl MidiPlayer {
         let _ = con.send(&[0xb0, 123]);
         let _ = con.send(&[0xb0, 120]);
     }
-
 }
 
 pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
@@ -376,7 +375,7 @@ pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
                     Event::Tempo(val) => timer.change_tempo(*val),
 
                     Event::Midi(msg) => match msg.message {
-                        MidiMessage::NoteOff { key, vel : _ } => {
+                        MidiMessage::NoteOff { key, vel: _ } => {
                             let uchannel: u16 = msg.channel.as_int().into();
                             let key = key.as_int();
                             let index: usize = (uchannel as usize) * 128 + key as usize;

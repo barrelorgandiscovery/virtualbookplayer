@@ -19,9 +19,8 @@ pub struct Note {
 }
 
 pub struct FileInformations {
-    pub duration: Option<Duration>
+    pub duration: Option<Duration>,
 }
-
 
 pub trait PlayerFactory {
     fn create(
@@ -30,7 +29,9 @@ pub trait PlayerFactory {
         receiver: Receiver<Command>,
     ) -> Result<Box<dyn Player>, Box<dyn Error>>;
 
-    fn create_information_getter(&self) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
+    fn create_information_getter(
+        &self,
+    ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
 }
 
 pub trait Player: Send {
@@ -43,7 +44,7 @@ pub trait Player: Send {
 }
 
 pub trait FileInformationsConstructor: Send {
-    fn compute(self, filename: &PathBuf) -> Result<FileInformations,Box<dyn Error>>;
+    fn compute(self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>>;
 }
 
 #[derive(Debug)]
