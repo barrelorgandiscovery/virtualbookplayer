@@ -47,11 +47,4 @@ jobs:
         with:
           command: build
           args: --release
-  # SAVE INSTALLER
-      - id: upload-installer
-        name: Upload installer
-        uses: actions/upload-artifact@v2
-        with:
-          path: ./target/release/virtualbookplayerapp
-          name: ubuntu-virtualbookplayerapp
-          retention-days: 1
+ 
