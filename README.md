@@ -11,6 +11,7 @@ Key features :
 - View the play (piano roll)
 - Large treeview of the music folder files
 - Adjust zoom factor for touch and far away reading
+- Load prepopulates playlists (text file with list of files)
 
 Typical setup :
 
