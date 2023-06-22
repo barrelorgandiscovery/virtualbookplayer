@@ -177,8 +177,13 @@ impl VirtualBookApp {
             }
 
             if let Some(path) = &old_storage.file_store_path {
-                if let Ok(storage_created) = FileStore::new(&PathBuf::from(path)) {
-                    old_storage.file_store = Some(storage_created);
+                match FileStore::new(&PathBuf::from(path)) {
+                    Ok(storage_created) => {
+                        old_storage.file_store = storage_created;
+                    }
+                    Err(e) => {
+                        error!("error in opening the path {}", &e);
+                    }
                 }
             }
 
@@ -270,7 +275,7 @@ impl eframe::App for VirtualBookApp {
             *file_store_path = result.clone();
             if let Some(r) = result {
                 if let Ok(fs) = FileStore::new(&r) {
-                    *file_store = Some(fs);
+                    *file_store = fs;
                 } else {
                     error!("fail to create file store with path {:?}", r.clone())
                 }

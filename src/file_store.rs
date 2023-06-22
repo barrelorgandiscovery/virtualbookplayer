@@ -172,20 +172,27 @@ impl FileStore {
         }
     }
 
-    pub fn new(path: &PathBuf) -> Result<FileStore, FileStoreError> {
-        let p = path.parent().unwrap().to_path_buf();
+    pub fn new(path: &PathBuf) -> Result<Option<FileStore>, FileStoreError> {
+        if let Some(p) = path.parent() {
+            let pathbuf = p.to_path_buf();
 
-        let data_root: Rc<RefCell<FileNode>> = Self::recurse_construct(path, &None).unwrap();
+            if let Ok(data_root) = Self::recurse_construct(path, &None) {
+                let mut fs = FileStore {
+                    base_path: pathbuf,
+                    root: data_root,
+                    default_view: None,
+                };
 
-        let mut fs = FileStore {
-            base_path: p,
-            root: data_root,
-            default_view: None,
-        };
+                fs.default_view = Some(fs.view(&None).unwrap());
 
-        fs.default_view = Some(fs.view(&None).unwrap());
-
-        Ok(fs)
+                Ok(Some(fs))
+            } else {
+                error!("error opening path {:?}", &path);
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     #[allow(clippy::only_used_in_recursion)]
@@ -255,7 +262,7 @@ fn test_file_node() {
 
 #[test]
 fn test_file_store_and_view() {
-    let f = FileStore::new(&PathBuf::from("/home/use/tmp/t"));
+    let f = FileStore::new(&PathBuf::from("/home/use/tmp/t")).unwrap();
 
     let fstore = f.unwrap();
     let fv1 = &fstore.view(&None).unwrap();
