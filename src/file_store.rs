@@ -183,9 +183,16 @@ impl FileStore {
                     default_view: None,
                 };
 
-                fs.default_view = Some(fs.view(&None).unwrap());
-
-                Ok(Some(fs))
+                match fs.view(&None) {
+                    Ok(default_view) => {
+                        fs.default_view = Some(default_view);
+                        Ok(Some(fs))
+                    }
+                    Err(e) => {
+                        error!("fail to create view {}", &e);
+                        Ok(None)
+                    }
+                }
             } else {
                 error!("error opening path {:?}", &path);
                 Ok(None)
