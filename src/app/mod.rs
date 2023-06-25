@@ -274,10 +274,17 @@ impl eframe::App for VirtualBookApp {
         if let Some(Ok(result)) = file_path_dialog.check() {
             *file_store_path = result.clone();
             if let Some(r) = result {
-                if let Ok(fs) = FileStore::new(&r) {
-                    *file_store = fs;
-                } else {
-                    error!("fail to create file store with path {:?}", r.clone())
+                match FileStore::new(&r) {
+                    Ok(fs) => {
+                        *file_store = fs;
+                    }
+                    Err(e) => {
+                        error!(
+                            "fail to create file store : {} \n with path {:?}",
+                            e,
+                            r.clone()
+                        )
+                    }
                 }
             }
         }
@@ -337,6 +344,8 @@ impl eframe::App for VirtualBookApp {
                                         error!("fail to open device {}", e);
                                     }
                                 }
+
+                                ui.close_menu();
                             }
                         }
 
@@ -393,7 +402,11 @@ impl eframe::App for VirtualBookApp {
 
         let present = appplayer.player.is_some();
 
-        if present {
+        if !present {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.label("Choisissez un périphérique de sortie dans le menu Fichier");
+            });
+        } else {
             egui::CentralPanel::default().show(ctx, |ui| {
                 // borrow checker clarification for the closure
                 let self1 = self;
