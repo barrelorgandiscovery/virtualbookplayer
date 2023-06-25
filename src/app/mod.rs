@@ -356,7 +356,7 @@ impl eframe::App for VirtualBookApp {
 
                 ui.menu_button(&i18n.display, |ui| {
                     ui.label(&i18n.zoom);
-                    ui.add(egui::Slider::new(screen_zoom_factor, 0.5..=4.0));
+                    ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
                 });
 
                 if ui
