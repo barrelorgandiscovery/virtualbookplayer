@@ -173,31 +173,27 @@ impl FileStore {
     }
 
     pub fn new(path: &PathBuf) -> Result<Option<FileStore>, FileStoreError> {
-        if let Some(p) = path.parent() {
-            let pathbuf = p.to_path_buf();
+        let pathbuf = path.to_path_buf();
 
-            if let Ok(data_root) = Self::recurse_construct(path, &None) {
-                let mut fs = FileStore {
-                    base_path: pathbuf,
-                    root: data_root,
-                    default_view: None,
-                };
+        if let Ok(data_root) = Self::recurse_construct(path, &None) {
+            let mut fs = FileStore {
+                base_path: pathbuf,
+                root: data_root,
+                default_view: None,
+            };
 
-                match fs.view(&None) {
-                    Ok(default_view) => {
-                        fs.default_view = Some(default_view);
-                        Ok(Some(fs))
-                    }
-                    Err(e) => {
-                        error!("fail to create view {}", &e);
-                        Ok(None)
-                    }
+            match fs.view(&None) {
+                Ok(default_view) => {
+                    fs.default_view = Some(default_view);
+                    Ok(Some(fs))
                 }
-            } else {
-                error!("error opening path {:?}", &path);
-                Ok(None)
+                Err(e) => {
+                    error!("fail to create view {}", &e);
+                    Ok(None)
+                }
             }
         } else {
+            error!("error opening path {:?}", &path);
             Ok(None)
         }
     }
@@ -214,7 +210,7 @@ impl FileStore {
             // this is file
             match filter {
                 Some(f) => {
-                    if bn.name.contains(f) {
+                    if bn.name.to_lowercase().contains(&f.to_lowercase()) {
                         debug!("match filter");
                         Some(FileViewNode::new(Rc::clone(node), vec![]))
                     } else {

@@ -121,7 +121,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
         .size(Size::remainder())
         .vertical(|mut strip| {
             strip.strip(|builder| {
-                builder.sizes(Size::remainder(), 2).vertical(|mut strip| {
+                builder.sizes(Size::remainder(), if app.hidden_number_pad { 1 } else { 2 } ).vertical(|mut strip| {
                     strip.cell(|ui| {
                         StripBuilder::new(ui)
                             .size(Size::remainder())
@@ -195,6 +195,8 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                 deleted =
                                                                                     Some(index);
                                                                             }
+                                                                        } else {
+                                                                            ui.label(&i.name);
                                                                         }
                                                                     }
 
@@ -214,13 +216,17 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                 });
                             });
                     });
-                    strip.strip(|builder| {
-                        builder.sizes(Size::remainder(), 1).vertical(|mut strip| {
-                            strip.cell(|ui| {
-                                ui_button_panel(app, ctx, ui);
+
+                    if !app.hidden_number_pad {
+                        strip.strip(|builder| {
+                            builder.sizes(Size::remainder(), 1).vertical(|mut strip| {
+                                strip.cell(|ui| {
+                                    ui_button_panel(app, ctx, ui);
+                                });
                             });
+
                         });
-                    });
+                    }
                 });
             });
         });

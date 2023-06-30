@@ -1,9 +1,19 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-// When compiling natively:
-#[cfg(not(target_arch = "windows"))]
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Name of the person to greet
+    #[arg(short, long)]
+    reset_preferences: bool,
+}
+
 fn main() -> eframe::Result<()> {
+    let args = Args::parse();
+
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
@@ -11,34 +21,11 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "VirtualBook Player",
         native_options,
-        Box::new(|cc| Box::new(virtualbookplayerapp::VirtualBookApp::new(cc))),
+        Box::new(move |cc| {
+            Box::new(virtualbookplayerapp::VirtualBookApp::new(
+                cc,
+                args.reset_preferences,
+            ))
+        }),
     )
-}
-
-#[cfg(target_arch = "windows")]
-fn main() {}
-
-// when compiling to web using trunk.
-#[cfg(target_arch = "wasm32")]
-fn main() {
-    // Make sure panics are logged using `console.error`.
-
-    use eframe_template::TemplateApp;
-    console_error_panic_hook::set_once();
-
-    // Redirect tracing to console.log and friends:
-    tracing_wasm::set_as_global_default();
-
-    let web_options = eframe::WebOptions::default();
-
-    wasm_bindgen_futures::spawn_local(async {
-        let apprunnerref = eframe::start_web(
-            "the_canvas_id", // hardcode it
-            web_options,
-            Box::new(|cc| Box::new(TemplateApp::new(cc))),
-        )
-        .await;
-
-        let app = apprunnerref.expect("failed to start eframe");
-    });
 }

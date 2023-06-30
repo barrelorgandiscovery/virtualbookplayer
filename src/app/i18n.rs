@@ -11,6 +11,14 @@ pub struct I18NMessages {
     pub save_playlist: String,
     pub enter: String,
     pub aucun_fichiers: String,
+    pub hide_num_pad: String,
+}
+
+pub fn create_i18n_message_with_lang(lang: String) -> Box<I18NMessages> {
+    match lang.as_str() {
+        "fr" => create_i18n_fr_message(),
+        _ => create_i18n_message(),
+    }
 }
 
 pub fn create_i18n_message() -> Box<I18NMessages> {
@@ -25,6 +33,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         save_playlist: "Save playlist ..".into(),
         enter: "Enter".into(),
         aucun_fichiers: "no_files".into(),
+        hide_num_pad: "hide numpad".into(),
     })
 }
 
@@ -40,5 +49,6 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         save_playlist: "Enregistrer la liste ..".into(),
         enter: "Entrer".into(),
         aucun_fichiers: "Aucuns fichiers".into(),
+        hide_num_pad: "Cacher le pavé numérique".into(),
     })
 }

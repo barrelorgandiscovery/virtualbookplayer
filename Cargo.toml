@@ -40,6 +40,7 @@ eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", d
 
 # all plateforms support jack
 nodi= { version = "0.19.2" , features=["midir-jack"]}
+clap = { version = "4.3.10", features = ["derive"] }
 
 
 [profile.release]

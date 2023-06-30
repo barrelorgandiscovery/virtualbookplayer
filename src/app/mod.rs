@@ -85,6 +85,10 @@ pub struct VirtualBookApp {
 
     #[serde(skip)]
     i18n: Box<I18NMessages>,
+
+    islight: bool,
+
+    hidden_number_pad: bool,
 }
 
 impl Default for VirtualBookApp {
@@ -120,13 +124,17 @@ impl Default for VirtualBookApp {
             adjusted_start_time: Instant::now(),
 
             i18n: create_i18n_fr_message(),
+
+            islight: false,
+
+            hidden_number_pad: false,
         }
     }
 }
 
 impl VirtualBookApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, reset: bool) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -152,42 +160,44 @@ impl VirtualBookApp {
             .unwrap()
             .push("my_font".to_owned());
 
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            let mut old_storage: Self =
-                eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        if !reset {
+            // Load previous app state (if any).
+            // Note that you must enable the `persistence` feature for this to work.
+            if let Some(storage) = cc.storage {
+                let mut old_storage: Self =
+                    eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
-            // reopen the selected midi port
-            // reopening
-            let factory = MidiPlayerFactory {
-                device_no: old_storage.selected_device,
-            };
+                // reopen the selected midi port
+                // reopening
+                let factory = MidiPlayerFactory {
+                    device_no: old_storage.selected_device,
+                };
 
-            let (_scmd, rcmd) = channel();
-            let (s, r) = channel();
+                let (_scmd, rcmd) = channel();
+                let (s, r) = channel();
 
-            match factory.create(s, rcmd) {
-                Ok(player) => {
-                    old_storage.appplayer.player(Some((player, r)));
-                }
-                Err(e) => {
-                    error!("fail to open device {}", e);
-                }
-            }
-
-            if let Some(path) = &old_storage.file_store_path {
-                match FileStore::new(&PathBuf::from(path)) {
-                    Ok(storage_created) => {
-                        old_storage.file_store = storage_created;
+                match factory.create(s, rcmd) {
+                    Ok(player) => {
+                        old_storage.appplayer.player(Some((player, r)));
                     }
                     Err(e) => {
-                        error!("error in opening the path {}", &e);
+                        error!("fail to open device {}", e);
                     }
                 }
-            }
 
-            return old_storage;
+                if let Some(path) = &old_storage.file_store_path {
+                    match FileStore::new(&PathBuf::from(path)) {
+                        Ok(storage_created) => {
+                            old_storage.file_store = storage_created;
+                        }
+                        Err(e) => {
+                            error!("error in opening the path {}", &e);
+                        }
+                    }
+                }
+
+                return old_storage;
+            }
         }
 
         let app: VirtualBookApp = Default::default();
@@ -230,10 +240,18 @@ impl eframe::App for VirtualBookApp {
             file_store,
             file_path_dialog,
             i18n,
+            islight,
+            hidden_number_pad,
             ..
         } = self;
 
         ctx.set_pixels_per_point(*screen_zoom_factor);
+
+        if *islight {
+            ctx.set_visuals(Visuals::light());
+        } else {
+            ctx.set_visuals(Visuals::dark());
+        }
 
         let last_response_arc = Arc::clone(&appplayer.last_response);
 
@@ -366,6 +384,7 @@ impl eframe::App for VirtualBookApp {
                 ui.menu_button(&i18n.display, |ui| {
                     ui.label(&i18n.zoom);
                     ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
+                    ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
                 });
 
                 if ui
@@ -415,21 +434,14 @@ impl eframe::App for VirtualBookApp {
                 {
                     let appplayer = &mut self1.appplayer;
 
+                    let v = vec![
+                        (Key::Backspace, String::from(screen_playlist::BACKSPACE)),
+                        (Key::Enter, String::from(screen_playlist::ENTER)),
+                    ];
+
                     ui.input(|i| {
-                        for k in vec![
-                            (Key::Num0, String::from("0")),
-                            (Key::Num1, String::from("1")),
-                            (Key::Num2, String::from("2")),
-                            (Key::Num3, String::from("3")),
-                            (Key::Num4, String::from("4")),
-                            (Key::Num5, String::from("5")),
-                            (Key::Num6, String::from("6")),
-                            (Key::Num7, String::from("7")),
-                            (Key::Num8, String::from("8")),
-                            (Key::Num9, String::from("9")),
-                            (Key::Backspace, String::from(screen_playlist::BACKSPACE)),
-                            (Key::Enter, String::from(screen_playlist::ENTER)),
-                        ] {
+                        let mut consumed = false;
+                        for k in v {
                             if i.key_pressed(k.0) {
                                 let no = k.1;
                                 screen_playlist::handling_key(
@@ -438,6 +450,22 @@ impl eframe::App for VirtualBookApp {
                                     file_store1,
                                     appplayer,
                                 );
+                                consumed = true;
+                            }
+                        }
+
+                        if !consumed {
+                            for e in i.events.iter() {
+                                if let Event::Key { key, pressed, .. } = e {
+                                    if *pressed {
+                                        screen_playlist::handling_key(
+                                            key.name(),
+                                            current_typed_no1,
+                                            file_store1,
+                                            appplayer,
+                                        );
+                                    }
+                                }
                             }
                         }
                     });
