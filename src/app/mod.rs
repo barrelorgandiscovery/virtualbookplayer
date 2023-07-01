@@ -204,6 +204,7 @@ impl VirtualBookApp {
                         }
                         Err(e) => {
                             error!("error in opening the path {}", &e);
+                            old_storage.file_store = None;
                         }
                     }
                 }

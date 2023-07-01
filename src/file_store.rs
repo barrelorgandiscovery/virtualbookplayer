@@ -213,7 +213,7 @@ impl FileStore {
             // this is file
 
             if let Some(f) = name_filter {
-                if !bn.name.to_lowercase().contains(&f.to_lowercase()) {
+                if !bn.name.to_lowercase().contains(&f.to_lowercase()) && f.len() > 0 {
                     return None;
                 }
             }
@@ -259,7 +259,19 @@ impl FileStore {
         filter: &Option<String>,
         extension_filter: &ExtensionsFilter,
     ) -> Result<FileView, Box<dyn Error>> {
-        let selected_files = self.recurse_construct_view(&self.root, filter, extension_filter);
+        let sanitied_filter: Option<String> = match filter {
+            Some(content) => {
+                if content.len() > 0 {
+                    Some(content.clone())
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
+
+        let selected_files =
+            self.recurse_construct_view(&self.root, &sanitied_filter, extension_filter);
         match selected_files {
             None => Err(FileStoreError::new(
                 "fail to construct view, there is no generated elements in view",

@@ -330,8 +330,17 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
             strip.cell(|ui| {
                 egui::ScrollArea::both().show(ui, |ui| {
                     StripBuilder::new(ui)
+                        .size(Size::initial(6.0))
                         .size(Size::remainder())
-                        .horizontal(|mut strip| {
+                        .vertical(|mut strip| {
+                            strip.cell(|ui| {
+                                
+                                ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
+                                    if app.current_typed_no.len() > 0 {
+                                        ui.label(format!("Filter : {}", app.current_typed_no));
+                                    }
+                                });
+                            });
                             strip.cell(|ui| {
                                 if let Some(filestore) = &mut app.file_store {
                                     if let Some(view) = &mut filestore.default_view {
