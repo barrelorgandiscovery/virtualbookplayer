@@ -15,7 +15,7 @@ use player::{PlayerFactory, Response};
 use crate::appplayer::AppPlayer;
 use crate::file_store::*;
 
-use log::error;
+use log::{error, debug};
 
 use self::i18n::{create_i18n_fr_message, I18NMessages};
 
@@ -311,6 +311,7 @@ impl eframe::App for VirtualBookApp {
                 match FileStore::new(&r) {
                     Ok(fs) => {
                         *file_store = fs;
+                        debug!("folder opened, reapply the elements and views");
                         // refilter the view using the filters
                         if let Some(store) = file_store {
                             if let Ok(result) = store.view(&None, extensions_filters) {

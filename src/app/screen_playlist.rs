@@ -1,4 +1,4 @@
-use log::error;
+use log::{debug, error};
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -276,7 +276,11 @@ fn display_tree(
                             error!("error in displaying sub tree {}", e);
                             // continue
                         }
-                        Ok(_returned_value) => file_selected = true,
+                        Ok(returned_value) => {
+                            if returned_value {
+                                file_selected = true
+                            }
+                        }
                     }
                 });
             let borrowed_element = &mut element.borrow_mut();
@@ -354,6 +358,8 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                                             }
                                             Ok(returned_value) => {
                                                 if returned_value {
+                                                    // click detected
+                                                    debug!("click on the file, refresh the view");
                                                     if let Ok(new_view) = filestore.view(
                                                         &Some(app.current_typed_no.clone()),
                                                         &app.extensions_filters,
