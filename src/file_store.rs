@@ -213,7 +213,7 @@ impl FileStore {
             // this is file
 
             if let Some(f) = name_filter {
-                if !bn.name.to_lowercase().contains(&f.to_lowercase()) && f.len() > 0 {
+                if !bn.name.to_lowercase().contains(&f.to_lowercase()) && !f.is_empty() {
                     debug!("there is a filter, and the file is skipped because the file {} does not contains the filter element {}", &bn.name, &f.to_lowercase());
                     return None;
                 }
@@ -221,16 +221,20 @@ impl FileStore {
 
             // check extension filter
             if let Some(extension) = extension_filter {
+                let mut found = false;
                 for tested_extension in extension.iter() {
                     if bn
                         .name
                         .to_lowercase()
                         .ends_with(&tested_extension.to_lowercase())
                     {
+                        found = true;
                         break;
                     }
                 }
-                return None;
+                if !found {
+                    return None;
+                }
             }
 
             Some(FileViewNode::new(Rc::clone(node), vec![]))
@@ -263,7 +267,7 @@ impl FileStore {
     ) -> Result<FileView, Box<dyn Error>> {
         let sanitied_filter: Option<String> = match filter {
             Some(content) => {
-                if content.len() > 0 {
+                if !content.is_empty() {
                     Some(content.clone())
                 } else {
                     None

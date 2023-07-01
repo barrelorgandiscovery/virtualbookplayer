@@ -262,6 +262,7 @@ impl eframe::App for VirtualBookApp {
             i18n,
             islight,
             hidden_number_pad,
+            extensions_filters,
             ..
         } = self;
 
@@ -303,12 +304,19 @@ impl eframe::App for VirtualBookApp {
             }
         }
 
+        // Open folder Dialog response
         if let Some(Ok(result)) = file_path_dialog.check() {
             *file_store_path = result.clone();
             if let Some(r) = result {
                 match FileStore::new(&r) {
                     Ok(fs) => {
                         *file_store = fs;
+                        // refilter the view using the filters
+                        if let Some(store) = file_store {
+                            if let Ok(result) = store.view(&None, extensions_filters) {
+                                store.default_view = Some(result);
+                            }
+                        }
                     }
                     Err(e) => {
                         error!(

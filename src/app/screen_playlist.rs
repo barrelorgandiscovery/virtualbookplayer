@@ -334,9 +334,8 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                         .size(Size::remainder())
                         .vertical(|mut strip| {
                             strip.cell(|ui| {
-                                
                                 ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
-                                    if app.current_typed_no.len() > 0 {
+                                    if !app.current_typed_no.is_empty() {
                                         ui.label(format!("Filter : {}", app.current_typed_no));
                                     }
                                 });
