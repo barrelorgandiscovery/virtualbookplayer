@@ -93,7 +93,7 @@ jobs:
         name: Upload installer windows
         uses: actions/upload-artifact@v2
         with:
-          path: target/release/virtualbookplayerapp.exe
+          path: target/debug/virtualbookplayerapp.exe
           name: windows-virtualbookplayerapp.exe
           retention-days: 1
 
