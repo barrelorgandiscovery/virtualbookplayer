@@ -86,7 +86,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
+          # args: --release
 
       # SAVE INSTALLER
       - id: upload-installer-win
