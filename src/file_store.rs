@@ -214,7 +214,7 @@ impl FileStore {
 
             if let Some(f) = name_filter {
                 if !bn.name.to_lowercase().contains(&f.to_lowercase()) && f.len() > 0 {
-                    debug!("skip because the file {} does not contains the filter element {}", &bn.name, &f.to_lowercase());
+                    debug!("there is a filter, and the file is skipped because the file {} does not contains the filter element {}", &bn.name, &f.to_lowercase());
                     return None;
                 }
             }
@@ -222,15 +222,15 @@ impl FileStore {
             // check extension filter
             if let Some(extension) = extension_filter {
                 for tested_extension in extension.iter() {
-                    if !bn
+                    if bn
                         .name
                         .to_lowercase()
                         .ends_with(&tested_extension.to_lowercase())
                     {
-                        debug!("skip because the file does not ends with extensions {}", &tested_extension);
-                        return None;
+                        break;
                     }
                 }
+                return None;
             }
 
             Some(FileViewNode::new(Rc::clone(node), vec![]))
