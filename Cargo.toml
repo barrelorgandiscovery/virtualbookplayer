@@ -25,22 +25,32 @@ midir = { version = "0.9.1" }
 tracing-subscriber = "0.3"
 im-native-dialog = "0.3.0"
 
+
+# all plateforms support jack
+nodi= { version = "0.19.2" , features=["midir-jack"]}
+clap = { version = "4.3.10", features = ["derive"] }
+
 egui = { git = "https://github.com/rustytsuki/egui", branch = "rust-office"}
 egui_extras = { git = "https://github.com/rustytsuki/egui", branch = "rust-office" , features = ["image"]}
 
-
 image = { version = "0.22.0", default-features = false, features = ["png"] }
 
+
+[target.'cfg(not(any(target_os = "unix", target_os = "windows")))'.dependencies]
+eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
+    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
 eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
     "skia",          # Use the glow rendering backend. Alternative: "wgpu".
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
-
-# all plateforms support jack
-nodi= { version = "0.19.2" , features=["midir-jack"]}
-clap = { version = "4.3.10", features = ["derive"] }
 
 
 [profile.release]

@@ -58,6 +58,8 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     file_store: Option<FileStore>,
 
+    extensions_filters: Option<Vec<String>>,
+
     #[serde(skip)]
     current_typed_no: String,
 
@@ -128,6 +130,8 @@ impl Default for VirtualBookApp {
             islight: false,
 
             hidden_number_pad: false,
+
+            extensions_filters: Some(vec![".mid".into(), ".playlist".into()]),
         }
     }
 }
@@ -187,7 +191,15 @@ impl VirtualBookApp {
 
                 if let Some(path) = &old_storage.file_store_path {
                     match FileStore::new(&PathBuf::from(path)) {
-                        Ok(storage_created) => {
+                        Ok(mut storage_created) => {
+                            if storage_created.is_some() {
+                                if let Some(mut fs) = storage_created {
+                                    if let Ok(v) = fs.view(&None, &old_storage.extensions_filters) {
+                                        fs.default_view = Some(v);
+                                    }
+                                    storage_created = Some(fs);
+                                }
+                            }
                             old_storage.file_store = storage_created;
                         }
                         Err(e) => {
@@ -218,14 +230,21 @@ impl eframe::App for VirtualBookApp {
         // self.frame_history
         //     .on_new_frame(ctx.input(|i| i.time), _frame.info().cpu_usage);
 
-        let mut style = Style::default();
+        let old = if self.islight {
+            Visuals::light()
+        } else {
+            Visuals::dark()
+        };
 
-        style.visuals.window_fill = Color32::from_rgba_premultiplied(0, 0, 0, 30);
+        ctx.set_visuals(old);
+
+        let mut style: Style = Style::default();
+        style.clone_from(&ctx.style());
+
+        let mut c = style.visuals.window_fill;
+        c = Color32::from_rgba_premultiplied(c.r(), c.g(), c.b(), 60);
+        style.visuals.window_fill = c;
         style.visuals.window_rounding = Rounding::same(0.0);
-
-        style.visuals.panel_fill = Color32::from_rgba_premultiplied(0, 0, 0, 10);
-        style.visuals.extreme_bg_color = Color32::from_rgba_premultiplied(0, 0, 0, 10);
-        style.visuals.faint_bg_color = Color32::from_rgba_premultiplied(0, 0, 0, 10);
 
         ctx.set_style(style);
 
@@ -246,12 +265,6 @@ impl eframe::App for VirtualBookApp {
         } = self;
 
         ctx.set_pixels_per_point(*screen_zoom_factor);
-
-        if *islight {
-            ctx.set_visuals(Visuals::light());
-        } else {
-            ctx.set_visuals(Visuals::dark());
-        }
 
         let last_response_arc = Arc::clone(&appplayer.last_response);
 
@@ -307,17 +320,17 @@ impl eframe::App for VirtualBookApp {
             }
         }
 
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-
         #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
         let top_response = egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
+
             let old = ui.visuals().clone();
             let mut visual_mut = old.clone();
-            visual_mut.window_fill = Color32::BLACK;
+
+            let mut c = visual_mut.window_fill;
+            c = Color32::from_rgb(c.r(), c.g(), c.b());
+            visual_mut.window_fill = c;
+
             ctx.set_visuals(visual_mut);
 
             egui::menu::bar(ui, |ui| {
@@ -385,6 +398,7 @@ impl eframe::App for VirtualBookApp {
                     ui.label(&i18n.zoom);
                     ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
                     ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
+                    ui.checkbox(islight, &i18n.dark_light);
                 });
 
                 if ui
@@ -429,6 +443,7 @@ impl eframe::App for VirtualBookApp {
             egui::CentralPanel::default().show(ctx, |ui| {
                 // borrow checker clarification for the closure
                 let self1 = self;
+                let extensions_filter = &self1.extensions_filters;
                 let file_store1 = &mut self1.file_store;
                 let current_typed_no1 = &mut self1.current_typed_no;
                 {
@@ -449,6 +464,7 @@ impl eframe::App for VirtualBookApp {
                                     current_typed_no1,
                                     file_store1,
                                     appplayer,
+                                    extensions_filter,
                                 );
                                 consumed = true;
                             }
@@ -463,6 +479,7 @@ impl eframe::App for VirtualBookApp {
                                             current_typed_no1,
                                             file_store1,
                                             appplayer,
+                                            extensions_filter,
                                         );
                                     }
                                 }

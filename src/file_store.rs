@@ -119,6 +119,8 @@ pub struct FileStore {
     pub default_view: Option<FileView>,
 }
 
+type ExtensionsFilter = Option<Vec<String>>;
+
 impl FileStore {
     fn recurse_construct(
         path: &PathBuf,
@@ -182,7 +184,7 @@ impl FileStore {
                 default_view: None,
             };
 
-            match fs.view(&None) {
+            match fs.view(&None, &None) {
                 Ok(default_view) => {
                     fs.default_view = Some(default_view);
                     Ok(Some(fs))
@@ -202,32 +204,39 @@ impl FileStore {
     pub fn recurse_construct_view(
         &self,
         node: &Rc<RefCell<FileNode>>,
-        filter: &Option<String>,
+        name_filter: &Option<String>,
+        extension_filter: &ExtensionsFilter,
     ) -> Option<Rc<RefCell<FileViewNode>>> {
         let bn = node.borrow();
         debug!("entering {:?}", node);
         if !bn.is_folder {
             // this is file
-            match filter {
-                Some(f) => {
-                    if bn.name.to_lowercase().contains(&f.to_lowercase()) {
-                        debug!("match filter");
-                        Some(FileViewNode::new(Rc::clone(node), vec![]))
-                    } else {
-                        debug!("does not correspond to filter");
-                        None
-                    }
-                }
-                None => {
-                    debug!("no filter, create the view node");
-                    Some(FileViewNode::new(Rc::clone(node), vec![]))
+
+            if let Some(f) = name_filter {
+                if !bn.name.to_lowercase().contains(&f.to_lowercase()) {
+                    return None;
                 }
             }
+
+            // check extension filter
+            if let Some(extension) = extension_filter {
+                for tested_extension in extension.iter() {
+                    if !bn
+                        .name
+                        .to_lowercase()
+                        .ends_with(&tested_extension.to_lowercase())
+                    {
+                        return None;
+                    }
+                }
+            }
+
+            Some(FileViewNode::new(Rc::clone(node), vec![]))
         } else {
             // go to sub elements
             let mut v: Vec<Rc<RefCell<FileViewNode>>> = Vec::new();
             for i in &bn.folder_files {
-                let r = self.recurse_construct_view(i, filter);
+                let r = self.recurse_construct_view(i, name_filter, extension_filter);
                 if let Some(element_found) = r {
                     v.push(element_found);
                 }
@@ -245,8 +254,12 @@ impl FileStore {
         }
     }
 
-    pub fn view(&self, filter: &Option<String>) -> Result<FileView, Box<dyn Error>> {
-        let selected_files = self.recurse_construct_view(&self.root, filter);
+    pub fn view(
+        &self,
+        filter: &Option<String>,
+        extension_filter: &ExtensionsFilter,
+    ) -> Result<FileView, Box<dyn Error>> {
+        let selected_files = self.recurse_construct_view(&self.root, filter, extension_filter);
         match selected_files {
             None => Err(FileStoreError::new(
                 "fail to construct view, there is no generated elements in view",
@@ -268,9 +281,9 @@ fn test_file_store_and_view() {
     let f = FileStore::new(&PathBuf::from("/home/use/tmp/t")).unwrap();
 
     let fstore = f.unwrap();
-    let fv1 = &fstore.view(&None).unwrap();
+    let fv1 = &fstore.view(&None, &None).unwrap();
     println!("{:?}", &fv1);
-    let fv2 = &fstore.view(&Some("hello".into())).unwrap();
+    let fv2 = &fstore.view(&Some("hello".into()), &None).unwrap();
     println!("{:?}", &fv2);
 }
 

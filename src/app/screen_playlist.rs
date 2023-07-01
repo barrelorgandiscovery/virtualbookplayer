@@ -20,6 +20,7 @@ pub fn handling_key(
     current_typed_no: &mut String,
     file_store: &mut Option<FileStore>,
     appplayer: &mut AppPlayer,
+    extensions_filter: &Option<Vec<String>>,
 ) {
     match no.as_str() {
         BACKSPACE => {
@@ -56,7 +57,7 @@ pub fn handling_key(
     }
 
     if let Some(filestore) = file_store {
-        if let Ok(new_view) = filestore.view(&Some(current_typed_no.clone())) {
+        if let Ok(new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter) {
             new_view.expand();
             filestore.default_view = Some(new_view);
         } else {
@@ -105,6 +106,7 @@ pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, _ctx: &egui::Context, ui
                                                 current_typed_no,
                                                 file_store,
                                                 &mut app.appplayer,
+                                                &app.extensions_filters,
                                             );
                                         }
                                     });
@@ -344,9 +346,10 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                                             }
                                             Ok(returned_value) => {
                                                 if returned_value {
-                                                    if let Ok(new_view) = filestore
-                                                        .view(&Some(app.current_typed_no.clone()))
-                                                    {
+                                                    if let Ok(new_view) = filestore.view(
+                                                        &Some(app.current_typed_no.clone()),
+                                                        &app.extensions_filters,
+                                                    ) {
                                                         new_view.expand();
                                                         filestore.default_view = Some(new_view);
                                                     } else {
