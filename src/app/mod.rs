@@ -15,7 +15,7 @@ use player::{PlayerFactory, Response};
 use crate::appplayer::AppPlayer;
 use crate::file_store::*;
 
-use log::{error, debug};
+use log::{debug, error};
 
 use self::i18n::{create_i18n_fr_message, I18NMessages};
 
