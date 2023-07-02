@@ -94,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           path: target/release/virtualbookplayerapp.exe
-          name: windows-virtualbookplayerapp$-{{ github.ref_name }}.exe
+          name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
           retention-days: 1
 
 
