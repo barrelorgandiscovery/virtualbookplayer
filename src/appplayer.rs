@@ -34,8 +34,12 @@ pub struct AppPlayer {
     pub play_mod: bool,
 
     pub start_play_time: Instant,
+
     /// virtual book
     pub virtual_book: Option<Arc<VirtualBook>>,
+
+    // starting time wait
+    pub waittime_between_file_play: f32,
 }
 
 impl AppPlayer {
@@ -50,7 +54,12 @@ impl AppPlayer {
             last_response: Arc::new(Mutex::new(None)),
             virtual_book: None,
             start_play_time: Instant::now() - Duration::from_millis(10_000),
+            waittime_between_file_play: 0_f32,
         }
+    }
+
+    pub fn set_waittime_between_file_play(&mut self, wait_time: f32) {
+        self.waittime_between_file_play = wait_time;
     }
 
     pub fn player(&mut self, player: Option<(Box<dyn Player>, Receiver<Response>)>) {
@@ -89,7 +98,7 @@ impl AppPlayer {
             if !self.playlist.file_list.is_empty() {
                 if let Some(n) = self.playlist.file_list.get(0) {
                     self.start_play_time = Instant::now(); // before play
-                    if let Err(e) = p.play(&n.path) {
+                    if let Err(e) = p.play(&n.path, Some(self.waittime_between_file_play)) {
                         error!("error in playing file : {}", e);
                     } else {
                     }

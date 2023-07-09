@@ -91,6 +91,9 @@ pub struct VirtualBookApp {
     islight: bool,
 
     hidden_number_pad: bool,
+
+    /// wait time before playing the file
+    play_wait: f32,
 }
 
 impl Default for VirtualBookApp {
@@ -133,6 +136,8 @@ impl Default for VirtualBookApp {
             hidden_number_pad: false,
 
             extensions_filters: Some(vec![".mid".into(), ".playlist".into()]),
+
+            play_wait: 2.0,
         }
     }
 }
@@ -264,6 +269,7 @@ impl eframe::App for VirtualBookApp {
             islight,
             hidden_number_pad,
             extensions_filters,
+            play_wait,
             ..
         } = self;
 
@@ -405,11 +411,16 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
-                ui.menu_button(&i18n.display, |ui| {
+                ui.menu_button(&i18n.preferences, |ui| {
                     ui.label(&i18n.zoom);
                     ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
                     ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
                     ui.checkbox(islight, &i18n.dark_light);
+                    ui.label(&i18n.time_between_file);
+                    let time_slider = egui::Slider::new(play_wait, 0.0..=30.0);
+                    if time_slider.ui(ui).changed() {
+                        appplayer.set_waittime_between_file_play(*play_wait);
+                    }
                 });
 
                 if ui

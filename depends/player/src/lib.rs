@@ -35,7 +35,7 @@ pub trait PlayerFactory {
 }
 
 pub trait Player: Send {
-    fn play(&mut self, filename: &PathBuf) -> Result<(), Box<dyn Error>>;
+    fn play(&mut self, filename: &PathBuf, start_time: Option<f32>) -> Result<(), Box<dyn Error>>;
     fn stop(&mut self);
     fn is_playing(&self) -> bool;
     // in milliseconds

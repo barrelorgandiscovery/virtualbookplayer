@@ -131,7 +131,7 @@ impl FileInformationsConstructor for MidiFileInformationsConstructor {
         // parse it
         let smf = Smf::parse(&file_content_data)?;
         // get note display
-        let notes = Arc::new(to_notes(&smf)?);
+        let notes = Arc::new(to_notes(&smf, &None)?);
 
         let result = notes
             .iter()
@@ -204,7 +204,7 @@ impl Player for MidiPlayer {
     fn associated_notes(&self) -> Arc<Vec<Note>> {
         Arc::clone(&self.notes)
     }
-    fn play(&mut self, filename: &PathBuf) -> Result<(), Box<dyn Error>> {
+    fn play(&mut self, filename: &PathBuf, start_wait: Option<f32>) -> Result<(), Box<dyn Error>> {
         // load the midi file
 
         // Load bytes first
@@ -212,7 +212,13 @@ impl Player for MidiPlayer {
         // parse it
         let smf = Smf::parse(&file_content_data)?;
         // get note display
-        self.notes = Arc::new(to_notes(&smf)?);
+        self.notes = Arc::new(to_notes(&smf, &start_wait)?);
+
+        let wait_time = if let Some(w) = start_wait {
+            Duration::from_secs_f32(w)
+        } else {
+            Duration::ZERO
+        };
 
         // deconstruct the elements
         let Smf { header, tracks } = smf;
@@ -246,6 +252,16 @@ impl Player for MidiPlayer {
             let mut counter = 0_u32;
             if let Ok(mut con) = con.lock() {
                 all_notes_off(&mut con);
+
+                if let Ok(output_locked) = output_reference.lock() {
+                    output_locked
+                        .send(Response::CurrentPlayTime(Duration::ZERO))
+                        .unwrap();
+                }
+
+                if let Some(wait) = start_wait {
+                    thread::sleep(Duration::from_secs_f32(wait))
+                }
 
                 for moment in sheet {
                     if receiver.try_recv().is_ok() {
@@ -283,7 +299,7 @@ impl Player for MidiPlayer {
 
                         if let Ok(output_locked) = output_reference.lock() {
                             output_locked
-                                .send(Response::CurrentPlayTime(total_duration.clone()))
+                                .send(Response::CurrentPlayTime(total_duration + wait_time))
                                 .unwrap();
                         }
                     }
@@ -349,13 +365,19 @@ impl MidiPlayer {
     }
 }
 
-pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
+pub fn to_notes(smf: &Smf, start_wait: &Option<f32>) -> Result<Vec<Note>, Box<dyn Error>> {
     let Smf { header, tracks } = smf;
     let mut timer = Ticker::try_from(header.timing)?;
 
     let sheet = match header.format {
         Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),
         Format::Parallel => Sheet::parallel(&tracks),
+    };
+
+    let shift_duration = if start_wait.is_some() {
+        Duration::from_secs_f32(start_wait.unwrap())
+    } else {
+        Duration::ZERO
     };
 
     // note activation
@@ -385,7 +407,7 @@ pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
                                     Some(d) => notes.push(Note {
                                         channel: uchannel,
                                         note: key,
-                                        start: d,
+                                        start: d + shift_duration,
                                         length: total_duration - d,
                                     }),
                                     None => {}
@@ -405,7 +427,7 @@ pub fn to_notes(smf: &Smf) -> Result<Vec<Note>, Box<dyn Error>> {
                                         Some(d) => notes.push(Note {
                                             channel: uchannel,
                                             note: key,
-                                            start: d,
+                                            start: d + shift_duration,
                                             length: total_duration - d,
                                         }),
                                         None => {}
