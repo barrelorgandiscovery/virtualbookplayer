@@ -108,6 +108,7 @@ impl Default for VirtualBookApp {
             screen: Screen::PlayListConstruction,
             screen_zoom_factor: 2.0,
 
+            // filter
             current_typed_no: "".into(),
 
             file_path_dialog: im_native_dialog::ImNativeFileDialog::default(),

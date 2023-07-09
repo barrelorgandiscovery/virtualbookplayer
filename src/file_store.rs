@@ -74,19 +74,23 @@ impl Debug for FileNode {
 impl FileNode {
     pub fn new(path: &PathBuf) -> Result<FileNode, FileStoreError> {
         match path.file_name() {
-            Some(filename) => {
-                let md = metadata(path).unwrap();
-                let is_dir = md.is_dir();
+            Some(filename) => match metadata(path) {
+                Ok(md) => {
+                    let is_dir = md.is_dir();
 
-                let n = FileNode {
-                    name: filename.to_str().unwrap().into(),
-                    path: path.clone(),
-                    is_folder: is_dir,
-                    folder_files: vec![],
-                    parent_folder: None,
-                };
-                Ok(n)
-            }
+                    let n = FileNode {
+                        name: filename.to_str().unwrap().into(),
+                        path: path.clone(),
+                        is_folder: is_dir,
+                        folder_files: vec![],
+                        parent_folder: None,
+                    };
+                    Ok(n)
+                }
+                Err(e) => Err(FileStoreError::new(
+                    format!("fail to get metadata on {:?}", e).as_str(),
+                )),
+            },
             None => Err(FileStoreError::new(
                 format!("Filename {:?} not found", &path).as_str(),
             )),
