@@ -16,6 +16,8 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 - Send panic or note-off messages to all channels when starting/stopping playback.
 - Adjust zoom factor for touch and reading from a distance.
 
+![](doc/20230623_195212.jpg)
+
 ## Other setup :
 
 ![](doc/20230617_194321.jpg)
