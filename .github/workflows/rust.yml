@@ -90,13 +90,32 @@ jobs:
 
       # SAVE INSTALLER
       - id: upload-installer-win
-        name: Upload installer windows
+        name: Upload windows release
         uses: actions/upload-artifact@v2
         with:
           path: target/release/virtualbookplayerapp.exe
           name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
           retention-days: 1
 
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --debug
+
+      - id: display-downloaded-files
+        name: display downloaded files
+        run: |
+          cp target/debug/virtualbookplayerapp.exe target/debug/virtualbookplayerapp-debug.exe
+
+      # SAVE INSTALLER
+      - id: upload-installer-win-debug
+        name: Upload windows binary debug
+        uses: actions/upload-artifact@v2
+        with:
+          path: target/debug/virtualbookplayerapp-debug.exe
+          name: windows-virtualbookplayerapp-${{ github.ref_name }}-debug.exe
+          retention-days: 1
 
           
   create-release:
@@ -118,6 +137,12 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
+
+    - id: download-windows-image-debug
+      name: Download Windows appimage
+      uses: actions/download-artifact@v2
+      with:
+        name: windows-virtualbookplayerapp-${{ github.ref_name }}-debug.exe
 
     - id: display-downloaded-files
       name: display downloaded files
@@ -157,5 +182,17 @@ jobs:
         upload_url: ${{ steps.create-release.outputs.upload_url }}
         asset_path: virtualbookplayerapp.exe
         asset_name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
+        asset_content_type: application/x-binary
+
+
+    - id: debug-windows-appimage
+      name: Debug Windows appimage
+      uses: actions/upload-release-asset@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: virtualbookplayerapp-debug.exe
+        asset_name: windows-virtualbookplayerapp-${{ github.ref_name }}-debug.exe
         asset_content_type: application/x-binary
 
