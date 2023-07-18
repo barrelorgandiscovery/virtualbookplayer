@@ -355,7 +355,20 @@ impl eframe::App for VirtualBookApp {
                 if ui
                     .menu_button(&i18n.file, |ui| {
                         if ui.button(&i18n.open_folder).clicked() {
-                            let location: Option<PathBuf> = self.file_store_path.clone();
+                            let mut location: Option<PathBuf> = self.file_store_path.clone();
+                            if let Some(loc) = &location {
+                                // check location exists
+                                match loc.metadata() {
+                                    Ok(_r) => {
+                                        if !_r.is_dir() {
+                                            location = None;
+                                        }
+                                    }
+                                    Err(_e) => {
+                                        location = None;
+                                    }
+                                }
+                            }
 
                             //let repaint_signal = ctx.repaint_signal();
                             if let Err(_result_open_signle_dir) =
