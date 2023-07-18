@@ -3,7 +3,7 @@ on:
     tags:
       - 'v*'
 
-name: CI prerelease
+name: CI release
 
 env:
   RUSTFLAGS: --cfg=web_sys_unstable_apis

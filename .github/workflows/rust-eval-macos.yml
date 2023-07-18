@@ -3,7 +3,7 @@ on:
     branch:
       - 'main'
 
-name: CI prerelease
+name: CI eval macos build
 
 env:
   RUSTFLAGS: --cfg=web_sys_unstable_apis
@@ -47,4 +47,9 @@ jobs:
         with:
           command: build
           args: --release
- 
+
+      - id: display-build-files
+        name: display build files
+        run: |
+          ls -alR .
+  
