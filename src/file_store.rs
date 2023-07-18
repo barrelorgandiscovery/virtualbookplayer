@@ -79,7 +79,7 @@ impl FileNode {
                     let is_dir = md.is_dir();
 
                     let n = FileNode {
-                        name: filename.to_str().unwrap().into(),
+                        name: filename.to_str().expect("cannot read the file name").into(),
                         path: path.clone(),
                         is_folder: is_dir,
                         folder_files: vec![],
@@ -141,22 +141,24 @@ impl FileStore {
                     let mut bn = r_file_node.borrow_mut();
                     if bn.folder() {
                         debug!("path :{:?}", &path);
-                        for r in path.read_dir().expect("error opening dir") {
-                            match r {
-                                Ok(dir_entry) => {
-                                    debug!("entry : {:?}", &dir_entry);
-                                    let p = dir_entry.path();
-                                    if let Ok(child) = FileStore::recurse_construct(
-                                        &p,
-                                        &Some(Rc::clone(&r_file_node)),
-                                    ) {
-                                        childs.push(child);
-                                    } else {
-                                        error!("error in getting {:?}", &p);
+                        if let Ok(path_dir) = path.read_dir() {
+                            for r in path_dir {
+                                match r {
+                                    Ok(dir_entry) => {
+                                        debug!("entry : {:?}", &dir_entry);
+                                        let p = dir_entry.path();
+                                        if let Ok(child) = FileStore::recurse_construct(
+                                            &p,
+                                            &Some(Rc::clone(&r_file_node)),
+                                        ) {
+                                            childs.push(child);
+                                        } else {
+                                            error!("error in getting {:?}", &p);
+                                        }
                                     }
-                                }
-                                Err(e) => {
-                                    error!("error getting dir entry : {}", e);
+                                    Err(e) => {
+                                        error!("error getting dir entry : {}", e);
+                                    }
                                 }
                             }
                         }
