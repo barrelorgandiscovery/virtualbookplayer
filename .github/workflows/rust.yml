@@ -33,7 +33,6 @@ jobs:
         with:
             submodules: recursive
 
-
       - name: Cache rust compilations
         uses: actions/cache@v3
         with:
@@ -42,7 +41,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo
           
-      - name: Run cargo check
+      - name: Run cargo build release
         uses: actions-rs/cargo@v1
         with:
           command: build
@@ -82,7 +81,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo
 
-      - name: Run cargo check
+      - name: Run cargo build --release
         uses: actions-rs/cargo@v1
         with:
           command: build
@@ -97,7 +96,7 @@ jobs:
           name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
           retention-days: 1
 
-      - name: Run cargo check
+      - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
           command: build
