@@ -101,7 +101,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --debug
+          
 
       - id: display-downloaded-files
         name: display downloaded files
