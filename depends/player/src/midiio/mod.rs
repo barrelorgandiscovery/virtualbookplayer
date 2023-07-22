@@ -22,7 +22,9 @@ use crate::{
 
 use std::convert::TryFrom;
 
-use log::error;
+use log::{debug, error};
+
+const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
 
 /// Midi device player factory
 pub struct MidiPlayerFactory {
@@ -224,6 +226,8 @@ impl Player for MidiPlayer {
         let Smf { header, tracks } = smf;
 
         let mut timer = Ticker::try_from(header.timing)?;
+        debug!("timer : {:?}", &timer);
+        timer.change_tempo(DEFAULT_TEMPO_IF_NOT_SET_IN_FILE);
 
         let sheet = match header.format {
             Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),
@@ -367,7 +371,11 @@ impl MidiPlayer {
 
 pub fn to_notes(smf: &Smf, start_wait: &Option<f32>) -> Result<Vec<Note>, Box<dyn Error>> {
     let Smf { header, tracks } = smf;
-    let mut timer = Ticker::try_from(header.timing)?;
+    let miditiming = header.timing;
+    let mut timer = Ticker::try_from(miditiming)?;
+
+    debug!("timer : {:?}", &timer);
+    timer.change_tempo(DEFAULT_TEMPO_IF_NOT_SET_IN_FILE);
 
     let sheet = match header.format {
         Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),

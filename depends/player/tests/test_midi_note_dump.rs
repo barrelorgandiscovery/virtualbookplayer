@@ -19,7 +19,7 @@ pub fn test_reading_midifile() -> Result<(), Box<dyn Error>> {
 
     // Load bytes first
     let smf = Smf::parse(&file_content_data)?;
-    let notes = to_notes(&smf)?;
+    let notes = to_notes(&smf, &None)?;
 
     println!("notes : {:?}", notes);
 
