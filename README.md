@@ -18,6 +18,10 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 
 ![](doc/20230623_195212.jpg)
 
+## Download and install
+
+The software is available for linux, windows [https://github.com/barrelorgandiscovery/virtualbookplayer/releases](https://github.com/barrelorgandiscovery/virtualbookplayer/releases). 
+
 ## Other setup :
 
 ![](doc/20230617_194321.jpg)
