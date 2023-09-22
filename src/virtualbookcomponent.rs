@@ -11,6 +11,8 @@ pub struct VirtualBookComponent {
     yfactor: f32,
     fit_to_height: bool,
 
+    scrollbars_visible: bool,
+
     virtual_book: Option<Arc<VirtualBook>>,
 }
 
@@ -21,6 +23,7 @@ impl Default for VirtualBookComponent {
             xscale: 3_000f32,
             yfactor: 3.0f32,
             fit_to_height: true,
+            scrollbars_visible: true,
             virtual_book: None,
         }
     }
@@ -53,12 +56,18 @@ impl VirtualBookComponent {
         self
     }
 
+    pub fn hide_scrollbar(mut self) -> Self {
+        self.scrollbars_visible = false;
+        self
+    }
+
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let Self {
             offset,
             xscale,
             yfactor,
             fit_to_height,
+            scrollbars_visible,
             ..
         } = self;
 
@@ -71,6 +80,7 @@ impl VirtualBookComponent {
         let width_container = ui.available_width();
 
         egui::ScrollArea::horizontal()
+            .hscroll(*scrollbars_visible)
             .show(ui, |ui| {
                 let mut book_screen_width = ui.available_width();
 

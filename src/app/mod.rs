@@ -19,6 +19,8 @@ use log::{debug, error};
 
 use self::i18n::{create_i18n_fr_message, I18NMessages};
 
+use pid_lite::Controller;
+
 mod i18n;
 mod screen_playlist;
 mod screen_visu;
@@ -43,6 +45,11 @@ pub struct VirtualBookApp {
 
     #[serde(skip)]
     offset: f32,
+
+    #[serde(skip)]
+    pid_regulated_offset: f64,
+    #[serde(skip)]
+    pid_controller: Controller,
 
     #[serde(skip)]
     screen: Screen,
@@ -107,6 +114,9 @@ impl Default for VirtualBookApp {
         Self {
             frame_history: frame_history::FrameHistory::default(),
             offset: 0.0,
+            pid_regulated_offset: 0.0,
+            pid_controller: Controller::new(0.0, 0.15, 0.005, 0.05),
+
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
             screen_zoom_factor: 2.0,
@@ -127,7 +137,7 @@ impl Default for VirtualBookApp {
             selected_device: 0,
 
             latest_duration_time: Duration::new(0, 0),
-            adjusted_start_time: Instant::now(),
+            adjusted_start_time: Instant::now(), // start time since we start the play
 
             i18n: create_i18n_fr_message(),
 
@@ -280,15 +290,21 @@ impl eframe::App for VirtualBookApp {
         // handling smooth
         if appplayer.is_playing()
             && *adjusted_start_time + Duration::from_millis(100) < Instant::now()
+        // evaluated every 100ms
         {
             let delta = Instant::now().duration_since(*adjusted_start_time);
             if let Some(vb) = &appplayer.virtual_book {
                 if let Some(max_time) = vb.max_time() {
                     *current_duration = delta;
                     self.offset = delta.as_micros() as f32 / max_time as f32;
+                    self.pid_controller.set_target(self.offset.into());
                 }
             }
         }
+
+        // compute smoothed values for nice display
+        //self.pid_regulated_offset
+        self.pid_regulated_offset = self.pid_controller.update(self.pid_regulated_offset);
 
         // handling messages
         if let Ok(mut opt_last_response) = last_response_arc.lock() {
@@ -447,23 +463,23 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
-                if appplayer.is_playing() {
-                    let cell = &appplayer.playlist.current();
-                    match cell {
-                        Some(t) => {
-                            let name = t.name.clone();
-                            let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+                // if appplayer.is_playing() {
+                //     let cell = &appplayer.playlist.current();
+                //     match cell {
+                //         Some(t) => {
+                //             let name = t.name.clone();
+                //             let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
 
-                            rt = rt.background_color(ui.style().visuals.selection.bg_fill);
-                            rt = rt.color(ui.style().visuals.selection.stroke.color);
+                //             rt = rt.background_color(ui.style().visuals.selection.bg_fill);
+                //             rt = rt.color(ui.style().visuals.selection.stroke.color);
 
-                            ui.label(rt.monospace());
-                        }
-                        None => {}
-                    }
+                //             ui.label(rt.monospace());
+                //         }
+                //         None => {}
+                //     }
 
-                    ui.label(format!("{:.0}s", &current_duration.as_secs_f32()));
-                }
+                //     ui.label(format!("{:.0}s", &current_duration.as_secs_f32()));
+                // }
             });
             ctx.set_visuals(old);
         });
@@ -471,6 +487,7 @@ impl eframe::App for VirtualBookApp {
         let present = appplayer.player.is_some();
 
         if !present {
+            // there is no player instanciated (because we need to define the output port)
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.label("Choisissez un périphérique de sortie dans le menu Fichier");
             });
@@ -543,11 +560,12 @@ impl eframe::App for VirtualBookApp {
                     min: pos2(0.0, 0.0),
                     max: pos2(1.0, 1.0),
                 };
-                //mesh.add_rect_with_uv(ctx.screen_rect(), uv, Color32::WHITE);
+
                 let mut displayed_image = ctx.screen_rect();
                 *displayed_image.top_mut() += top_response.response.rect.bottom();
 
                 if let Some(t) = &self1.texture_handle {
+                    // background image
                     p.image(t.id(), displayed_image, uv, Color32::WHITE);
                 }
                 let mut rect = ctx.screen_rect();
@@ -556,6 +574,7 @@ impl eframe::App for VirtualBookApp {
                     - (ui.style().spacing.window_margin.bottom
                         + ui.style().spacing.window_margin.top);
 
+                // windows is the only way to have a transparent overlap in egui
                 Window::new("title")
                     .title_bar(false)
                     .fixed_rect(rect)

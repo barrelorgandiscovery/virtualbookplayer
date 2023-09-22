@@ -15,6 +15,10 @@ pub struct I18NMessages {
     pub aucun_fichiers: String,
     pub hide_num_pad: String,
     pub dark_light: String,
+    pub filter: String,
+    pub remove_file_from_list: String,
+    pub button_remove: String,
+    pub go_to_next_file: String,
 }
 
 pub fn create_i18n_message_with_lang(lang: String) -> Box<I18NMessages> {
@@ -32,7 +36,6 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         quit: "Quit".into(),
         display: "Display".into(),
         preferences: "Preferences".into(),
-        time_between_file: "Temps supplementaire au debut du morceau :".into(),
         zoom: "Zoom".into(),
         file: "File".into(),
         save_playlist: "Save playlist ..".into(),
@@ -40,6 +43,11 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         aucun_fichiers: "No_files".into(),
         hide_num_pad: "Hide numpad".into(),
         dark_light: "Light mode".into(),
+        filter: "Filter".into(),
+        remove_file_from_list: "Remove file from list".into(),
+        button_remove: "Remove".into(),
+        go_to_next_file: "Go to next file".into(),
+        time_between_file: "Additional Time at the beginning (s):".into(),
     })
 }
 
@@ -51,7 +59,8 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         quit: "Quitter".into(),
         display: "Affichage".into(),
         preferences: "Preferences".into(),
-        time_between_file: "Additional Time at the beginning :".into(),
+        time_between_file: "Temps supplementaire au debut du morceau (s):".into(),
+
         zoom: "Zoom :".into(),
         file: "Fichier".into(),
         save_playlist: "Enregistrer la liste ..".into(),
@@ -59,5 +68,9 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         aucun_fichiers: "Aucuns fichiers".into(),
         hide_num_pad: "Cacher le pavé numérique".into(),
         dark_light: "Couleures Claires".into(),
+        filter: "Recherche".into(),
+        button_remove: "Enlever".into(),
+        remove_file_from_list: "Enlever le fichier de la liste".into(),
+        go_to_next_file: "Aller au fichier suivant".into(),
     })
 }

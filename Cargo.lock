@@ -2225,6 +2225,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
+name = "pid-lite"
+version = "1.1.2"
+source = "git+https://github.com/yoshuawuyts/pid-lite?tag=v1.1.2#8c9b3919b4a48c313571342ef9c590bcedd8586a"
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3131,6 +3136,7 @@ dependencies = [
  "log",
  "midir 0.9.1",
  "nodi",
+ "pid-lite",
  "player",
  "serde",
  "tracing-subscriber",

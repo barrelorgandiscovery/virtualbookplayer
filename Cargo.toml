@@ -35,6 +35,8 @@ egui_extras = { git = "https://github.com/rustytsuki/egui", branch = "rust-offic
 
 image = { version = "0.22.0", default-features = false, features = ["png"] }
 
+pid-lite = { git = "https://github.com/yoshuawuyts/pid-lite", tag="v1.1.2" }
+
 
 [target.'cfg(not(any(target_os = "unix", target_os = "windows")))'.dependencies]
 eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
@@ -54,7 +56,7 @@ eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", d
 
 
 [profile.release]
-opt-level = 2 # fast and small wasm
+opt-level = 2
 
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
