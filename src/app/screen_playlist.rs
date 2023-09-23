@@ -460,6 +460,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                             .offset(foffset)
                             .xscale(app.xscale)
                             .hide_scrollbar();
+
                             c.ui_content(ui);
                         });
                         strip.cell(|ui| {

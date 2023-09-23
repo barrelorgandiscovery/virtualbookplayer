@@ -212,17 +212,28 @@ impl VirtualBookComponent {
                     ]);
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
                 } else {
-                    // draw an empty
+                    // some virtualbook
 
-                    let book_background = Rect::from_points(&[
-                        pos2(0.0, 0.0),
-                        pos2(ui.available_width(), ui.available_height()),
-                    ]);
+                    let to_screen = emath::RectTransform::from_to(
+                        Rect::from_min_size(Pos2::ZERO, response.rect.size()),
+                        response.rect,
+                    );
+                    // draw an empty
+                    let book_background = to_screen
+                        .transform_rect(Rect::from_min_size(Pos2::ZERO, response.rect.size()));
+
                     painter.add(RectShape::filled(
                         book_background,
                         Rounding::default(),
-                        Color32::from_rgb(255, 255, 255),
+                        Color32::WHITE,
                     ));
+
+                    let bar = Rect::from_points(&[
+                        to_screen * pos2(midx - 1.0, 0.0),
+                        to_screen * pos2(midx + 1.0, maxy + 10.0),
+                    ]);
+
+                    painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
                 }
                 ui.ctx().request_repaint();
                 response
