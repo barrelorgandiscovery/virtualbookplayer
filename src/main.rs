@@ -19,12 +19,14 @@ fn main() -> eframe::Result<()> {
     tracing_subscriber::fmt::init();
 
     let version = env!("CARGO_PKG_VERSION");
-    println!("Virtual Book Player {} (Patrice Freydiere - BarrelOrganDiscovery)", version);
+    println!(
+        "Virtual Book Player {} (Patrice Freydiere - BarrelOrganDiscovery)",
+        version
+    );
     println!("https://www.barrel-organ-discovery.org");
-    
+
     println!("  date: {}", std::env!("BUILD_DATE"));
     println!("  build: {}", std::env!("GIT_HASH"));
-
 
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);
