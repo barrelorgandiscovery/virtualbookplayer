@@ -12,6 +12,9 @@ struct Args {
 
     #[arg(short, long)]
     lang_code: Option<String>,
+
+    #[arg(short, long)]
+    full_screen: Option<bool>,
 }
 
 fn main() -> eframe::Result<()> {
@@ -33,7 +36,10 @@ fn main() -> eframe::Result<()> {
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);
 
-    let native_options = eframe::NativeOptions::default();
+    let mut native_options = eframe::NativeOptions::default();
+    if let Some(fs) = args.full_screen {
+        native_options.fullscreen = fs;
+    }
     eframe::run_native(
         "VirtualBook Player",
         native_options,

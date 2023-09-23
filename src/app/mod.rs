@@ -196,6 +196,8 @@ impl VirtualBookApp {
             .families
             .insert(FontFamily::Name("icon_font".into()), v);
 
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
         cc.egui_ctx.set_fonts(fonts);
 
         if !reset {
@@ -390,10 +392,17 @@ impl eframe::App for VirtualBookApp {
                 #[allow(clippy::blocks_in_if_conditions)]
                 if ui
                     .menu_button(&i18n.file, |ui| {
-                        if ui.button(&i18n.open_folder).clicked() {
+                        if ui
+                            .button(format!(
+                                "{} {}",
+                                egui_phosphor::regular::FOLDER_OPEN,
+                                &i18n.open_folder
+                            ))
+                            .clicked()
+                        {
                             let mut location: Option<PathBuf> = self.file_store_path.clone();
                             if let Some(loc) = &location {
-                                // check location exists
+                                // check l,ocation exists
                                 match loc.metadata() {
                                     Ok(_r) => {
                                         if !_r.is_dir() {
@@ -460,17 +469,24 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
-                ui.menu_button(&i18n.preferences, |ui| {
-                    ui.label(&i18n.zoom);
-                    ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
-                    ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
-                    ui.checkbox(islight, &i18n.dark_light);
-                    ui.label(&i18n.time_between_file);
-                    let time_slider = egui::Slider::new(play_wait, 0.0..=30.0);
-                    if time_slider.ui(ui).changed() {
-                        appplayer.set_waittime_between_file_play(*play_wait);
-                    }
-                });
+                ui.menu_button(
+                    format!(
+                        "{} {}",
+                        egui_phosphor::variants::regular::GEAR_SIX,
+                        &i18n.preferences
+                    ),
+                    |ui| {
+                        ui.label(&i18n.zoom);
+                        ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
+                        ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
+                        ui.checkbox(islight, &i18n.dark_light);
+                        ui.label(&i18n.time_between_file);
+                        let time_slider = egui::Slider::new(play_wait, 0.0..=30.0);
+                        if time_slider.ui(ui).changed() {
+                            appplayer.set_waittime_between_file_play(*play_wait);
+                        }
+                    },
+                );
             });
             ctx.set_visuals(old);
         });
@@ -598,19 +614,19 @@ impl eframe::App for VirtualBookApp {
 
                             StripBuilder::new(ui)
                                 .size(Size::remainder())
-                                .size(Size::relative(0.05))
+                                // .size(Size::relative(0.05))
                                 .horizontal(|mut strip| {
                                     strip.cell(|ui| {
                                         screen_playlist::ui_content(self1, ctx, ui);
                                     });
 
-                                    strip.cell(|ui| {
-                                        ui.centered_and_justified(|ui| {
-                                            if ui.button(">").clicked() {
-                                                self1.screen = Screen::Display
-                                            }
-                                        });
-                                    });
+                                    // strip.cell(|ui| {
+                                    //     ui.centered_and_justified(|ui| {
+                                    //         if ui.button(">").clicked() {
+                                    //             self1.screen = Screen::Display
+                                    //         }
+                                    //     });
+                                    // });
                                 });
                         }
                     });

@@ -38,6 +38,7 @@ image = { version = "0.22.0", default-features = false, features = ["png"] }
 
 pid-lite = { git = "https://github.com/yoshuawuyts/pid-lite", tag="v1.1.2" }
 
+egui-phosphor = "0.2.0"
 
 [target.'cfg(not(any(target_os = "unix", target_os = "windows")))'.dependencies]
 eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
@@ -64,3 +65,4 @@ opt-level = 2
 
 
 [patch.crates-io]
+egui = { git = "https://github.com/rustytsuki/egui", branch = "rust-office"}

@@ -14,6 +14,8 @@ use crate::{
 use egui::*;
 use egui_extras::{Size, StripBuilder};
 
+use super::Screen;
+
 pub const BACKSPACE: &str = "<-";
 pub const ENTER: &str = "Enter";
 
@@ -143,10 +145,11 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                 strip.cell(|ui| {
                                                     ui.horizontal(|ui| {
 
-                                                        ui.label(RichText::new("PlayList : ").heading());
+                                                        ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
 
+                                                        ui.add_enabled_ui(!app.appplayer.playlist.file_list.is_empty() , |ui| {
                                                         if ui
-                                                            .toggle_value(&mut app.appplayer.play_mod, RichText::new('\u{F04B}')
+                                                            .toggle_value(&mut app.appplayer.play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
                                                             .font(FontId::new(26.0, FontFamily::Name("icon_font".into())))
                                                         ).on_hover_text(&app.i18n.play)
                                                             .clicked()
@@ -164,11 +167,13 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                             .clicked() {
                                                             app.appplayer.next();
                                                         }
+                                                    });
 
                                                         if let Some(path_buf) = &app.file_store_path
                                                         {
-                                                            ui.spacing();
-                                                            if crate::app::font_button(ui, '\u{F381}')
+                                                            ui.separator();
+                                                            if ui.button( egui_phosphor::regular::LIST_PLUS)
+                                                                .on_hover_text(&app.i18n.save_playlist)
                                                                 .clicked()
                                                             {
                                                                 let date = Local::now();
@@ -221,7 +226,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                     Label::new(format!("{}:", index + 1))
                                                                                 );
                                                                                 ui.label(&i.name);
-                                                                                if ui.button(&app.i18n.button_remove)
+                                                                                if ui.button( egui_phosphor::regular::TRASH).on_hover_text(&app.i18n.button_remove)
                                                                                     .on_hover_text(&app.i18n.remove_file_from_list)
                                                                                     .clicked() {
                                                                                     deleted =
@@ -461,7 +466,9 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                             .xscale(app.xscale)
                             .hide_scrollbar();
 
-                            c.ui_content(ui);
+                            if c.ui_content(ui).clicked() {
+                                app.screen = Screen::Display;
+                            }
                         });
                         strip.cell(|ui| {
                             // render playlist panel

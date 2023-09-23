@@ -1036,6 +1036,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-phosphor"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c20b33023d92696a165857bcb3d87a698894b0d8d04f9383fd890b945ba0b23f"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui-winit"
 version = "0.22.0"
 source = "git+https://github.com/rustytsuki/egui?branch=rust-office#69846b2af7612c1cd8a971505caa67105a275756"
@@ -3138,6 +3147,7 @@ dependencies = [
  "clap",
  "eframe",
  "egui",
+ "egui-phosphor",
  "egui_extras",
  "env_logger",
  "im-native-dialog",

@@ -236,7 +236,8 @@ impl VirtualBookComponent {
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
                 }
                 ui.ctx().request_repaint();
-                response
+                ui.interact(response.rect, Id::new("area"), Sense::click())
+                //response
             })
             .inner
     }
