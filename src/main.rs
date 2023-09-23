@@ -18,6 +18,7 @@ fn main() -> eframe::Result<()> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
+    println!("==========================================================================");
     let version = env!("CARGO_PKG_VERSION");
     println!(
         "Virtual Book Player {} (Patrice Freydiere - BarrelOrganDiscovery)",
@@ -27,6 +28,7 @@ fn main() -> eframe::Result<()> {
 
     println!("  date: {}", std::env!("BUILD_DATE"));
     println!("  build: {}", std::env!("GIT_HASH"));
+    println!("==========================================================================");
 
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);

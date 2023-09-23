@@ -34,12 +34,12 @@ fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages>
 }
 
 pub fn create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
-    log::info!("command line language : {:?}", language);
+    log::debug!("command line language : {:?}", language);
     if let Some(_lang) = language.clone() {
         return _create_i18n_message_with_lang(language);
     }
 
-    log::info!("using LANG variable to detect language");
+    log::debug!("using LANG variable to detect language");
 
     let key = "LANG";
 
@@ -54,7 +54,7 @@ pub fn create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessag
     use sys_locale::get_locale;
 
     let locale = get_locale().unwrap_or_else(|| String::from("en-US"));
-    println!("The current locale is {}", locale);
+    log::debug!("The current locale is {}", locale);
     if locale.len() >= 2 {
         _create_i18n_message_with_lang(Some(locale[0..2].into()))
     } else {
@@ -63,7 +63,7 @@ pub fn create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessag
 }
 
 pub fn create_i18n_message() -> Box<I18NMessages> {
-    log::info!("use english language");
+    log::debug!("use english language");
     Box::new(I18NMessages {
         play: "Play".into(),
         next: "Next".into(),
@@ -87,7 +87,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
 }
 
 pub fn create_i18n_fr_message() -> Box<I18NMessages> {
-    log::info!("use french language");
+    log::debug!("use french language");
     Box::new(I18NMessages {
         play: "Jouer".into(),
         next: "Suivant".into(),
