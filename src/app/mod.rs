@@ -166,6 +166,11 @@ impl VirtualBookApp {
             FontData::from_static(include_bytes!("../../fonts/Rubik-VariableFont_wght.ttf")),
         ); // .ttf and .otf supported
 
+        fonts.font_data.insert(
+            "icon_font".to_owned(),
+            FontData::from_static(include_bytes!("../../fonts/fa-solid-900.ttf")),
+        );
+
         // Put my font first (highest priority):
         fonts
             .families
@@ -179,6 +184,14 @@ impl VirtualBookApp {
             .get_mut(&FontFamily::Monospace)
             .unwrap()
             .push("my_font".to_owned());
+
+        let v = vec!["icon_font".to_owned()];
+
+        fonts
+            .families
+            .insert(FontFamily::Name("icon_font".into()), v);
+
+        cc.egui_ctx.set_fonts(fonts);
 
         if !reset {
             // Load previous app state (if any).
@@ -309,8 +322,7 @@ impl eframe::App for VirtualBookApp {
         // handling messages
         if let Ok(mut opt_last_response) = last_response_arc.lock() {
             if opt_last_response.is_some() {
-                let last_response = opt_last_response.as_mut().unwrap();
-                // println!("command received : {:?}", &last_response);
+                let last_response = opt_last_response.as_mut().unwrap();                
                 match *last_response {
                     Response::EndOfFile => {
                         appplayer.next();
@@ -452,34 +464,22 @@ impl eframe::App for VirtualBookApp {
                     }
                 });
 
-                if ui
-                    .toggle_value(&mut appplayer.play_mod, &i18n.play)
-                    .clicked()
-                {
-                    if appplayer.play_mod {
-                        appplayer.play_file_on_top();
-                    } else {
-                        appplayer.stop();
-                    }
-                }
-
-                // if appplayer.is_playing() {
-                //     let cell = &appplayer.playlist.current();
-                //     match cell {
-                //         Some(t) => {
-                //             let name = t.name.clone();
-                //             let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
-
-                //             rt = rt.background_color(ui.style().visuals.selection.bg_fill);
-                //             rt = rt.color(ui.style().visuals.selection.stroke.color);
-
-                //             ui.label(rt.monospace());
+                // ui.vertical_centered(|ui| {
+                //     // takes remaining space
+                //     let height = ui.spacing().interact_size.y;
+                //     ui.set_min_size(vec2(ui.available_width(), height));
+                   
+                //     if ui
+                //         .toggle_value(&mut appplayer.play_mod, &i18n.play)
+                //         .clicked()
+                //     {
+                //         if appplayer.play_mod {
+                //             appplayer.play_file_on_top();
+                //         } else {
+                //             appplayer.stop();
                 //         }
-                //         None => {}
                 //     }
-
-                //     ui.label(format!("{:.0}s", &current_duration.as_secs_f32()));
-                // }
+                // });
             });
             ctx.set_visuals(old);
         });
@@ -628,3 +628,10 @@ impl eframe::App for VirtualBookApp {
         ctx.request_repaint();
     }
 }
+
+
+pub fn font_button(ui:&mut  egui::Ui, icon_character: char) -> egui::Response {
+    ui.button(RichText::new(icon_character)
+    .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))))
+}
+

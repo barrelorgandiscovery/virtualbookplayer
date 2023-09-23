@@ -24,6 +24,7 @@ use std::convert::TryFrom;
 
 use log::{debug, error};
 
+// 120 bpm default tempo for files that does not have tempo signature in it
 const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
 
 /// Midi device player factory
@@ -166,8 +167,8 @@ pub struct MidiPlayer {
 
 impl Drop for MidiPlayer {
     fn drop(&mut self) {
-        drop(&self.midi_output_connection);
-        drop(&self.output);
+        // drop(*self.midi_output_connection);
+        // drop(*self.output);
     }
 }
 

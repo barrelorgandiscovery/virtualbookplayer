@@ -12,6 +12,7 @@ pub struct VirtualBookComponent {
     fit_to_height: bool,
 
     scrollbars_visible: bool,
+    scrollbats_width: f32,
 
     virtual_book: Option<Arc<VirtualBook>>,
 }
@@ -24,6 +25,7 @@ impl Default for VirtualBookComponent {
             yfactor: 3.0f32,
             fit_to_height: true,
             scrollbars_visible: true,
+            scrollbats_width: 12.0,
             virtual_book: None,
         }
     }
@@ -34,6 +36,21 @@ impl VirtualBookComponent {
     pub fn from(virtual_book: Arc<VirtualBook>) -> VirtualBookComponent {
         VirtualBookComponent {
             virtual_book: Some(virtual_book),
+            ..Default::default()
+        }
+    }
+
+    /// create the component state from the virtual book
+    pub fn from_some_virtualbook(some_virtual_book: Option<Arc<VirtualBook>>) -> VirtualBookComponent {
+        VirtualBookComponent {
+            virtual_book: some_virtual_book,
+            ..Default::default()
+        }
+    }
+
+    pub fn new() -> VirtualBookComponent {
+        VirtualBookComponent {
+            virtual_book: None,
             ..Default::default()
         }
     }
@@ -61,6 +78,11 @@ impl VirtualBookComponent {
         self
     }
 
+    pub fn scrollbar_width(mut self, width: f32) -> Self {
+        self.scrollbats_width = width;
+        self
+    }
+
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let Self {
             offset,
@@ -72,7 +94,7 @@ impl VirtualBookComponent {
         } = self;
 
         let mut style = ui.style_mut().clone();
-        style.spacing.scroll_bar_width = 32.0;
+        style.spacing.scroll_bar_width = self.scrollbats_width;
         style.spacing.scroll_handle_min_length = 50.0;
 
         ui.set_style(style);
@@ -186,6 +208,18 @@ impl VirtualBookComponent {
                         to_screen * pos2(midx + 1.0, maxy + 10.0),
                     ]);
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
+                } else {
+                    // draw an empty
+                
+                    let book_background = Rect::from_points(&[
+                        pos2(0.0, 0.0),
+                        pos2(ui.available_width(), ui.available_height())
+                    ]);
+                    painter.add(RectShape::filled(
+                        book_background,
+                        Rounding::default(),
+                        Color32::from_rgb(255, 255, 255),
+                    ));
                 }
                 ui.ctx().request_repaint();
                 response
@@ -194,6 +228,7 @@ impl VirtualBookComponent {
     }
 }
 
+/// widget implementation
 impl Widget for VirtualBookComponent {
     fn ui(mut self, ui: &mut Ui) -> Response {
         self.ui_content(ui)

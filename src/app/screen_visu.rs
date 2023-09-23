@@ -26,7 +26,8 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mu
         ui.add(
             VirtualBookComponent::from(Arc::clone(vbc))
                 .offset(foffset)
-                .xscale(*xscale),
+                .xscale(*xscale)
+                .scrollbar_width(32.0),
         );
     }
 }

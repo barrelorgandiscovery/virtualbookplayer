@@ -71,6 +71,6 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         filter: "Recherche".into(),
         button_remove: "Enlever".into(),
         remove_file_from_list: "Enlever le fichier de la liste".into(),
-        go_to_next_file: "Aller au fichier suivant".into(),
+        go_to_next_file: "Lire le fichier suivant".into(),
     })
 }
