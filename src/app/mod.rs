@@ -471,23 +471,6 @@ impl eframe::App for VirtualBookApp {
                         appplayer.set_waittime_between_file_play(*play_wait);
                     }
                 });
-
-                // ui.vertical_centered(|ui| {
-                //     // takes remaining space
-                //     let height = ui.spacing().interact_size.y;
-                //     ui.set_min_size(vec2(ui.available_width(), height));
-
-                //     if ui
-                //         .toggle_value(&mut appplayer.play_mod, &i18n.play)
-                //         .clicked()
-                //     {
-                //         if appplayer.play_mod {
-                //             appplayer.play_file_on_top();
-                //         } else {
-                //             appplayer.stop();
-                //         }
-                //     }
-                // });
             });
             ctx.set_visuals(old);
         });

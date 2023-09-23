@@ -16,6 +16,7 @@ bookparsing = { path = "depends/book-lib-rs" }
 
 env_logger = "0.10.0"
 log = "0.4.8"
+sys-locale = "0.3.1"
 
 player= { path = "depends/player" }
 midir = { version = "0.9.1" }

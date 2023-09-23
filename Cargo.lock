@@ -2822,6 +2822,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sys-locale"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e801cf239ecd6ccd71f03d270d67dd53d13e90aab208bf4b8fe4ad957ea949b0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "tar"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3122,7 +3131,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "virtualbookplayerapp"
-version = "0.1.0"
+version = "0.0.27"
 dependencies = [
  "bookparsing",
  "chrono",
@@ -3139,6 +3148,7 @@ dependencies = [
  "pid-lite",
  "player",
  "serde",
+ "sys-locale",
  "tracing-subscriber",
 ]
 

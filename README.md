@@ -68,7 +68,9 @@ this option reset the saved preferences (window size, output midi port, ... )
 
 Overload the window language, and take this value instead of trying to detect it
 
-There are two languages available : french and english, the software try to detect it from the LANG environement variable.
+There are two languages available : french and english, the software try to detect it.
 if not detected english is taken
 
- codes are two char ISO country code in lower case
+codes are two char ISO country code in lower case
+feel free to create a pull request and provide other languages translations
+

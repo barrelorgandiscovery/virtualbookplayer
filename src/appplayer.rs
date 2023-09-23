@@ -100,7 +100,6 @@ impl AppPlayer {
                     self.start_play_time = Instant::now(); // before play
                     if let Err(e) = p.play(&n.path, Some(self.waittime_between_file_play)) {
                         error!("error in playing file : {}", e);
-                    } else {
                     }
                 }
             }

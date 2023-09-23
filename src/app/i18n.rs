@@ -36,17 +36,29 @@ fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages>
 pub fn create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
     log::info!("command line language : {:?}", language);
     if let Some(_lang) = language.clone() {
-        _create_i18n_message_with_lang(language)
-    } else {
-        log::info!("using LANG variable to detect language");
-        // detect plateform language
-        let lang_environement = env!("LANG");
-        if lang_environement.len() >= 2 {
-            _create_i18n_message_with_lang(Some(lang_environement[0..2].into()))
-        } else {
-            // use default language
-            create_i18n_message()
+        return _create_i18n_message_with_lang(language);
+    }
+
+    log::info!("using LANG variable to detect language");
+
+    let key = "LANG";
+
+    use std::env;
+    if let Some(lang_environement) = env::var_os(key) {
+        let string_lang = lang_environement.to_string_lossy();
+        if string_lang.len() >= 2 {
+            return _create_i18n_message_with_lang(Some(string_lang[0..2].into()));
         }
+    }
+
+    use sys_locale::get_locale;
+
+    let locale = get_locale().unwrap_or_else(|| String::from("en-US"));
+    println!("The current locale is {}", locale);
+    if locale.len() >= 2 {
+        _create_i18n_message_with_lang(Some(locale[0..2].into()))
+    } else {
+        create_i18n_message()
     }
 }
 
