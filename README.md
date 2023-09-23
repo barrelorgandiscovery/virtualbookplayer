@@ -38,3 +38,37 @@ Piano Roll display :
 Midi output selection : (don't need to restart the application, plug and choose the output port)
 ![](doc/ss3.png) 
 
+
+## launch using command line
+
+several options are available thought command line, 
+
+```
+    virtualbookplayer --help
+```
+
+this returns : 
+
+```
+Usage: virtualbookplayerapp [OPTIONS]
+
+Options:
+  -r, --reset-preferences      Name of the person to greet
+  -l, --lang-code <LANG_CODE>  
+  -h, --help                   Print help
+  -V, --version                Print version
+
+```
+
+### option -r, --reset-preferences  
+
+this option reset the saved preferences (window size, output midi port, ... )
+
+### option  -l, --lang-code <LANG_CODE>  
+
+Overload the window language, and take this value instead of trying to detect it
+
+There are two languages available : french and english, the software try to detect it from the LANG environement variable.
+if not detected english is taken
+
+ codes are two char ISO country code in lower case

@@ -17,7 +17,7 @@ use crate::file_store::*;
 
 use log::{debug, error};
 
-use self::i18n::{create_i18n_fr_message, I18NMessages};
+use self::i18n::{create_i18n_message_with_lang, I18NMessages};
 
 use pid_lite::Controller;
 
@@ -101,6 +101,8 @@ pub struct VirtualBookApp {
 
     /// wait time before playing the file
     play_wait: f32,
+
+    lang: Option<String>,
 }
 
 impl Default for VirtualBookApp {
@@ -113,6 +115,9 @@ impl Default for VirtualBookApp {
 
         Self {
             frame_history: frame_history::FrameHistory::default(),
+
+            lang: None,
+
             offset: 0.0,
             pid_regulated_offset: 0.0,
             pid_controller: Controller::new(0.0, 0.15, 0.005, 0.05),
@@ -139,7 +144,7 @@ impl Default for VirtualBookApp {
             latest_duration_time: Duration::new(0, 0),
             adjusted_start_time: Instant::now(), // start time since we start the play
 
-            i18n: create_i18n_fr_message(),
+            i18n: create_i18n_message_with_lang(None),
 
             islight: false,
 
@@ -154,7 +159,7 @@ impl Default for VirtualBookApp {
 
 impl VirtualBookApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>, reset: bool) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, reset: bool, lang: Option<String>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -237,14 +242,17 @@ impl VirtualBookApp {
                         }
                     }
                 }
-
+                old_storage.lang = lang.clone();
+                old_storage.i18n = create_i18n_message_with_lang(lang);
                 return old_storage;
             }
         }
 
-        let app: VirtualBookApp = Default::default();
-
-        app
+        VirtualBookApp {
+            lang: lang.clone(),
+            i18n: create_i18n_message_with_lang(lang),
+            ..Default::default()
+        }
     }
 }
 

@@ -9,13 +9,17 @@ struct Args {
     /// Name of the person to greet
     #[arg(short, long)]
     reset_preferences: bool,
+
+    #[arg(short, long)]
+    lang_code: Option<String>,
 }
 
 fn main() -> eframe::Result<()> {
-    let args = Args::parse();
-
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
+
+    let args = Args::parse();
+    log::debug!("commandline arguments : {:?}", args);
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
@@ -25,6 +29,7 @@ fn main() -> eframe::Result<()> {
             Box::new(virtualbookplayerapp::VirtualBookApp::new(
                 cc,
                 args.reset_preferences,
+                args.lang_code,
             ))
         }),
     )

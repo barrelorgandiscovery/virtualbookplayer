@@ -21,14 +21,37 @@ pub struct I18NMessages {
     pub go_to_next_file: String,
 }
 
-pub fn create_i18n_message_with_lang(lang: String) -> Box<I18NMessages> {
-    match lang.as_str() {
-        "fr" => create_i18n_fr_message(),
-        _ => create_i18n_message(),
+fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
+    if let Some(lang) = language {
+        match lang.as_str() {
+            "fr" => create_i18n_fr_message(),
+            _ => create_i18n_message(),
+        }
+    } else {
+        // use default language
+        create_i18n_message()
+    }
+}
+
+pub fn create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
+    log::info!("command line language : {:?}", language);
+    if let Some(_lang) = language.clone() {
+        _create_i18n_message_with_lang(language)
+    } else {
+        log::info!("using LANG variable to detect language");
+        // detect plateform language
+        let lang_environement = env!("LANG");
+        if lang_environement.len() >= 2 {
+            _create_i18n_message_with_lang(Some(lang_environement[0..2].into()))
+        } else {
+            // use default language
+            create_i18n_message()
+        }
     }
 }
 
 pub fn create_i18n_message() -> Box<I18NMessages> {
+    log::info!("use english language");
     Box::new(I18NMessages {
         play: "Play".into(),
         next: "Next".into(),
@@ -52,6 +75,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
 }
 
 pub fn create_i18n_fr_message() -> Box<I18NMessages> {
+    log::info!("use french language");
     Box::new(I18NMessages {
         play: "Jouer".into(),
         next: "Suivant".into(),
