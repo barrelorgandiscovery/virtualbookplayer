@@ -41,13 +41,16 @@ impl VirtualBookComponent {
     }
 
     /// create the component state from the virtual book
-    pub fn from_some_virtualbook(some_virtual_book: Option<Arc<VirtualBook>>) -> VirtualBookComponent {
+    pub fn from_some_virtualbook(
+        some_virtual_book: Option<Arc<VirtualBook>>,
+    ) -> VirtualBookComponent {
         VirtualBookComponent {
             virtual_book: some_virtual_book,
             ..Default::default()
         }
     }
 
+    #[allow(dead_code)]
     pub fn new() -> VirtualBookComponent {
         VirtualBookComponent {
             virtual_book: None,
@@ -210,10 +213,10 @@ impl VirtualBookComponent {
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
                 } else {
                     // draw an empty
-                
+
                     let book_background = Rect::from_points(&[
                         pos2(0.0, 0.0),
-                        pos2(ui.available_width(), ui.available_height())
+                        pos2(ui.available_width(), ui.available_height()),
                     ]);
                     painter.add(RectShape::filled(
                         book_background,

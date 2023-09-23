@@ -1,6 +1,6 @@
 use log::{debug, error};
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc};
 
 use chrono::Local;
 
@@ -142,7 +142,6 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                             |mut strip| {
                                                 strip.cell(|ui| {
                                                     ui.horizontal(|ui| {
-                                                        
 
                                                         ui.label(RichText::new("PlayList : ").heading());
 
@@ -169,7 +168,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                         if let Some(path_buf) = &app.file_store_path
                                                         {
                                                             ui.spacing();
-                                                            if crate::app::font_button(ui, '\u{F381}')                                                               
+                                                            if crate::app::font_button(ui, '\u{F381}')
                                                                 .clicked()
                                                             {
                                                                 let date = Local::now();
@@ -421,22 +420,21 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                     .size(Size::remainder())
                     .vertical(|mut strip| {
                         strip.cell(|ui| {
-
                             // name of the element
                             ui.vertical_centered(|ui| {
+                                if app.appplayer.is_playing() {
+                                    let cell = &app.appplayer.playlist.current();
+                                    match cell {
+                                        Some(t) => {
+                                            let name = t.name.clone();
+                                            let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
 
-                            if app.appplayer.is_playing() {
-                                let cell = &app.appplayer.playlist.current();
-                                match cell {
-                                    Some(t) => {
-                                        let name = t.name.clone();
-                                        let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+                                            rt = rt.background_color(
+                                                ui.style().visuals.selection.bg_fill,
+                                            );
+                                            rt =
+                                                rt.color(ui.style().visuals.selection.stroke.color);
 
-                                        rt = rt
-                                            .background_color(ui.style().visuals.selection.bg_fill);
-                                        rt = rt.color(ui.style().visuals.selection.stroke.color);
-
-                                       
                                             ui.horizontal(|ui| {
                                                 ui.label(rt.monospace());
                                                 ui.label(format!(
@@ -444,25 +442,25 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                                                     &app.current_duration.as_secs_f32()
                                                 ));
                                             });
-                                       
+                                        }
+                                        None => {}
                                     }
-                                    None => {}
                                 }
-                            }
-                             });
+                            });
                         });
 
                         strip.cell(|ui| {
                             // draw book vignette
-                           let foffset: f32 = app.pid_regulated_offset as f32;
+                            let foffset: f32 = app.pid_regulated_offset as f32;
 
                             // display virtualbook
-                           let mut c = VirtualBookComponent::from_some_virtualbook(app.appplayer.virtual_book.clone())
-                                .offset(foffset)
-                                .xscale(app.xscale)
-                                .hide_scrollbar();
-                           c.ui_content(ui);
-                        
+                            let mut c = VirtualBookComponent::from_some_virtualbook(
+                                app.appplayer.virtual_book.clone(),
+                            )
+                            .offset(foffset)
+                            .xscale(app.xscale)
+                            .hide_scrollbar();
+                            c.ui_content(ui);
                         });
                         strip.cell(|ui| {
                             // render playlist panel

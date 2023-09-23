@@ -322,7 +322,7 @@ impl eframe::App for VirtualBookApp {
         // handling messages
         if let Ok(mut opt_last_response) = last_response_arc.lock() {
             if opt_last_response.is_some() {
-                let last_response = opt_last_response.as_mut().unwrap();                
+                let last_response = opt_last_response.as_mut().unwrap();
                 match *last_response {
                     Response::EndOfFile => {
                         appplayer.next();
@@ -468,7 +468,7 @@ impl eframe::App for VirtualBookApp {
                 //     // takes remaining space
                 //     let height = ui.spacing().interact_size.y;
                 //     ui.set_min_size(vec2(ui.available_width(), height));
-                   
+
                 //     if ui
                 //         .toggle_value(&mut appplayer.play_mod, &i18n.play)
                 //         .clicked()
@@ -629,9 +629,8 @@ impl eframe::App for VirtualBookApp {
     }
 }
 
-
-pub fn font_button(ui:&mut  egui::Ui, icon_character: char) -> egui::Response {
-    ui.button(RichText::new(icon_character)
-    .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))))
+pub fn font_button(ui: &mut egui::Ui, icon_character: char) -> egui::Response {
+    ui.button(
+        RichText::new(icon_character).font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
+    )
 }
-
