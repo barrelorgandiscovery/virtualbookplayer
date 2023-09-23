@@ -18,7 +18,8 @@ fn main() -> eframe::Result<()> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
-    println!("Virtual Book Player (Patrice Freydiere - BarrelOrganDiscovery)");
+    let version = env!("CARGO_PKG_VERSION");
+    println!("Virtual Book Player {} (Patrice Freydiere - BarrelOrganDiscovery)", version);
     println!("https://www.barrel-organ-discovery.org");
     
     println!("  date: {}", std::env!("BUILD_DATE"));
