@@ -18,6 +18,13 @@ fn main() -> eframe::Result<()> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
+    println!("Virtual Book Player (Patrice Freydiere - BarrelOrganDiscovery)");
+    println!("https://www.barrel-organ-discovery.org");
+    
+    println!("  date: {}", std::env!("BUILD_DATE"));
+    println!("  build: {}", std::env!("GIT_HASH"));
+
+
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);
 

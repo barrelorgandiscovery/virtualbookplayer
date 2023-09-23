@@ -55,7 +55,6 @@ eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", d
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 
-
 [profile.release]
 opt-level = 2
 
