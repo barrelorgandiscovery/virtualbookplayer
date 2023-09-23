@@ -1,6 +1,6 @@
 [package]
 name = "virtualbookplayerapp"
-version = "0.0.29"
+version = "0.0.30"
 authors = ["frett27@gmail.com"]
 edition = "2021"
 rust-version = "1.65"
