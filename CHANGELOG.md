@@ -7,3 +7,8 @@
 - add title next to it
 - rework the playlist list
 - add tooltips
+
+### 2023-09-23: 
+- add icons on buttons, simplify the gui
+
+
