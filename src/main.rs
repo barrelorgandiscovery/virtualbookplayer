@@ -39,6 +39,7 @@ fn main() -> eframe::Result<()> {
     let mut native_options = eframe::NativeOptions::default();
     if let Some(fs) = args.full_screen {
         native_options.fullscreen = fs;
+        native_options.decorated = false;
     }
     eframe::run_native(
         "VirtualBook Player",
