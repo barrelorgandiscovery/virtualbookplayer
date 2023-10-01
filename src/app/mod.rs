@@ -513,8 +513,40 @@ impl eframe::App for VirtualBookApp {
                         (Key::Enter, String::from(screen_playlist::ENTER)),
                     ];
 
+                    let skipped_keys = vec![
+                        Key::Tab,
+                        Key::PageDown,
+                        Key::ArrowDown,
+                        Key::ArrowLeft,
+                        Key::ArrowRight,
+                        Key::ArrowUp                        
+                    ];
+
                     ui.input(|i| {
+
+                        // top level key handling
+
                         let mut consumed = false;
+                        // translate some special keys and call the screen accordingly
+
+                        if i.modifiers.alt ||
+                            i.modifiers.command ||
+                            i.modifiers.ctrl ||
+                            i.modifiers.shift {
+                                return;
+                        }
+
+                        for k in skipped_keys {
+                            if i.key_pressed(k) {
+                                return;
+                            }
+                        }
+
+                        // using space to select using the keyboard
+                        if i.key_pressed(Key::Space) && current_typed_no1 == "" {
+                            return;
+                        }
+
                         for k in v {
                             if i.key_pressed(k.0) {
                                 let no = k.1;
