@@ -65,7 +65,7 @@ pub fn create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessag
 pub fn create_i18n_message() -> Box<I18NMessages> {
     log::debug!("use english language");
     Box::new(I18NMessages {
-        play: "Play".into(),
+        play: "Toggle Play Mode".into(),
         next: "Next".into(),
         open_folder: "Open Folder ...".into(),
         quit: "Quit".into(),
@@ -89,7 +89,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
 pub fn create_i18n_fr_message() -> Box<I18NMessages> {
     log::debug!("use french language");
     Box::new(I18NMessages {
-        play: "Jouer".into(),
+        play: "Basculer le mode de jeu".into(),
         next: "Suivant".into(),
         open_folder: "Ouvrir un nouveau répertoire ...".into(),
         quit: "Quitter".into(),
