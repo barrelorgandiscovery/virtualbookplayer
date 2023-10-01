@@ -519,21 +519,21 @@ impl eframe::App for VirtualBookApp {
                         Key::ArrowDown,
                         Key::ArrowLeft,
                         Key::ArrowRight,
-                        Key::ArrowUp                        
+                        Key::ArrowUp,
                     ];
 
                     ui.input(|i| {
-
                         // top level key handling
 
                         let mut consumed = false;
                         // translate some special keys and call the screen accordingly
 
-                        if i.modifiers.alt ||
-                            i.modifiers.command ||
-                            i.modifiers.ctrl ||
-                            i.modifiers.shift {
-                                return;
+                        if i.modifiers.alt
+                            || i.modifiers.command
+                            || i.modifiers.ctrl
+                            || i.modifiers.shift
+                        {
+                            return;
                         }
 
                         for k in skipped_keys {
@@ -543,7 +543,7 @@ impl eframe::App for VirtualBookApp {
                         }
 
                         // using space to select using the keyboard
-                        if i.key_pressed(Key::Space) && current_typed_no1 == "" {
+                        if i.key_pressed(Key::Space) && current_typed_no1.is_empty() {
                             return;
                         }
 

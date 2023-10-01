@@ -981,7 +981,7 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 [[package]]
 name = "ecolor"
 version = "0.22.0"
-source = "git+https://github.com/rustytsuki/egui?branch=rust-office#69846b2af7612c1cd8a971505caa67105a275756"
+source = "git+https://github.com/rustytsuki/egui?branch=rust-office#ed81c46311255fd5610096002bf18639d2f766ae"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1024,7 +1024,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.22.0"
-source = "git+https://github.com/rustytsuki/egui?branch=rust-office#69846b2af7612c1cd8a971505caa67105a275756"
+source = "git+https://github.com/rustytsuki/egui?branch=rust-office#ed81c46311255fd5610096002bf18639d2f766ae"
 dependencies = [
  "accesskit",
  "ahash",
@@ -1062,6 +1062,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_animation"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b60efcf66fd83f86608835229b2bf376c30a11b008c337a55ba4e3cb3005f6f"
+dependencies = [
+ "egui",
+ "hello_egui_utils",
+ "simple-easing",
+]
+
+[[package]]
+name = "egui_dnd"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60a183d4f83f02cb89ecdfe6f0dbbc888f81186120c4020108b1b5e8d40eb622"
+dependencies = [
+ "egui",
+ "egui_animation",
+ "simple-easing",
+ "web-time",
+]
+
+[[package]]
 name = "egui_extras"
 version = "0.22.0"
 source = "git+https://github.com/rustytsuki/egui?branch=rust-office#69846b2af7612c1cd8a971505caa67105a275756"
@@ -1094,7 +1117,7 @@ checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 [[package]]
 name = "emath"
 version = "0.22.0"
-source = "git+https://github.com/rustytsuki/egui?branch=rust-office#69846b2af7612c1cd8a971505caa67105a275756"
+source = "git+https://github.com/rustytsuki/egui?branch=rust-office#ed81c46311255fd5610096002bf18639d2f766ae"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1148,7 +1171,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.22.0"
-source = "git+https://github.com/rustytsuki/egui?branch=rust-office#69846b2af7612c1cd8a971505caa67105a275756"
+source = "git+https://github.com/rustytsuki/egui?branch=rust-office#ed81c46311255fd5610096002bf18639d2f766ae"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -1366,9 +1389,9 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "glow"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "807edf58b70c0b5b2181dd39fe1839dbdb3ba02645630dc5f753e23da307f762"
+checksum = "ca0fe580e4b60a8ab24a868bc08e2f03cbcb20d3d676601fa909386713333728"
 dependencies = [
  "js-sys",
  "slotmap",
@@ -1451,6 +1474,15 @@ name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+
+[[package]]
+name = "hello_egui_utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fc77c7186e36b79ee4ed836fcafe66fdd09bb39ebc428a29c0d7d424dae7cb0"
+dependencies = [
+ "egui",
+]
 
 [[package]]
 name = "hermit-abi"
@@ -2659,6 +2691,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
+name = "simple-easing"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "832ddd7df0d98d6fd93b973c330b7c8e0742d5cb8f1afc7dea89dba4d2531aa1"
+
+[[package]]
 name = "skia-bindings"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3148,6 +3186,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui-phosphor",
+ "egui_dnd",
  "egui_extras",
  "env_logger",
  "im-native-dialog",
@@ -3387,6 +3426,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e33b99f4b23ba3eec1a53ac264e35a755f00e966e0065077d6027c0f575b0b97"
 dependencies = [
  "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "web-time"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19353897b48e2c4d849a2d73cb0aeb16dc2be4e00c565abfc11eb65a806e47de"
+dependencies = [
+ "js-sys",
+ "once_cell",
  "wasm-bindgen",
 ]
 

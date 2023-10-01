@@ -6,7 +6,7 @@ pub struct PlayList {
     pub file_list: Vec<PlaylistElement>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct PlaylistElement {
     pub name: String,
     pub path: PathBuf,

@@ -12,6 +12,7 @@ use crate::{
     VirtualBookApp,
 };
 use egui::*;
+use egui_dnd::dnd;
 use egui_extras::{Size, StripBuilder};
 
 use super::Screen;
@@ -144,9 +145,6 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                             |mut strip| {
                                                 strip.cell(|ui| {
                                                     ui.horizontal(|ui| {
-
-                                                        ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
-
                                                         ui.add_enabled_ui(!app.appplayer.playlist.file_list.is_empty() , |ui| {
                                                         if ui
                                                             .toggle_value(&mut app.appplayer.play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
@@ -161,6 +159,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                             }
                                                         }
 
+                                                        ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
 
                                                         if  crate::app::font_button(ui, '\u{23E9}')
                                                             .on_hover_text(&app.i18n.go_to_next_file)
@@ -207,36 +206,112 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                 strip.cell(|ui| {
                                                                     let isplaying =
                                                                         app.appplayer.is_playing();
-                                                                    let mut deleted: Option<usize> =
-                                                                        None;
 
-                                                                    // render playlist content
-                                                                    for (index, i) in app
+                                                                    let mut deleted: Option<usize> = None;
+                                                                        let item_size =  Vec2::new(ui.available_width(), 32.0);
+                                                                        let items = &mut app
                                                                         .appplayer
                                                                         .playlist
-                                                                        .file_list
-                                                                        .iter_mut()
-                                                                        .enumerate()
-                                                                    {
-                                                                        if !(isplaying
-                                                                            && index == 0)
-                                                                        {
-                                                                            ui.horizontal_wrapped(|ui| {
-                                                                                ui.add(
-                                                                                    Label::new(format!("{}:", index + 1))
-                                                                                );
-                                                                                ui.label(&i.name);
-                                                                                if ui.button( egui_phosphor::regular::TRASH).on_hover_text(&app.i18n.button_remove)
-                                                                                    .on_hover_text(&app.i18n.remove_file_from_list)
-                                                                                    .clicked() {
-                                                                                    deleted =
-                                                                                    Some(index);
-                                                                                }
-                                                                            });
-                                                                            ui.end_row();
-                                                                            ui.separator();
-                                                                        }
-                                                                    }
+                                                                        .file_list;
+
+                                                                    // see https://github.com/lucasmerlin/hello_egui/blob/main/fancy-example/src/main.rs
+                                                                    // for dnd examples
+                                                                    let response = dnd(ui, "playlist_dnd")
+                                                                        .show_custom(|ui, iter| {
+                                                                                items.iter_mut().enumerate().for_each(|(index, item)| {
+                                                                                     iter.next(ui, Id::new(&item), index, true, |ui, item_handle| {
+                                                                                        item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
+                                                                                            ui.horizontal_wrapped(|ui| {
+                                                                                                handle.ui_sized(ui, item_size, |ui| {
+                                                                                                if !(isplaying && index == 0)
+                                                                                                {
+                                                                                                    // let size_factor = ui.ctx().animate_value_with_time(
+                                                                                                    //     item.id().with("handle_anim"),
+                                                                                                    //     if state.dragged { 1.1 } else { 1.0 },
+                                                                                                    //     0.2,
+                                                                                                    // );
+
+                                                                                                        //     let (_id, response) =
+                                                                                                        //     ui.allocate_exact_size(Vec2::splat(size), Sense::click());
+
+                                                                                                        // // if response.clicked() {
+                                                                                                        // //     item.rounded = !item.rounded;
+                                                                                                        // // }
+                                                                                                        // let rect = response.rect;
+
+                                                                                                        // // let x = ui.ctx().animate_bool(item.id(), item.rounded);
+                                                                                                        // //let rounding = x * 16.0 + 1.0;
+
+                                                                                                        // let rounding = 16.0 ;
+
+                                                                                                        // ui.painter().rect_filled(
+                                                                                                        //     rect.shrink(4.0 * size_factor)
+                                                                                                        //         .shrink(rect.width() * (1.0 - size_factor)),
+                                                                                                        //     Rounding::same(rounding),
+                                                                                                        //     Color32::BLACK,
+                                                                                                        // );
+
+                                                                                                        ui.add(
+                                                                                                            Label::new(format!("{}:", index + 1))
+                                                                                                        );
+                                                                                                        ui.label(&item.name);
+                                                                                                        if ui.button( egui_phosphor::regular::TRASH).on_hover_text(&app.i18n.button_remove)
+                                                                                                            .on_hover_text(&app.i18n.remove_file_from_list)
+                                                                                                            .clicked() {
+                                                                                                            deleted =
+                                                                                                            Some(index);
+                                                                                                        }
+                                                                                                        ui.end_row();
+                                                                                                        ui.separator();
+
+                                                                                                }
+
+                                                                                                });
+
+                                                                                            });
+
+
+                                                                                        })
+                                                                                    });
+                                                                                });
+                                                                            }
+                                                                           );
+                                                                            response.update_vec(&mut app
+                                                                             .appplayer
+                                                                             .playlist
+                                                                             .file_list);
+
+                                                                            if let Some(reason) = response.cancellation_reason() {
+                                                                                debug!("Drag has been cancelled because of {:?}", reason);
+                                                                            }
+
+                                                                    // // render playlist content
+                                                                    // for (index, i) in app
+                                                                    //     .appplayer
+                                                                    //     .playlist
+                                                                    //     .file_list
+                                                                    //     .iter_mut()
+                                                                    //     .enumerate()
+                                                                    // {
+                                                                    //     if !(isplaying
+                                                                    //         && index == 0)
+                                                                    //     {
+                                                                    //         ui.horizontal_wrapped(|ui| {
+                                                                    //             ui.add(
+                                                                    //                 Label::new(format!("{}:", index + 1))
+                                                                    //             );
+                                                                    //             ui.label(&i.name);
+                                                                    //             if ui.button( egui_phosphor::regular::TRASH).on_hover_text(&app.i18n.button_remove)
+                                                                    //                 .on_hover_text(&app.i18n.remove_file_from_list)
+                                                                    //                 .clicked() {
+                                                                    //                 deleted =
+                                                                    //                 Some(index);
+                                                                    //             }
+                                                                    //         });
+                                                                    //         ui.end_row();
+                                                                    //         ui.separator();
+                                                                    //     }
+                                                                    // }
 
                                                                     if let Some(index) = deleted {
                                                                         app.appplayer
