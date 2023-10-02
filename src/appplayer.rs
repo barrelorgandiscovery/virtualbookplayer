@@ -23,7 +23,7 @@ pub struct AppPlayer {
     pub player: Option<Arc<Mutex<Box<dyn Player>>>>,
 
     /// play list containing the list of references of the files
-    pub playlist: PlayList,
+    pub playlist: Arc<Mutex<PlayList>>,
 
     /// command send to the player
     pub commands: Sender<Command>,
@@ -42,14 +42,14 @@ pub struct AppPlayer {
     pub waittime_between_file_play: f32,
 }
 
+/// manage asynchrone actions (play, informations retrieve)
 impl AppPlayer {
     pub fn new() -> AppPlayer {
         let commands = channel();
-
         AppPlayer {
             commands: commands.0,
             player: None,
-            playlist: PlayList::new(),
+            playlist: Arc::new(Mutex::new(PlayList::new())),
             play_mod: false,
             last_response: Arc::new(Mutex::new(None)),
             virtual_book: None,
@@ -94,9 +94,9 @@ impl AppPlayer {
         if let Some(player) = &self.player {
             let mut p = player.lock().unwrap();
             p.stop();
-
-            if !self.playlist.file_list.is_empty() {
-                if let Some(n) = self.playlist.file_list.get(0) {
+            let locked_playlist = self.playlist.lock().expect("fail to get lock on playlist");
+            if !locked_playlist.file_list.is_empty() {
+                if let Some(n) = locked_playlist.file_list.get(0) {
                     self.start_play_time = Instant::now(); // before play
                     if let Err(e) = p.play(&n.path, Some(self.waittime_between_file_play)) {
                         error!("error in playing file : {}", e);
@@ -143,10 +143,22 @@ impl AppPlayer {
 
     /// next file, and "unpop" the currently played
     pub fn next(&mut self) {
-        self.playlist.skip();
+        self.playlist
+            .lock()
+            .expect("fail to get lock on playlist")
+            .skip();
+
         if self.play_mod {
             self.play_file_on_top();
         }
+    }
+
+    pub fn is_playlist_empty(&self) -> bool {
+        self.playlist
+            .lock()
+            .expect("fail to get lock on playlist")
+            .file_list
+            .is_empty()
     }
 
     pub fn is_playing(&self) -> bool {

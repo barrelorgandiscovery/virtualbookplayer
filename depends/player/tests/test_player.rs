@@ -12,8 +12,23 @@ use std::{
 };
 
 #[test]
+pub fn test_player_informations() {
+    let f = MidiPlayerFactory { device_no: 0 };
+
+    let mut getter = f
+        .create_information_getter()
+        .expect("fail to create the file information constuctor");
+    let file = PathBuf::from("debussy_63503a_arabesque_2_e_major_(nc)smythe.mid");
+
+    let result = getter
+        .compute(&file)
+        .expect("fail to compute file informations");
+    println!("file duration : {:?}", result.duration);
+}
+
+#[test]
 pub fn test_player() {
-    let f = MidiPlayerFactory { device_no: 6 };
+    let f = MidiPlayerFactory { device_no: 0 };
 
     let (sender, receiver) = channel();
     let (sendercmd, receivercmd) = channel();
@@ -27,12 +42,24 @@ pub fn test_player() {
         .unwrap();
     });
 
-    loop {}
+    loop {
+        match receiver.recv().expect("error getting message") {
+            player::Response::EndOfFile => {
+                println!("End of file received, stopping");
+                break;
+            }
+            player::Response::CurrentPlayTime(t) => {
+                println!("current play time :{}", t.as_secs());
+            }
+
+            player::Response::FileCancelled => println!("file canceled"),
+        }
+    }
 }
 
 #[test]
 pub fn test_player_1() {
-    let f = MidiPlayerFactory { device_no: 6 };
+    let f = MidiPlayerFactory { device_no: 0 };
 
     let (sender, receiver) = channel();
     let (sendercmd, receivercmd) = channel();

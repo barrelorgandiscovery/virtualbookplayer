@@ -1,4 +1,6 @@
-use std::{cell::RefCell, error::Error, fs, path::PathBuf, rc::Rc, time::Duration};
+use std::{cell::RefCell, error::Error, fs, hash::Hash, path::PathBuf, rc::Rc};
+
+use player::FileInformations;
 
 use crate::file_store::{FileNode, FileViewNode};
 
@@ -6,11 +8,28 @@ pub struct PlayList {
     pub file_list: Vec<PlaylistElement>,
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct PlaylistElement {
     pub name: String,
     pub path: PathBuf,
-    pub duration: Option<Duration>,
+    pub additional_informations: Option<FileInformations>,
+}
+
+/// hash implementation for playlist element
+impl Hash for PlaylistElement {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.path.hash(state);
+    }
+    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
+    where
+        Self: Sized,
+    {
+        for playlist_element in data {
+            playlist_element.name.hash(state);
+            playlist_element.path.hash(state);
+        }
+    }
 }
 
 impl From<&PathBuf> for PlaylistElement {
@@ -24,7 +43,7 @@ impl From<&PathBuf> for PlaylistElement {
         PlaylistElement {
             name,
             path: value.clone(),
-            duration: None,
+            additional_informations: None,
         }
     }
 }

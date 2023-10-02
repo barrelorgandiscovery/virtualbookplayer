@@ -38,14 +38,20 @@ pub fn handling_key(
             if let Some(filestore) = &file_store {
                 if let Some(view) = &filestore.default_view {
                     let result = view.find_first_file();
+
                     if let Some(view_node) = result {
                         let file_node = Rc::clone(&view_node.borrow().node);
-                        let was_empty = appplayer.playlist.file_list.is_empty();
+                        let was_empty;
+                        {
+                            let mut locked_playlist = appplayer
+                                .playlist
+                                .lock()
+                                .expect("fail to lock the playlist");
+                            was_empty = locked_playlist.file_list.is_empty();
 
-                        appplayer
-                            .playlist
-                            .add_from_path_and_expand_playlists(&file_node.borrow().path);
-
+                            locked_playlist
+                                .add_from_path_and_expand_playlists(&file_node.borrow().path);
+                        }
                         if was_empty && appplayer.play_mod {
                             appplayer.play_file_on_top();
                         }
@@ -145,56 +151,59 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                             |mut strip| {
                                                 strip.cell(|ui| {
                                                     ui.horizontal(|ui| {
-                                                        ui.add_enabled_ui(!app.appplayer.playlist.file_list.is_empty() , |ui| {
-                                                        if ui
-                                                            .toggle_value(&mut app.appplayer.play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
-                                                            .font(FontId::new(26.0, FontFamily::Name("icon_font".into())))
-                                                        ).on_hover_text(&app.i18n.play)
-                                                            .clicked()
-                                                        {
-                                                            if app.appplayer.play_mod {
-                                                                app.appplayer.play_file_on_top();
-                                                            } else {
-                                                                app.appplayer.stop();
-                                                            }
-                                                        }
 
-                                                        ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
-
-                                                        if  crate::app::font_button(ui, '\u{23E9}')
-                                                            .on_hover_text(&app.i18n.go_to_next_file)
-                                                            .clicked() {
-                                                            app.appplayer.next();
-                                                        }
-                                                    });
-
-                                                        if let Some(path_buf) = &app.file_store_path
-                                                        {
-                                                            ui.separator();
-                                                            if ui.button( egui_phosphor::regular::LIST_PLUS)
-                                                                .on_hover_text(&app.i18n.save_playlist)
+                                                        let appplayer = &mut app.appplayer;
+                                                        ui.add_enabled_ui(!appplayer.is_playlist_empty() , |ui| {
+                                                            let play_mod = &mut appplayer.play_mod;
+                                                            if ui
+                                                                .toggle_value(play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
+                                                                .font(FontId::new(26.0, FontFamily::Name("icon_font".into())))
+                                                            ).on_hover_text(&app.i18n.play)
                                                                 .clicked()
                                                             {
-                                                                let date = Local::now();
-
-                                                                let formatted_date = date
-                                                                    .format("%Y-%m-%d_%H-%M-%S");
-
-                                                                let mut pb = path_buf.clone();
-
-                                                                pb.push(format!(
-                                                                    "playlist_{}.playlist",
-                                                                    formatted_date
-                                                                ));
-                                                                if let Err(e) = playlist::save(
-                                                                    &app.appplayer.playlist,
-                                                                    &pb,
-                                                                ) {
-                                                                    error!("error in saving playlist in {}, {}", pb.display(), e);
+                                                                if *play_mod {
+                                                                    appplayer.play_file_on_top();
+                                                                } else {
+                                                                    appplayer.stop();
                                                                 }
                                                             }
-                                                        }
-                                                    });
+
+                                                            ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
+
+                                                            if  crate::app::font_button(ui, '\u{23E9}')
+                                                                .on_hover_text(&app.i18n.go_to_next_file)
+                                                                .clicked() {
+                                                                appplayer.next();
+                                                            }
+                                                        });
+                                                        if let Some(path_buf) = &app.file_store_path {
+                                                                ui.separator();
+                                                                if ui.button( egui_phosphor::regular::LIST_PLUS)
+                                                                    .on_hover_text(&app.i18n.save_playlist)
+                                                                    .clicked()
+                                                                {
+                                                                    let date = Local::now();
+
+                                                                    let formatted_date = date
+                                                                        .format("%Y-%m-%d_%H-%M-%S");
+
+                                                                    let mut pb = path_buf.clone();
+
+                                                                    pb.push(format!(
+                                                                        "playlist_{}.playlist",
+                                                                        formatted_date
+                                                                    ));
+                                                                    let locked_playlist = appplayer.playlist.lock().expect("fail to lock the playlist");
+
+                                                                    if let Err(e) = playlist::save(
+                                                                        &locked_playlist,
+                                                                        &pb,
+                                                                    ) {
+                                                                        error!("error in saving playlist in {}, {}", pb.display(), e);
+                                                                    }
+                                                                }
+                                                            }
+                                                        });
 
                                                     ui.separator();
 
@@ -206,51 +215,29 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                 strip.cell(|ui| {
                                                                     let isplaying =
                                                                         app.appplayer.is_playing();
+                                                                    let mut locked_playlist = app
+                                                                    .appplayer
+                                                                    .playlist.lock().expect("fail to lock playlist");
+
+                                                                    let mut working_list = locked_playlist.file_list.clone();
+                                                                    if isplaying && !working_list.is_empty() {
+                                                                        working_list = working_list[1..].to_vec();
+                                                                    }
 
                                                                     let mut deleted: Option<usize> = None;
-                                                                        let item_size =  Vec2::new(ui.available_width(), 32.0);
-                                                                        let items = &mut app
-                                                                        .appplayer
-                                                                        .playlist
-                                                                        .file_list;
+                                                                    let item_size =  Vec2::new(ui.available_width(), 32.0);
+                                                                    // let items = &mut locked_playlist
+                                                                    // .file_list;
 
                                                                     // see https://github.com/lucasmerlin/hello_egui/blob/main/fancy-example/src/main.rs
                                                                     // for dnd examples
                                                                     let response = dnd(ui, "playlist_dnd")
                                                                         .show_custom(|ui, iter| {
-                                                                                items.iter_mut().enumerate().for_each(|(index, item)| {
+                                                                            working_list.iter_mut().enumerate().for_each(|(index, item)| {
                                                                                      iter.next(ui, Id::new(&item), index, true, |ui, item_handle| {
                                                                                         item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
                                                                                             ui.horizontal_wrapped(|ui| {
                                                                                                 handle.ui_sized(ui, item_size, |ui| {
-                                                                                                if !(isplaying && index == 0)
-                                                                                                {
-                                                                                                    // let size_factor = ui.ctx().animate_value_with_time(
-                                                                                                    //     item.id().with("handle_anim"),
-                                                                                                    //     if state.dragged { 1.1 } else { 1.0 },
-                                                                                                    //     0.2,
-                                                                                                    // );
-
-                                                                                                        //     let (_id, response) =
-                                                                                                        //     ui.allocate_exact_size(Vec2::splat(size), Sense::click());
-
-                                                                                                        // // if response.clicked() {
-                                                                                                        // //     item.rounded = !item.rounded;
-                                                                                                        // // }
-                                                                                                        // let rect = response.rect;
-
-                                                                                                        // // let x = ui.ctx().animate_bool(item.id(), item.rounded);
-                                                                                                        // //let rounding = x * 16.0 + 1.0;
-
-                                                                                                        // let rounding = 16.0 ;
-
-                                                                                                        // ui.painter().rect_filled(
-                                                                                                        //     rect.shrink(4.0 * size_factor)
-                                                                                                        //         .shrink(rect.width() * (1.0 - size_factor)),
-                                                                                                        //     Rounding::same(rounding),
-                                                                                                        //     Color32::BLACK,
-                                                                                                        // );
-
                                                                                                         ui.add(
                                                                                                             Label::new(format!("{}:", index + 1))
                                                                                                         );
@@ -263,59 +250,28 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                                         }
                                                                                                         ui.end_row();
                                                                                                         ui.separator();
-
-                                                                                                }
-
                                                                                                 });
 
                                                                                             });
-
-
                                                                                         })
                                                                                     });
                                                                                 });
-                                                                            }
-                                                                           );
-                                                                            response.update_vec(&mut app
-                                                                             .appplayer
-                                                                             .playlist
-                                                                             .file_list);
+                                                                        }
+                                                                    );
+                                                                    response.update_vec(&mut working_list);
+                                                                    if isplaying && (!locked_playlist.file_list.is_empty()) {
+                                                                        locked_playlist.file_list.truncate(1);
+                                                                        locked_playlist.file_list.extend(working_list);
+                                                                    } else {
+                                                                        locked_playlist.file_list = working_list;
+                                                                    }
 
-                                                                            if let Some(reason) = response.cancellation_reason() {
-                                                                                debug!("Drag has been cancelled because of {:?}", reason);
-                                                                            }
-
-                                                                    // // render playlist content
-                                                                    // for (index, i) in app
-                                                                    //     .appplayer
-                                                                    //     .playlist
-                                                                    //     .file_list
-                                                                    //     .iter_mut()
-                                                                    //     .enumerate()
-                                                                    // {
-                                                                    //     if !(isplaying
-                                                                    //         && index == 0)
-                                                                    //     {
-                                                                    //         ui.horizontal_wrapped(|ui| {
-                                                                    //             ui.add(
-                                                                    //                 Label::new(format!("{}:", index + 1))
-                                                                    //             );
-                                                                    //             ui.label(&i.name);
-                                                                    //             if ui.button( egui_phosphor::regular::TRASH).on_hover_text(&app.i18n.button_remove)
-                                                                    //                 .on_hover_text(&app.i18n.remove_file_from_list)
-                                                                    //                 .clicked() {
-                                                                    //                 deleted =
-                                                                    //                 Some(index);
-                                                                    //             }
-                                                                    //         });
-                                                                    //         ui.end_row();
-                                                                    //         ui.separator();
-                                                                    //     }
-                                                                    // }
+                                                                    if let Some(reason) = response.cancellation_reason() {
+                                                                        debug!("Drag has been cancelled because of {:?}", reason);
+                                                                    }
 
                                                                     if let Some(index) = deleted {
-                                                                        app.appplayer
-                                                                            .playlist
+                                                                        locked_playlist
                                                                             .file_list
                                                                             .remove(index);
                                                                     }
@@ -415,9 +371,13 @@ fn display_tree(
                 }
             }
             if clicked {
-                appplayer
-                    .playlist
-                    .add_fileviewnode_and_read_playlists(element);
+                {
+                    let mut locked_playlist = appplayer
+                        .playlist
+                        .lock()
+                        .expect("fail to lock the playlist");
+                    locked_playlist.add_fileviewnode_and_read_playlists(element);
+                }
                 if appplayer.play_mod && !appplayer.is_playing() {
                     appplayer.play_file_on_top();
                 }
@@ -503,7 +463,12 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                             // name of the element
                             ui.vertical_centered(|ui| {
                                 if app.appplayer.is_playing() {
-                                    let cell = &app.appplayer.playlist.current();
+                                    let cell = &app
+                                        .appplayer
+                                        .playlist
+                                        .lock()
+                                        .expect("fail to lock playlist")
+                                        .current();
                                     match cell {
                                         Some(t) => {
                                             let name = t.name.clone();

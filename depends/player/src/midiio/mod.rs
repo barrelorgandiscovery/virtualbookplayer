@@ -128,7 +128,7 @@ impl MidiPlayerFactory {
 pub struct MidiFileInformationsConstructor {}
 
 impl FileInformationsConstructor for MidiFileInformationsConstructor {
-    fn compute(self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>> {
+    fn compute(&mut self, filename: &PathBuf) -> Result<Arc<FileInformations>, Box<dyn Error>> {
         // Load bytes first
         let file_content_data = std::fs::read(filename)?;
         // parse it
@@ -141,9 +141,9 @@ impl FileInformationsConstructor for MidiFileInformationsConstructor {
             .fold(Duration::new(0, 0), |acc, n| acc.max(n.start + n.length));
 
         // result
-        Ok(FileInformations {
+        Ok(Arc::new(FileInformations {
             duration: Some(result),
-        })
+        }))
     }
 }
 
@@ -209,6 +209,15 @@ impl Player for MidiPlayer {
     }
     fn play(&mut self, filename: &PathBuf, start_wait: Option<f32>) -> Result<(), Box<dyn Error>> {
         // load the midi file
+        {
+            self.output
+                .lock()
+                .unwrap()
+                .send(Response::CurrentPlayTime(Duration::from_secs(0)))
+                .unwrap();
+        }
+
+        let _ = self.cancel.send(true); // don't handle the error
 
         // Load bytes first
         let file_content_data = std::fs::read(filename)?;
@@ -236,8 +245,6 @@ impl Player for MidiPlayer {
         };
 
         self.silence();
-
-        let _ = self.cancel.send(true); // don't handle the error
 
         let (sender, receiver) = channel();
         self.cancel = sender;

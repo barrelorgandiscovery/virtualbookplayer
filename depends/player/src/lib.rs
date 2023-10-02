@@ -17,18 +17,21 @@ pub struct Note {
     pub start: Duration,
     pub length: Duration,
 }
-
+#[derive(Clone, Debug)]
 pub struct FileInformations {
     pub duration: Option<Duration>,
 }
 
 pub trait PlayerFactory {
+    /// create a factory for player instanciation
     fn create(
         &self,
         sender: Sender<Response>,
         receiver: Receiver<Command>,
     ) -> Result<Box<dyn Player>, Box<dyn Error>>;
 
+    /// get the information associated to a given file,
+    /// return the associated informations
     fn create_information_getter(
         &self,
     ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
@@ -44,13 +47,11 @@ pub trait Player: Send {
 }
 
 pub trait FileInformationsConstructor: Send {
-    fn compute(self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>>;
+    fn compute(&mut self, filename: &PathBuf) -> Result<Arc<FileInformations>, Box<dyn Error>>;
 }
 
 #[derive(Debug)]
 pub enum Response {
-    EndOfTrack,
-    StartOfTrack,
     EndOfFile,
     FileCancelled,
     CurrentPlayTime(Duration),

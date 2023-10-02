@@ -1,4 +1,4 @@
-// Ecran de visualisation
+// Ecran de visualisation du carton
 
 use std::sync::Arc;
 

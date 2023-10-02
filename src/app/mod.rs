@@ -92,16 +92,19 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     adjusted_start_time: Instant,
 
+    /// associated language strings
     #[serde(skip)]
     i18n: Box<I18NMessages>,
 
     islight: bool,
 
+    /// display the number pad
     hidden_number_pad: bool,
 
     /// wait time before playing the file
     play_wait: f32,
 
+    /// selected language
     lang: Option<String>,
 }
 
@@ -341,8 +344,6 @@ impl eframe::App for VirtualBookApp {
                         *latest_duration_time = duration;
                         *adjusted_start_time = Instant::now() - duration;
                     }
-                    Response::EndOfTrack => {}
-                    Response::StartOfTrack => {}
                     Response::FileCancelled => {}
                 }
                 *opt_last_response = None;

@@ -27,7 +27,7 @@ pub fn test_reading_midifile() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-pub fn test_tracks() -> Result<(), Box<dyn Error>> {
+pub fn test_tracks_in_midly() -> Result<(), Box<dyn Error>> {
     let filename = &PathBuf::from("chopin-nocturne-op9-no2.mid");
 
     // load the midi file
