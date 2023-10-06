@@ -73,6 +73,7 @@ impl PlayList {
         self.add_from_path(&cell.path);
     }
 
+    /// add the file, and if the file is a playlist, read all the elements
     pub fn add_from_path_and_expand_playlists(&mut self, path: &PathBuf) {
         let extension_result = path.extension();
 
@@ -89,6 +90,7 @@ impl PlayList {
         }
     }
 
+    /// add file from path
     pub fn add_from_path(&mut self, path: &PathBuf) {
         let playlist_element: PlaylistElement = path.into();
         self.file_list.push(playlist_element);
@@ -101,6 +103,7 @@ impl PlayList {
     }
 }
 
+/// save a playlist to a file
 pub fn save(p: &PlayList, filepath: &PathBuf) -> Result<(), Box<dyn Error>> {
     let content = p
         .file_list
@@ -115,6 +118,7 @@ pub fn save(p: &PlayList, filepath: &PathBuf) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// load a playlist from a file
 pub fn load(filepath: &PathBuf) -> Result<PlayList, Box<dyn Error>> {
     let contents = fs::read_to_string(filepath)?;
 
@@ -128,4 +132,4 @@ pub fn load(filepath: &PathBuf) -> Result<PlayList, Box<dyn Error>> {
 }
 
 #[test]
-pub fn test_pllaylist() {}
+pub fn test_playlist() {}

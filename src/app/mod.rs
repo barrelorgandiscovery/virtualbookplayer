@@ -488,6 +488,24 @@ impl eframe::App for VirtualBookApp {
                         }
                     },
                 );
+
+                let play_mod = &mut appplayer.play_mod;
+                if ui
+                    .toggle_value(
+                        play_mod,
+                        RichText::new('\u{F04B}')
+                            .color(Color32::GREEN)
+                            .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
+                    )
+                    .on_hover_text(&i18n.play)
+                    .clicked()
+                {
+                    if *play_mod {
+                        appplayer.play_file_on_top();
+                    } else {
+                        appplayer.stop();
+                    }
+                }
             });
             ctx.set_visuals(old);
         });

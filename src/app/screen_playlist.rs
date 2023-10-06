@@ -154,19 +154,19 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
 
                                                         let appplayer = &mut app.appplayer;
                                                         ui.add_enabled_ui(!appplayer.is_playlist_empty() , |ui| {
-                                                            let play_mod = &mut appplayer.play_mod;
-                                                            if ui
-                                                                .toggle_value(play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
-                                                                .font(FontId::new(26.0, FontFamily::Name("icon_font".into())))
-                                                            ).on_hover_text(&app.i18n.play)
-                                                                .clicked()
-                                                            {
-                                                                if *play_mod {
-                                                                    appplayer.play_file_on_top();
-                                                                } else {
-                                                                    appplayer.stop();
-                                                                }
-                                                            }
+                                                            // let play_mod = &mut appplayer.play_mod;
+                                                            // if ui
+                                                            //     .toggle_value(play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
+                                                            //     .font(FontId::new(26.0, FontFamily::Name("icon_font".into())))
+                                                            // ).on_hover_text(&app.i18n.play)
+                                                            //     .clicked()
+                                                            // {
+                                                            //     if *play_mod {
+                                                            //         appplayer.play_file_on_top();
+                                                            //     } else {
+                                                            //         appplayer.stop();
+                                                            //     }
+                                                            // }
 
                                                             ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
 
