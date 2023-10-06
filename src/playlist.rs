@@ -55,7 +55,10 @@ impl From<&PathBuf> for PlaylistElement {
 
 impl PlayList {
     pub fn new() -> PlayList {
-        PlayList { file_list: vec![], is_dirty: false }
+        PlayList {
+            file_list: vec![],
+            is_dirty: false,
+        }
     }
 
     pub fn skip(&mut self) {
@@ -133,7 +136,10 @@ pub fn load(filepath: &PathBuf) -> Result<PlayList, Box<dyn Error>> {
         .map(|p| (&PathBuf::from(p)).into())
         .collect();
 
-    Ok(PlayList { file_list , is_dirty: true})
+    Ok(PlayList {
+        file_list,
+        is_dirty: true,
+    })
 }
 
 #[test]

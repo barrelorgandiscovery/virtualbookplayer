@@ -39,7 +39,6 @@ enum Screen {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct VirtualBookApp {
-
     #[serde(skip)]
     screen_zoom_factor: f32,
     slider_selected_zoom_factor: f32,
@@ -486,10 +485,10 @@ impl eframe::App for VirtualBookApp {
                     ),
                     |ui| {
                         ui.label(&i18n.zoom);
-                        let result = ui.add(egui::Slider::new(slider_selected_zoom_factor, 1.5..=6.0));
-                        if !result
-                                .is_pointer_button_down_on()  {
-                            *screen_zoom_factor =  *slider_selected_zoom_factor;
+                        let result =
+                            ui.add(egui::Slider::new(slider_selected_zoom_factor, 1.5..=6.0));
+                        if !result.is_pointer_button_down_on() {
+                            *screen_zoom_factor = *slider_selected_zoom_factor;
                         };
 
                         ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);

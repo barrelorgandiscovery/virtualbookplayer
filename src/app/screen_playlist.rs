@@ -36,13 +36,11 @@ pub fn handling_key(
         ENTER => {
             // select file
             if let Some(filestore) = &file_store {
-
                 let current_view = if current_typed_no.is_empty() {
                     &filestore.default_view
                 } else {
                     &filestore.filtered_view
                 };
-
 
                 if let Some(view) = &current_view {
                     let result = view.find_first_file();
@@ -82,7 +80,8 @@ pub fn handling_key(
 
     // filtering the treeview
     if let Some(filestore) = file_store {
-        if let Ok(mut new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter) {
+        if let Ok(mut new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter)
+        {
             new_view.expand();
             filestore.filtered_view = Some(new_view);
         }
@@ -324,9 +323,10 @@ fn display_tree(
                 expanded = e.expanded;
             } // relax e
 
-            let id_source_folder =  number_selected.clone() + element_name.as_str();
+            let id_source_folder = number_selected.clone() + element_name.as_str();
             let r = CollapsingHeader::new(&element_name)
-                .id_source(id_source_folder).default_open(expanded)
+                .id_source(id_source_folder)
+                .default_open(expanded)
                 //.open(Some(clicked))
                 // .default_open(default_opened)
                 .show(ui, |ui| {
@@ -348,7 +348,7 @@ fn display_tree(
             // borrowed_element.clicked_for_open = None;
 
             if r.header_response.clicked() {
-                borrowed_element.expanded = borrowed_element.expanded ^ true;
+                borrowed_element.expanded ^= true;
                 // borrowed_element.clicked_for_open = Some(borrowed_element.expanded);
             }
         } else {
