@@ -1,4 +1,4 @@
-use std::{cell::RefCell, error::Error, fs, hash::Hash, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, error::Error, fs, hash::Hash, path::PathBuf, rc::Rc, time::SystemTime};
 
 use player::FileInformations;
 
@@ -6,10 +6,12 @@ use crate::file_store::{FileNode, FileViewNode};
 
 pub struct PlayList {
     pub file_list: Vec<PlaylistElement>,
+    pub is_dirty: bool,
 }
 
 #[derive(Clone)]
 pub struct PlaylistElement {
+    pub added_at: SystemTime,
     pub name: String,
     pub path: PathBuf,
     pub additional_informations: Option<FileInformations>,
@@ -18,6 +20,7 @@ pub struct PlaylistElement {
 /// hash implementation for playlist element
 impl Hash for PlaylistElement {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.added_at.hash(state);
         self.name.hash(state);
         self.path.hash(state);
     }
@@ -26,6 +29,7 @@ impl Hash for PlaylistElement {
         Self: Sized,
     {
         for playlist_element in data {
+            playlist_element.added_at.hash(state);
             playlist_element.name.hash(state);
             playlist_element.path.hash(state);
         }
@@ -41,6 +45,7 @@ impl From<&PathBuf> for PlaylistElement {
         }
 
         PlaylistElement {
+            added_at: SystemTime::now(),
             name,
             path: value.clone(),
             additional_informations: None,
@@ -50,7 +55,7 @@ impl From<&PathBuf> for PlaylistElement {
 
 impl PlayList {
     pub fn new() -> PlayList {
-        PlayList { file_list: vec![] }
+        PlayList { file_list: vec![], is_dirty: false }
     }
 
     pub fn skip(&mut self) {
@@ -128,7 +133,7 @@ pub fn load(filepath: &PathBuf) -> Result<PlayList, Box<dyn Error>> {
         .map(|p| (&PathBuf::from(p)).into())
         .collect();
 
-    Ok(PlayList { file_list })
+    Ok(PlayList { file_list , is_dirty: true})
 }
 
 #[test]

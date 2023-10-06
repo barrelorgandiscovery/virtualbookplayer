@@ -120,7 +120,10 @@ pub trait Visitor {
 pub struct FileStore {
     pub base_path: PathBuf,
     pub root: Rc<RefCell<FileNode>>,
+    // view displayed when the standard display is done
     pub default_view: Option<FileView>,
+    // view when filtering
+    pub filtered_view: Option<FileView>,
 }
 
 type ExtensionsFilter = Option<Vec<String>>;
@@ -138,7 +141,7 @@ impl FileStore {
                 let r_file_node = Rc::new(RefCell::new(file_node));
                 let mut childs: Vec<Rc<RefCell<FileNode>>> = Vec::new();
                 {
-                    let mut bn = r_file_node.borrow_mut();
+                    let mut bn = (r_file_node.as_ref()).borrow_mut();
                     if bn.folder() {
                         debug!("path :{:?}", &path);
                         if let Ok(path_dir) = path.read_dir() {
@@ -188,8 +191,10 @@ impl FileStore {
                 base_path: pathbuf,
                 root: data_root,
                 default_view: None,
+                filtered_view: None,
             };
 
+            // construct the default_view
             match fs.view(&None, &None) {
                 Ok(default_view) => {
                     fs.default_view = Some(default_view);
@@ -315,8 +320,10 @@ fn test_file_store_and_view() {
 pub struct FileViewNode {
     pub node: Rc<RefCell<FileNode>>,
     pub childs: Vec<Rc<RefCell<FileViewNode>>>,
+
+    // view state for expansion
     pub expanded: bool,
-    pub clicked_for_open: Option<bool>,
+
     pub selected: bool,
 }
 
@@ -329,9 +336,10 @@ impl FileViewNode {
         let fv = FileViewNode {
             node: Rc::clone(&datanode),
             childs,
+            // this is the expanded state for display
             expanded: false,
+
             selected: false,
-            clicked_for_open: None,
         };
         Rc::new(RefCell::new(fv))
     }
@@ -350,15 +358,14 @@ impl FileViewNode {
 
     pub fn expand_all(&mut self) {
         self.expand();
-        for i in &self.childs {
-            let f = &mut i.borrow_mut();
-            f.expand_all();
+        for i in &mut self.childs {
+            let g = i.as_ref();
+            g.borrow_mut().expand_all()
         }
     }
 
     pub fn expand(&mut self) {
         self.expanded = true;
-        self.clicked_for_open = Some(true);
     }
 }
 
@@ -369,14 +376,20 @@ pub struct FileView {
 
 impl FileView {
     #[allow(dead_code)]
-    pub fn expand_all(&self) {
-        let e = &mut self.root.borrow_mut();
+    pub fn expand_all(&mut self) {
+        let mut e = self.root.borrow_mut();
         e.expand_all();
     }
 
-    pub fn expand(&self) {
-        let e = &mut self.root.borrow_mut();
+    pub fn expand(&mut self) {
+        let mut e = self.root.borrow_mut();
+        // root is not opened,
+        // open the first child
         e.expand();
+        if let Some(first) = e.childs.first() {
+            let mut f = first.borrow_mut();
+            f.expand();
+        }
     }
 
     fn recurse_find_first(node: &Rc<RefCell<FileViewNode>>) -> Option<Rc<RefCell<FileViewNode>>> {

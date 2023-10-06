@@ -22,7 +22,7 @@ use crate::{
 
 use std::convert::TryFrom;
 
-use log::{debug, error};
+use log::{debug, error, warn};
 
 // 120 bpm default tempo for files that does not have tempo signature in it
 const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
@@ -183,6 +183,7 @@ fn send_panic(con: &mut MutexGuard<MidiOutputConnection>) {
     }
 }
 
+// sending all note off
 fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
     let mut buf = Vec::new();
     for ch in 0..16 {
@@ -196,8 +197,10 @@ fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
             };
 
             buf.clear();
-            let _ = msg.write(&mut buf);
-            let _ = con.send(&buf);
+            let _ = msg.write(&mut buf); // ignore return
+            if let Err(e) = con.send(&buf) {
+                warn!("fail to send stop note : {:?}", e);
+            }
         }
     }
 }

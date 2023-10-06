@@ -39,7 +39,10 @@ enum Screen {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct VirtualBookApp {
+
+    #[serde(skip)]
     screen_zoom_factor: f32,
+    slider_selected_zoom_factor: f32,
 
     xscale: f32,
 
@@ -128,6 +131,7 @@ impl Default for VirtualBookApp {
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
             screen_zoom_factor: 2.0,
+            slider_selected_zoom_factor: 2.0,
 
             // filter
             current_typed_no: "".into(),
@@ -249,6 +253,9 @@ impl VirtualBookApp {
                 }
                 old_storage.lang = lang.clone();
                 old_storage.i18n = create_i18n_message_with_lang(lang);
+
+                old_storage.screen_zoom_factor = old_storage.slider_selected_zoom_factor;
+
                 return old_storage;
             }
         }
@@ -293,6 +300,7 @@ impl eframe::App for VirtualBookApp {
 
         let Self {
             appplayer,
+            slider_selected_zoom_factor,
             screen_zoom_factor,
             current_duration,
             selected_device,
@@ -478,7 +486,12 @@ impl eframe::App for VirtualBookApp {
                     ),
                     |ui| {
                         ui.label(&i18n.zoom);
-                        ui.add(egui::Slider::new(screen_zoom_factor, 1.5..=6.0));
+                        let result = ui.add(egui::Slider::new(slider_selected_zoom_factor, 1.5..=6.0));
+                        if !result
+                                .is_pointer_button_down_on()  {
+                            *screen_zoom_factor =  *slider_selected_zoom_factor;
+                        };
+
                         ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
                         ui.checkbox(islight, &i18n.dark_light);
                         ui.label(&i18n.time_between_file);
@@ -511,7 +524,6 @@ impl eframe::App for VirtualBookApp {
         });
 
         let present = appplayer.player.is_some();
-
         if !present {
             // there is no player instanciated (because we need to define the output port)
             egui::CentralPanel::default().show(ctx, |ui| {
@@ -670,14 +682,6 @@ impl eframe::App for VirtualBookApp {
                                     strip.cell(|ui| {
                                         screen_playlist::ui_content(self1, ctx, ui);
                                     });
-
-                                    // strip.cell(|ui| {
-                                    //     ui.centered_and_justified(|ui| {
-                                    //         if ui.button(">").clicked() {
-                                    //             self1.screen = Screen::Display
-                                    //         }
-                                    //     });
-                                    // });
                                 });
                         }
                     });

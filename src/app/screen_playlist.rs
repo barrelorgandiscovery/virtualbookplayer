@@ -36,7 +36,15 @@ pub fn handling_key(
         ENTER => {
             // select file
             if let Some(filestore) = &file_store {
-                if let Some(view) = &filestore.default_view {
+
+                let current_view = if current_typed_no.is_empty() {
+                    &filestore.default_view
+                } else {
+                    &filestore.filtered_view
+                };
+
+
+                if let Some(view) = &current_view {
                     let result = view.find_first_file();
 
                     if let Some(view_node) = result {
@@ -74,11 +82,9 @@ pub fn handling_key(
 
     // filtering the treeview
     if let Some(filestore) = file_store {
-        if let Ok(new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter) {
+        if let Ok(mut new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter) {
             new_view.expand();
-            filestore.default_view = Some(new_view);
-        } else {
-            filestore.default_view = None;
+            filestore.filtered_view = Some(new_view);
         }
     }
 }
@@ -154,20 +160,6 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
 
                                                         let appplayer = &mut app.appplayer;
                                                         ui.add_enabled_ui(!appplayer.is_playlist_empty() , |ui| {
-                                                            // let play_mod = &mut appplayer.play_mod;
-                                                            // if ui
-                                                            //     .toggle_value(play_mod, RichText::new('\u{F04B}').color(Color32::GREEN)
-                                                            //     .font(FontId::new(26.0, FontFamily::Name("icon_font".into())))
-                                                            // ).on_hover_text(&app.i18n.play)
-                                                            //     .clicked()
-                                                            // {
-                                                            //     if *play_mod {
-                                                            //         appplayer.play_file_on_top();
-                                                            //     } else {
-                                                            //         appplayer.stop();
-                                                            //     }
-                                                            // }
-
                                                             ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
 
                                                             if  crate::app::font_button(ui, '\u{23E9}')
@@ -236,22 +228,25 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                             working_list.iter_mut().enumerate().for_each(|(index, item)| {
                                                                                      iter.next(ui, Id::new(&item), index, true, |ui, item_handle| {
                                                                                         item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
-                                                                                            ui.horizontal_wrapped(|ui| {
+                                                                                            ui.vertical_centered_justified(|ui| {
                                                                                                 handle.ui_sized(ui, item_size, |ui| {
+                                                                                                    ui.horizontal_wrapped(|ui| {
+                                                                                                        ui.spacing();
+                                                                                                        if ui.button( egui_phosphor::regular::TRASH)
+                                                                                                            .on_hover_text(&app.i18n.remove_file_from_list)
+                                                                                                            .clicked() {
+                                                                                                                deleted = Some(index);
+                                                                                                        }
                                                                                                         ui.add(
                                                                                                             Label::new(format!("{}:", index + 1))
                                                                                                         );
                                                                                                         ui.label(&item.name);
-                                                                                                        if ui.button( egui_phosphor::regular::TRASH).on_hover_text(&app.i18n.button_remove)
-                                                                                                            .on_hover_text(&app.i18n.remove_file_from_list)
-                                                                                                            .clicked() {
-                                                                                                            deleted =
-                                                                                                            Some(index);
-                                                                                                        }
-                                                                                                        ui.end_row();
-                                                                                                        ui.separator();
-                                                                                                });
+                                                                                                    });
 
+                                                                                                   ui.end_row();
+
+                                                                                                });
+                                                                                                ui.separator();
                                                                                             });
                                                                                         })
                                                                                     });
@@ -323,18 +318,17 @@ fn display_tree(
         }
 
         if node_is_folder {
-            let default_opened: bool;
-            let clicked;
+            let expanded;
             {
                 let e = element.borrow();
-                default_opened = e.expanded;
-                clicked = e.clicked_for_open;
-            }
+                expanded = e.expanded;
+            } // relax e
 
+            let id_source_folder =  number_selected.clone() + element_name.as_str();
             let r = CollapsingHeader::new(&element_name)
-                // .default_open(None)
-                .open(clicked)
-                .default_open(default_opened)
+                .id_source(id_source_folder).default_open(expanded)
+                //.open(Some(clicked))
+                // .default_open(default_opened)
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.x = 0.0;
 
@@ -351,11 +345,11 @@ fn display_tree(
                     }
                 });
             let borrowed_element = &mut element.borrow_mut();
-            borrowed_element.clicked_for_open = None;
+            // borrowed_element.clicked_for_open = None;
 
             if r.header_response.clicked() {
-                borrowed_element.expanded = default_opened ^ true;
-                borrowed_element.clicked_for_open = Some(borrowed_element.expanded);
+                borrowed_element.expanded = borrowed_element.expanded ^ true;
+                // borrowed_element.clicked_for_open = Some(borrowed_element.expanded);
             }
         } else {
             // file and not a folder
@@ -419,7 +413,12 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                             });
                             strip.cell(|ui| {
                                 if let Some(filestore) = &mut app.file_store {
-                                    if let Some(view) = &mut filestore.default_view {
+                                    let current_view = match app.current_typed_no.is_empty() {
+                                        true => &mut filestore.default_view,
+                                        false => &mut filestore.filtered_view,
+                                    };
+
+                                    if let Some(view) = current_view {
                                         match display_tree(
                                             &mut app.appplayer,
                                             &mut app.current_typed_no,
@@ -429,21 +428,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                                             Err(e) => {
                                                 error!("error in display tree: {}", e);
                                             }
-                                            Ok(returned_value) => {
-                                                if returned_value {
-                                                    // click detected
-                                                    debug!("click on the file, refresh the view");
-                                                    if let Ok(new_view) = filestore.view(
-                                                        &Some(app.current_typed_no.clone()),
-                                                        &app.extensions_filters,
-                                                    ) {
-                                                        new_view.expand();
-                                                        filestore.default_view = Some(new_view);
-                                                    } else {
-                                                        filestore.default_view = None;
-                                                    }
-                                                }
-                                            }
+                                            Ok(_returned_value) => {}
                                         }
                                     } else {
                                         ui.label(&app.i18n.aucun_fichiers);
