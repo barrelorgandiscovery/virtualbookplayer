@@ -206,7 +206,7 @@ fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
             buf.clear();
             let _ = msg.write(&mut buf); // ignore return
             if let Err(e) = con.send(&buf) {
-                warn!("fail to send stop note : {:?}", e);
+                warn!("fail to send stop note : {:?} {:?}", msg, e);
             }
         }
     }

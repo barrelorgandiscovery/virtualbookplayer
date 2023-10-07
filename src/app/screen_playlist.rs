@@ -82,7 +82,7 @@ pub fn handling_key(
     if let Some(filestore) = file_store {
         if let Ok(mut new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter)
         {
-            new_view.expand();
+            new_view.recurse_expand_first();
             filestore.filtered_view = Some(new_view);
         }
     }
@@ -326,7 +326,7 @@ fn display_tree(
             let id_source_folder = number_selected.clone() + element_name.as_str();
             let r = CollapsingHeader::new(&element_name)
                 .id_source(id_source_folder)
-                .default_open(expanded)
+                .open(Some(expanded))
                 //.open(Some(clicked))
                 // .default_open(default_opened)
                 .show(ui, |ui| {

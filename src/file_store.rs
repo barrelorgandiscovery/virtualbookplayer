@@ -367,6 +367,15 @@ impl FileViewNode {
     pub fn expand(&mut self) {
         self.expanded = true;
     }
+
+    pub fn recurse_expand_first(&mut self) {
+        self.expand();
+
+        if let Some(first) = self.childs.first() {
+            let mut f = first.borrow_mut();
+            f.recurse_expand_first();
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -381,15 +390,18 @@ impl FileView {
         e.expand_all();
     }
 
+    pub fn recurse_expand_first(&mut self) {
+        let mut e = self.root.borrow_mut();
+        // root is not opened,
+        // open the first child
+        e.recurse_expand_first();
+    }
+
     pub fn expand(&mut self) {
         let mut e = self.root.borrow_mut();
         // root is not opened,
         // open the first child
         e.expand();
-        if let Some(first) = e.childs.first() {
-            let mut f = first.borrow_mut();
-            f.expand();
-        }
     }
 
     fn recurse_find_first(node: &Rc<RefCell<FileViewNode>>) -> Option<Rc<RefCell<FileViewNode>>> {
