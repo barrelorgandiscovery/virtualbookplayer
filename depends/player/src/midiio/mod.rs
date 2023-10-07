@@ -25,7 +25,14 @@ use std::convert::TryFrom;
 use log::{debug, error, warn};
 
 // 120 bpm default tempo for files that does not have tempo signature in it
-const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
+// 48 ticks per quarter note
+// 4/4 signature
+
+// microseconds per beat
+const BEAT_TIME_IN_MICROSECOND : u32 = 60 * 1_000_000 / 120 ;
+const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = BEAT_TIME_IN_MICROSECOND;
+
+// const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
 
 /// Midi device player factory
 pub struct MidiPlayerFactory {
