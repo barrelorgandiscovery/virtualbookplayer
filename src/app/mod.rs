@@ -25,8 +25,8 @@ mod i18n;
 mod screen_playlist;
 mod screen_visu;
 
-#[path = "frame_history.rs"]
-mod frame_history;
+// #[path = "frame_history.rs"]
+// mod frame_history;
 
 /// activated screen
 #[derive(PartialEq)]
@@ -56,8 +56,8 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     screen: Screen,
 
-    #[serde(skip)]
-    frame_history: frame_history::FrameHistory,
+    // #[serde(skip)]
+    // frame_history: frame_history::FrameHistory,
 
     #[serde(skip)]
     file_path_dialog: ImNativeFileDialog<Option<PathBuf>>,
@@ -119,7 +119,7 @@ impl Default for VirtualBookApp {
         let img: ColorImage = load_image_bytes(include_bytes!("bg2.png")).unwrap();
 
         Self {
-            frame_history: frame_history::FrameHistory::default(),
+            //frame_history: frame_history::FrameHistory::default(),
 
             lang: None,
 

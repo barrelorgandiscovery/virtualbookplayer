@@ -31,31 +31,25 @@ im-native-dialog = "0.3.0"
 nodi= { version = "0.19.2" , features=["midir-jack"]}
 clap = { version = "4.3.10", features = ["derive"] }
 
-egui = { git = "https://github.com/rustytsuki/egui", branch = "rust-office"}
-egui_extras = { git = "https://github.com/rustytsuki/egui", branch = "rust-office" , features = ["image"]}
+egui = { version="0.23"}
+
+egui_extras = { version="0.23.0" , features = ["image"]}
 
 image = { version = "0.22.0", default-features = false, features = ["png"] }
 
 pid-lite = { git = "https://github.com/yoshuawuyts/pid-lite", tag="v1.1.2" }
 
-egui-phosphor = "0.2.0"
+egui-phosphor = "0.3.0"
 egui_dnd = "0.5.1"
 
-[target.'cfg(not(any(target_os = "unix", target_os = "windows")))'.dependencies]
-eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
-    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+winit = {version="0.28.7", features=["wayland"]}
+
+eframe = { version="0.23.0" , default-features = false, features = [
     "default_fonts", # Embed the default egui fonts.
-    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "wgpu",
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-eframe = { git = "https://github.com/rustytsuki/egui", branch = "rust-office", default-features = false, features = [
-    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
-    "default_fonts", # Embed the default egui fonts.
-    "skia",          # Use the glow rendering backend. Alternative: "wgpu".
-    "persistence",   # Enable restoring app state when restarting the app.
-] }
 
 [profile.release]
 opt-level = 2
@@ -63,7 +57,3 @@ opt-level = 2
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
 opt-level = 2
-
-
-[patch.crates-io]
-egui = { git = "https://github.com/rustytsuki/egui", branch = "rust-office"}
