@@ -29,7 +29,7 @@ use log::{debug, error, warn};
 // 4/4 signature
 
 // microseconds per beat
-const BEAT_TIME_IN_MICROSECOND : u32 = 60 * 1_000_000 / 120 ;
+const BEAT_TIME_IN_MICROSECOND: u32 = 60 * 1_000_000 / 120;
 const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = BEAT_TIME_IN_MICROSECOND;
 
 // const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
