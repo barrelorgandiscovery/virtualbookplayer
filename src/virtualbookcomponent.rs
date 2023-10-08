@@ -61,7 +61,10 @@ impl VirtualBookComponent {
     }
 
     #[allow(dead_code)]
-    pub fn open_from_string_content(&mut self, file_string_content: String) -> Result<(), Box<dyn Error>> {
+    pub fn open_from_string_content(
+        &mut self,
+        file_string_content: String,
+    ) -> Result<(), Box<dyn Error>> {
         let mut c = Cursor::new(file_string_content.as_bytes().to_vec());
         self.virtual_book = Some(Arc::new(read_book_stream(&mut c)?));
         Ok(())

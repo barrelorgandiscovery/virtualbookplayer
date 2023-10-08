@@ -54,7 +54,7 @@ pub fn test_player() {
 
             player::Response::FileCancelled => println!("file canceled"),
 
-            player::Response::FilePlayStarted((file,notes)) => {}
+            player::Response::FilePlayStarted((file, notes)) => {}
         }
     }
 }

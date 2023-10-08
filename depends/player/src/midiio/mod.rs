@@ -80,7 +80,6 @@ pub struct DeviceInformation {
 }
 
 impl MidiPlayerFactory {
-
     pub fn get_connection(n: usize) -> Result<MidiOutputConnection, Box<dyn Error>> {
         let midi_out = MidiOutput::new("play_midi")?;
 
@@ -219,7 +218,6 @@ fn read_midi_file(
     filename: &PathBuf,
     start_wait: Option<f32>,
 ) -> Result<(Arc<Vec<Note>>, Ticker, Sheet), Box<dyn Error>> {
-    
     // Load bytes first
     let file_content_data = std::fs::read(filename)?;
 
@@ -347,9 +345,7 @@ impl Player for MidiPlayer {
                         }
 
                         for moment in sheet {
-
                             if receiver.try_recv().is_ok() {
-                                
                                 // stopped
                                 all_notes_off(&mut con);
                                 if let Ok(mut m) = isplaying_info.lock() {

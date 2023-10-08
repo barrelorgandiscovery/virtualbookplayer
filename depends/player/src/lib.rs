@@ -38,7 +38,6 @@ pub trait PlayerFactory {
 }
 
 pub trait Player: Send {
-    
     fn start_play(
         &mut self,
         filename: &PathBuf,
