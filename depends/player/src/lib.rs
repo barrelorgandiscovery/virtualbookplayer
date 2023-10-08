@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{Receiver, Sender},
-        Arc,
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -38,12 +38,16 @@ pub trait PlayerFactory {
 }
 
 pub trait Player: Send {
-    fn play(&mut self, filename: &PathBuf, start_time: Option<f32>) -> Result<(), Box<dyn Error>>;
+    fn start_play(
+        &mut self,
+        filename: &PathBuf,
+        start_time: Option<f32>,
+    ) -> Result<(), Box<dyn Error>>;
     fn stop(&mut self);
     fn is_playing(&self) -> bool;
     // in milliseconds
     fn current_play_time(&self) -> i64;
-    fn associated_notes(&self) -> Arc<Vec<Note>>;
+    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>>;
 }
 
 pub trait FileInformationsConstructor: Send {
@@ -55,6 +59,7 @@ pub enum Response {
     EndOfFile,
     FileCancelled,
     CurrentPlayTime(Duration),
+    FilePlayStarted((String, Arc<Vec<Note>>)),
 }
 
 #[derive(Debug)]

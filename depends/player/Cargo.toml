@@ -12,5 +12,7 @@ midir = { version = "0.9.1" }
 env_logger = "0.10.0"
 log = "0.4.8"
 
+thread-priority = "0.13.1"
+
 [patch.crates-io]
 midly = { git = "https://github.com/negamartin/midly" }

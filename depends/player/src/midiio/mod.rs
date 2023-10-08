@@ -24,6 +24,8 @@ use std::convert::TryFrom;
 
 use log::{debug, error, warn};
 
+use thread_priority::*;
+
 // 120 bpm default tempo for files that does not have tempo signature in it
 // 48 ticks per quarter note
 // 4/4 signature
@@ -31,8 +33,6 @@ use log::{debug, error, warn};
 // microseconds per beat
 const BEAT_TIME_IN_MICROSECOND: u32 = 60 * 1_000_000 / 120;
 const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = BEAT_TIME_IN_MICROSECOND;
-
-// const DEFAULT_TEMPO_IF_NOT_SET_IN_FILE: u32 = 120 * 240 * 20;
 
 /// Midi device player factory
 pub struct MidiPlayerFactory {
@@ -60,7 +60,7 @@ impl PlayerFactory for MidiPlayerFactory {
             output: Arc::new(Mutex::new(sender)),
             cancel: cancels.0,
             isplaying: Arc::new(Mutex::new(false)),
-            notes: Arc::new(vec![]),
+            notes: Arc::new(Mutex::new(Arc::new(vec![]))),
         }))
     }
 
@@ -169,7 +169,7 @@ pub struct MidiPlayer {
     isplaying: Arc<Mutex<bool>>,
 
     /// note representation for the display
-    notes: Arc<Vec<Note>>,
+    notes: Arc<Mutex<Arc<Vec<Note>>>>,
 }
 
 impl Drop for MidiPlayer {
@@ -212,12 +212,45 @@ fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
     }
 }
 
+fn read_midi_file(
+    filename: &PathBuf,
+    start_wait: Option<f32>,
+) -> Result<(Arc<Vec<Note>>, Ticker, Sheet), Box<dyn Error>> {
+    // Load bytes first
+    let file_content_data = std::fs::read(filename)?;
+
+    // parse it
+    let smf = Smf::parse(&file_content_data)?;
+
+    // get note display
+    let notes = Arc::new(to_notes(&smf, &start_wait)?);
+
+    // deconstruct the elements
+    let Smf { header, tracks } = smf;
+
+    let mut timer = Ticker::try_from(header.timing)?;
+    debug!("timer : {:?}", &timer);
+    timer.change_tempo(DEFAULT_TEMPO_IF_NOT_SET_IN_FILE);
+
+    let sheet = match header.format {
+        Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),
+        Format::Parallel => Sheet::parallel(&tracks),
+    };
+
+    Ok((notes, timer, sheet))
+}
+
 /// Player trait implementation
 impl Player for MidiPlayer {
-    fn associated_notes(&self) -> Arc<Vec<Note>> {
+    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>> {
         Arc::clone(&self.notes)
     }
-    fn play(&mut self, filename: &PathBuf, start_wait: Option<f32>) -> Result<(), Box<dyn Error>> {
+
+    fn start_play(
+        &mut self,
+        filename: &PathBuf,
+        start_wait: Option<f32>,
+    ) -> Result<(), Box<dyn Error>> {
         // load the midi file
         {
             self.output
@@ -229,31 +262,7 @@ impl Player for MidiPlayer {
 
         let _ = self.cancel.send(true); // don't handle the error
 
-        // Load bytes first
-        let file_content_data = std::fs::read(filename)?;
-        // parse it
-        let smf = Smf::parse(&file_content_data)?;
-        // get note display
-        self.notes = Arc::new(to_notes(&smf, &start_wait)?);
-
-        let wait_time = if let Some(w) = start_wait {
-            Duration::from_secs_f32(w)
-        } else {
-            Duration::ZERO
-        };
-
-        // deconstruct the elements
-        let Smf { header, tracks } = smf;
-
-        let mut timer = Ticker::try_from(header.timing)?;
-        debug!("timer : {:?}", &timer);
-        timer.change_tempo(DEFAULT_TEMPO_IF_NOT_SET_IN_FILE);
-
-        let sheet = match header.format {
-            Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),
-            Format::Parallel => Sheet::parallel(&tracks),
-        };
-
+        // silence the output
         self.silence();
 
         let (sender, receiver) = channel();
@@ -265,13 +274,22 @@ impl Player for MidiPlayer {
 
         let output_reference = Arc::clone(&self.output);
 
+        let filename_closure = filename.clone();
+        let start_wait_closure = start_wait.clone();
+
+        let notes_access = Arc::clone(&self.notes);
+
         // thread spawned interpret the Midi event and send them on the line
         thread::spawn(move || {
+            if let Err(e) = set_current_thread_priority(ThreadPriority::Max) {
+                warn!("fail to set max priority to player thread : {:?}", e);
+            }
+
             let mut buf = Vec::new();
 
             let mut total_duration = Duration::new(0, 0);
 
-            let mut counter = 0_u32;
+            let mut ticks_counter = 0_u32;
             if let Ok(mut con) = con.lock() {
                 all_notes_off(&mut con);
 
@@ -281,67 +299,107 @@ impl Player for MidiPlayer {
                         .unwrap();
                 }
 
-                if let Some(wait) = start_wait {
-                    thread::sleep(Duration::from_secs_f32(wait))
-                }
+                let read_result = read_midi_file(&filename_closure, start_wait_closure);
 
-                for moment in sheet {
-                    if receiver.try_recv().is_ok() {
-                        all_notes_off(&mut con);
-                        if let Ok(mut m) = isplaying_info.lock() {
-                            *m = false;
-                        }
-                        if let Ok(output_locked) = output_reference.lock() {
-                            output_locked.send(Response::FileCancelled).unwrap();
-                        }
-                        return;
+                match read_result {
+                    Err(e) => {
+                        error!("error in reading file : {:?}", e);
                     }
 
-                    if !moment.is_empty() {
+                    Ok((notes, mut timer, sheet)) => {
                         if let Ok(mut m) = isplaying_info.lock() {
                             *m = true;
                         }
-                        timer.sleep(counter);
-                        let d = timer.sleep_duration(counter);
-                        total_duration += d;
+                        {
+                            let mut note_guard = notes_access.try_lock().unwrap();
+                            *note_guard = Arc::clone(&notes);
+                        }
 
-                        counter = 0;
-                        for event in &moment.events {
-                            match event {
-                                Event::Tempo(val) => timer.change_tempo(*val),
+                        // send message
+                        if let Ok(output_locked) = output_reference.lock() {
+                            let filename = filename_closure.clone();
+                            if let Err(err_send_file_started) =
+                                output_locked.send(Response::FilePlayStarted((
+                                    String::from(filename.to_string_lossy()),
+                                    notes,
+                                )))
+                            {
+                                error!(
+                                    "error sending start of playing : {:?}",
+                                    err_send_file_started
+                                );
+                            }
+                        }
 
-                                Event::Midi(msg) => {
-                                    buf.clear();
-                                    let _ = msg.write(&mut buf);
-                                    let _ = con.send(&buf);
+                        let wait_time = if let Some(w) = start_wait {
+                            Duration::from_secs_f32(w)
+                        } else {
+                            Duration::ZERO
+                        };
+
+                        if let Some(wait) = start_wait {
+                            thread::sleep(Duration::from_secs_f32(wait))
+                        }
+
+                        for moment in sheet {
+                            if receiver.try_recv().is_ok() {
+                                all_notes_off(&mut con);
+                                if let Ok(mut m) = isplaying_info.lock() {
+                                    *m = false;
                                 }
-                                _ => (),
-                            };
+                                if let Ok(output_locked) = output_reference.lock() {
+                                    output_locked.send(Response::FileCancelled).unwrap();
+                                }
+                                return;
+                            }
+
+                            if !moment.is_empty() {
+                                if let Ok(mut m) = isplaying_info.lock() {
+                                    *m = true;
+                                }
+                                timer.sleep(ticks_counter);
+                                let d = timer.sleep_duration(ticks_counter);
+                                total_duration += d;
+
+                                ticks_counter = 0;
+                                for event in &moment.events {
+                                    match event {
+                                        Event::Tempo(val) => timer.change_tempo(*val),
+
+                                        Event::Midi(msg) => {
+                                            buf.clear();
+                                            let _ = msg.write(&mut buf);
+                                            let _ = con.send(&buf);
+                                        }
+                                        _ => (),
+                                    };
+                                }
+
+                                if let Ok(output_locked) = output_reference.lock() {
+                                    output_locked
+                                        .send(Response::CurrentPlayTime(total_duration + wait_time))
+                                        .unwrap();
+                                }
+                            }
+
+                            ticks_counter += 1;
+                        }
+
+                        if let Ok(mut m) = isplaying_info.lock() {
+                            *m = false;
                         }
 
                         if let Ok(output_locked) = output_reference.lock() {
-                            output_locked
-                                .send(Response::CurrentPlayTime(total_duration + wait_time))
-                                .unwrap();
+                            if let Err(err_send_end_of_file) =
+                                output_locked.send(Response::EndOfFile)
+                            {
+                                error!("error sending end of file : {:?}", err_send_end_of_file);
+                            }
                         }
                     }
-
-                    counter += 1;
-                }
-
-                if let Ok(mut m) = isplaying_info.lock() {
-                    *m = false;
-                }
-
-                if let Ok(output_locked) = output_reference.lock() {
-                    output_locked.send(Response::EndOfFile).unwrap();
                 }
             }
         });
-
-        if let Ok(mut m) = self.isplaying.lock() {
-            *m = true;
-        }
 
         Ok(())
     }
@@ -376,7 +434,7 @@ impl MidiPlayer {
             cancel: c.0,
             midi_output_connection: con,
             isplaying: Arc::new(Mutex::new(false)),
-            notes: Arc::new(vec![]),
+            notes: Arc::new(Mutex::new(Arc::new(vec![]))),
         }
     }
 

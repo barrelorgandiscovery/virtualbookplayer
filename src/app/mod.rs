@@ -21,6 +21,8 @@ use self::i18n::{create_i18n_message_with_lang, I18NMessages};
 
 use pid_lite::Controller;
 
+use egui_extras_xt::displays::IndicatorButton;
+
 mod i18n;
 mod screen_playlist;
 mod screen_visu;
@@ -318,7 +320,7 @@ impl eframe::App for VirtualBookApp {
         // evaluated every 100ms
         {
             let delta = Instant::now().duration_since(*adjusted_start_time);
-            if let Some(vb) = &appplayer.virtual_book {
+            if let Some(vb) = appplayer.virtual_book.read().as_deref() {
                 if let Some(max_time) = vb.max_time() {
                     *current_duration = delta;
                     self.offset = delta.as_micros() as f32 / max_time as f32;
@@ -335,15 +337,16 @@ impl eframe::App for VirtualBookApp {
         if let Ok(mut opt_last_response) = last_response_arc.lock() {
             if opt_last_response.is_some() {
                 let last_response = opt_last_response.as_mut().unwrap();
-                match *last_response {
+                match &*last_response {
                     Response::EndOfFile => {
                         appplayer.next();
                     }
                     Response::CurrentPlayTime(duration) => {
-                        *latest_duration_time = duration;
-                        *adjusted_start_time = Instant::now() - duration;
+                        *latest_duration_time = *duration;
+                        *adjusted_start_time = Instant::now() - *duration;
                     }
                     Response::FileCancelled => {}
+                    Response::FilePlayStarted((_filename, _notes)) => {}
                 }
                 *opt_last_response = None;
             }
@@ -494,20 +497,57 @@ impl eframe::App for VirtualBookApp {
                 );
 
                 let play_mod = &mut appplayer.play_mod;
-                if ui
-                    .toggle_value(
-                        play_mod,
-                        RichText::new('\u{F04B}')
-                            .color(Color32::GREEN)
-                            .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
-                    )
-                    .on_hover_text(&i18n.play)
-                    .clicked()
-                {
+                // if ui
+                //     .toggle_value(
+                //         play_mod,
+                //         RichText::new('\u{F04B}')
+                //             .color(Color32::GREEN)
+                //             .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
+                //     )
+                //     .on_hover_text(&i18n.play)
+                //     .clicked()
+                // {
+                //     if *play_mod {
+                //         appplayer.play_file_on_top();
+                //     } else {
+                //         appplayer.stop();
+                //     }
+                // }
+
+                let indicator_play_button = IndicatorButton::new(play_mod)
+                    .label("On Air")
+                    .width(32.0)
+                    .height(24.0);
+                if ui.add(indicator_play_button).changed() {
                     if *play_mod {
                         appplayer.play_file_on_top();
                     } else {
                         appplayer.stop();
+                    }
+                }
+
+                // playing title
+
+                if appplayer.is_playing() {
+                    let cell = &appplayer
+                        .playlist
+                        .lock()
+                        .expect("fail to lock playlist")
+                        .current();
+                    match cell {
+                        Some(t) => {
+                            let name = t.name.clone();
+                            let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+
+                            rt = rt.background_color(ui.style().visuals.selection.bg_fill);
+                            rt = rt.color(ui.style().visuals.selection.stroke.color);
+
+                            ui.horizontal(|ui| {
+                                ui.label(rt.monospace());
+                                ui.label(format!("{:.0}s", &current_duration.as_secs_f32()));
+                            });
+                        }
+                        None => {}
                     }
                 }
             });

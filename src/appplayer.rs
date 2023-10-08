@@ -9,6 +9,7 @@ use std::{
 };
 
 use bookparsing::{Hole, VirtualBook};
+use egui::mutex::RwLock;
 use player::{Command, Note, Player, Response};
 
 use crate::playlist::PlayList;
@@ -36,32 +37,77 @@ pub struct AppPlayer {
     pub start_play_time: Instant,
 
     /// virtual book
-    pub virtual_book: Option<Arc<VirtualBook>>,
+    pub virtual_book: Arc<RwLock<Option<Arc<VirtualBook>>>>,
 
     // starting time wait
     pub waittime_between_file_play: f32,
+
+    // appplayer cmd sender
+    applayer_sender: Sender<AppPlayerThreadCommands>,
 }
+
+enum AppPlayerThreadCommands {
+    /// signal notes have changed
+    NotesChanged(Arc<Mutex<Arc<Vec<Note>>>>),
+}
+
+#[allow(unused)]
+enum AppPlayerEvent {}
 
 /// manage asynchrone actions (play, informations retrieve)
 impl AppPlayer {
     pub fn new() -> AppPlayer {
         let commands = channel();
-        AppPlayer {
+
+        let inner_control_thread = channel::<AppPlayerThreadCommands>();
+
+        let appplayer = AppPlayer {
             commands: commands.0,
             player: None,
             playlist: Arc::new(Mutex::new(PlayList::new())),
             play_mod: false,
             last_response: Arc::new(Mutex::new(None)),
-            virtual_book: None,
+            virtual_book: Arc::new(RwLock::new(None)),
             start_play_time: Instant::now() - Duration::from_millis(10_000),
             waittime_between_file_play: 0_f32,
-        }
+            applayer_sender: inner_control_thread.0,
+        };
+
+        let vb_access = Arc::clone(&appplayer.virtual_book);
+        thread::spawn(move || {
+            let receiver = inner_control_thread.1;
+            loop {
+                while let Ok(cmd) = receiver.recv() {
+                    match cmd {
+                        AppPlayerThreadCommands::NotesChanged(notes) => {
+                            let mut virt = VirtualBook::midi_scale();
+                            virt.holes.holes = notes
+                                .lock()
+                                .unwrap()
+                                .iter()
+                                .map(|n| Hole {
+                                    timestamp: u64::try_from(n.start.as_micros()).unwrap(),
+                                    length: u64::try_from(n.length.as_micros()).unwrap(),
+                                    track: (127 - n.note).into(),
+                                })
+                                .collect();
+
+                            let mut wlock = vb_access.write();
+                            *wlock = Some(Arc::new(virt));
+                        }
+                    }
+                }
+            }
+        });
+
+        appplayer
     }
 
     pub fn set_waittime_between_file_play(&mut self, wait_time: f32) {
         self.waittime_between_file_play = wait_time;
     }
 
+    /// define the current player, with associated receiver for the player response
     pub fn player(&mut self, player: Option<(Box<dyn Player>, Receiver<Response>)>) {
         if let Some(old_player_mutex) = &self.player {
             let mut old_player = old_player_mutex.lock().unwrap();
@@ -75,10 +121,31 @@ impl AppPlayer {
                 let player_reference = Arc::new(Mutex::new(p.0));
                 let last_response = Arc::clone(&self.last_response);
 
+                let inner_thread_access = self.applayer_sender.clone();
                 thread::spawn(move || {
                     // println!("start thread for getting responses");
                     while let Ok(response) = p.1.recv() {
                         // println!("received a response from inner player : {:?}", response);
+
+                        match &response {
+                            Response::CurrentPlayTime(_time) => {}
+                            Response::EndOfFile => {}
+                            Response::FileCancelled => {}
+                            Response::FilePlayStarted((_filename, notes)) => {
+                                if let Err(e) =
+                                    inner_thread_access.send(AppPlayerThreadCommands::NotesChanged(
+                                        Arc::new(Mutex::new(Arc::clone(notes))),
+                                    ))
+                                {
+                                    error!(
+                                        "error when sending notes changed for app player : {:?}",
+                                        e
+                                    );
+                                }
+                            }
+                        }
+
+                        // forward the response
                         if let Ok(mut m) = last_response.lock() {
                             *m = Some(response);
                         }
@@ -98,25 +165,12 @@ impl AppPlayer {
             if !locked_playlist.file_list.is_empty() {
                 if let Some(n) = locked_playlist.file_list.get(0) {
                     self.start_play_time = Instant::now(); // before play
-                    if let Err(e) = p.play(&n.path, Some(self.waittime_between_file_play)) {
+                    if let Err(e) = p.start_play(&n.path, Some(self.waittime_between_file_play)) {
                         error!("error in playing file : {}", e);
                     }
                 }
             }
         }
-        let notes = self.notes();
-
-        let mut virt = VirtualBook::midi_scale();
-        virt.holes.holes = notes
-            .iter()
-            .map(|n| Hole {
-                timestamp: u64::try_from(n.start.as_micros()).unwrap(),
-                length: u64::try_from(n.length.as_micros()).unwrap(),
-                track: (127 - n.note).into(),
-            })
-            .collect();
-
-        self.virtual_book = Some(Arc::new(virt));
     }
 
     #[allow(dead_code)]
@@ -125,12 +179,12 @@ impl AppPlayer {
     }
 
     /// get visual notes of the current played file
-    pub fn notes(&self) -> Arc<Vec<Note>> {
+    pub fn notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>> {
         if let Some(player) = &self.player {
             let p = player.lock().unwrap();
             return p.associated_notes();
         }
-        Arc::new(vec![])
+        Arc::new(Mutex::new(Arc::new(vec![])))
     }
 
     /// stop the play

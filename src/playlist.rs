@@ -11,6 +11,7 @@ pub struct PlayList {
 
 #[derive(Clone)]
 pub struct PlaylistElement {
+    // system time when the file has been added
     pub added_at: SystemTime,
     pub name: String,
     pub path: PathBuf,

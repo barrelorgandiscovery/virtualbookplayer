@@ -372,6 +372,8 @@ fn display_tree(
                         .expect("fail to lock the playlist");
                     locked_playlist.add_fileviewnode_and_read_playlists(element);
                 }
+
+                // when just added and play is active, playit
                 if appplayer.play_mod && !appplayer.is_playing() {
                     appplayer.play_file_on_top();
                 }
@@ -440,44 +442,44 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
             });
             strip.cell(|ui| {
                 StripBuilder::new(ui)
-                    .size(Size::initial(12.0))
+                    // .size(Size::initial(12.0))
                     .size(Size::initial(100.0))
                     .size(Size::remainder())
                     .vertical(|mut strip| {
-                        strip.cell(|ui| {
-                            // name of the element
-                            ui.vertical_centered(|ui| {
-                                if app.appplayer.is_playing() {
-                                    let cell = &app
-                                        .appplayer
-                                        .playlist
-                                        .lock()
-                                        .expect("fail to lock playlist")
-                                        .current();
-                                    match cell {
-                                        Some(t) => {
-                                            let name = t.name.clone();
-                                            let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+                        // strip.cell(|ui| {
+                        //     // name of the element
+                        //     ui.vertical_centered(|ui| {
+                        //         if app.appplayer.is_playing() {
+                        //             let cell = &app
+                        //                 .appplayer
+                        //                 .playlist
+                        //                 .lock()
+                        //                 .expect("fail to lock playlist")
+                        //                 .current();
+                        //             match cell {
+                        //                 Some(t) => {
+                        //                     let name = t.name.clone();
+                        //                     let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
 
-                                            rt = rt.background_color(
-                                                ui.style().visuals.selection.bg_fill,
-                                            );
-                                            rt =
-                                                rt.color(ui.style().visuals.selection.stroke.color);
+                        //                     rt = rt.background_color(
+                        //                         ui.style().visuals.selection.bg_fill,
+                        //                     );
+                        //                     rt =
+                        //                         rt.color(ui.style().visuals.selection.stroke.color);
 
-                                            ui.horizontal(|ui| {
-                                                ui.label(rt.monospace());
-                                                ui.label(format!(
-                                                    "{:.0}s",
-                                                    &app.current_duration.as_secs_f32()
-                                                ));
-                                            });
-                                        }
-                                        None => {}
-                                    }
-                                }
-                            });
-                        });
+                        //                     ui.horizontal(|ui| {
+                        //                         ui.label(rt.monospace());
+                        //                         ui.label(format!(
+                        //                             "{:.0}s",
+                        //                             &app.current_duration.as_secs_f32()
+                        //                         ));
+                        //                     });
+                        //                 }
+                        //                 None => {}
+                        //             }
+                        //         }
+                        //     });
+                        // });
 
                         strip.cell(|ui| {
                             // draw book vignette
@@ -485,7 +487,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
 
                             // display virtualbook
                             let mut c = VirtualBookComponent::from_some_virtualbook(
-                                app.appplayer.virtual_book.clone(),
+                                app.appplayer.virtual_book.read().clone(),
                             )
                             .offset(foffset)
                             .xscale(app.xscale)

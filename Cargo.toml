@@ -21,11 +21,8 @@ sys-locale = "0.3.1"
 player= { path = "depends/player" }
 midir = { version = "0.9.1" }
 
-
-
 tracing-subscriber = "0.3"
 im-native-dialog = "0.3.0"
-
 
 # all plateforms support jack
 nodi= { version = "0.19.2" , features=["midir-jack"]}
@@ -41,6 +38,7 @@ pid-lite = { git = "https://github.com/yoshuawuyts/pid-lite", tag="v1.1.2" }
 
 egui-phosphor = "0.3.0"
 egui_dnd = "0.5.1"
+egui_extras_xt = { git="https://github.com/xTibor/egui_extras_xt", branch="master", features=["ui","displays"]}
 
 winit = {version="0.28.7", features=["wayland"]}
 
