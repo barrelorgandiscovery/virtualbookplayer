@@ -38,6 +38,7 @@ pub trait PlayerFactory {
 }
 
 pub trait Player: Send {
+    
     fn start_play(
         &mut self,
         filename: &PathBuf,
@@ -45,6 +46,7 @@ pub trait Player: Send {
     ) -> Result<(), Box<dyn Error>>;
     fn stop(&mut self);
     fn is_playing(&self) -> bool;
+
     // in milliseconds
     fn current_play_time(&self) -> i64;
     fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>>;

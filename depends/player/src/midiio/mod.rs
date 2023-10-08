@@ -26,6 +26,8 @@ use log::{debug, error, warn};
 
 use thread_priority::*;
 
+mod midifactory;
+
 // 120 bpm default tempo for files that does not have tempo signature in it
 // 48 ticks per quarter note
 // 4/4 signature
@@ -78,6 +80,7 @@ pub struct DeviceInformation {
 }
 
 impl MidiPlayerFactory {
+
     pub fn get_connection(n: usize) -> Result<MidiOutputConnection, Box<dyn Error>> {
         let midi_out = MidiOutput::new("play_midi")?;
 
@@ -216,6 +219,7 @@ fn read_midi_file(
     filename: &PathBuf,
     start_wait: Option<f32>,
 ) -> Result<(Arc<Vec<Note>>, Ticker, Sheet), Box<dyn Error>> {
+    
     // Load bytes first
     let file_content_data = std::fs::read(filename)?;
 
@@ -286,11 +290,12 @@ impl Player for MidiPlayer {
             }
 
             let mut buf = Vec::new();
-
             let mut total_duration = Duration::new(0, 0);
-
             let mut ticks_counter = 0_u32;
+
             if let Ok(mut con) = con.lock() {
+                debug!("midi connexion aquired");
+
                 all_notes_off(&mut con);
 
                 if let Ok(output_locked) = output_reference.lock() {
@@ -342,7 +347,10 @@ impl Player for MidiPlayer {
                         }
 
                         for moment in sheet {
+
                             if receiver.try_recv().is_ok() {
+                                
+                                // stopped
                                 all_notes_off(&mut con);
                                 if let Ok(mut m) = isplaying_info.lock() {
                                     *m = false;

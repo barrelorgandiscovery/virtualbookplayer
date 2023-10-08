@@ -35,7 +35,7 @@ pub fn test_player() {
 
     thread::spawn(move || {
         let mut p = f.create(sender, receivercmd).unwrap();
-        p.play(
+        p.start_play(
             &PathBuf::from("debussy_63503a_arabesque_2_e_major_(nc)smythe.mid"),
             None,
         )
@@ -53,6 +53,8 @@ pub fn test_player() {
             }
 
             player::Response::FileCancelled => println!("file canceled"),
+
+            player::Response::FilePlayStarted((file,notes)) => {}
         }
     }
 }
@@ -66,7 +68,7 @@ pub fn test_player_1() {
 
     thread::spawn(move || {
         let mut p = f.create(sender, receivercmd).unwrap();
-        p.play(&PathBuf::from("A PRESENT TU PEUX T EN ALLER.mid"), None)
+        p.start_play(&PathBuf::from("A PRESENT TU PEUX T EN ALLER.mid"), None)
             .unwrap();
     });
 
