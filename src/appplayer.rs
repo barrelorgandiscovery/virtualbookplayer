@@ -99,11 +99,11 @@ impl AppPlayer {
                                         warn!("error converting length : {}", n.length.as_micros());
                                     }
 
-                                    return Hole {
+                                    Hole {
                                         timestamp: t.unwrap(),
                                         length: l.unwrap(),
                                         track: (127 - n.note).into(),
-                                    };
+                                    }
                                 })
                                 .collect();
 
