@@ -14,5 +14,12 @@ log = "0.4.8"
 
 thread-priority = "0.13.1"
 
+bookparsing = {path = "../book-lib-rs"}
+
+# for input / output conversions, configurations
+
+serde = {version = "1.0.160", features = ["derive"]}
+serde_yaml = "0.9.25"
+
 [patch.crates-io]
 midly = { git = "https://github.com/negamartin/midly" }

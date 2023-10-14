@@ -1,14 +1,18 @@
 use std::{
     error::Error,
+    fs::File,
+    io::BufReader,
     path::PathBuf,
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex, MutexGuard,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
+use bookparsing::VirtualBook;
+use env_logger::fmt::Timestamp;
 use midir::{MidiOutput, MidiOutputConnection};
 use nodi::{
     midly::{Format, MidiMessage, Smf},
@@ -17,16 +21,19 @@ use nodi::{
 };
 
 use crate::{
-    Command, FileInformations, FileInformationsConstructor, Note, Player, PlayerFactory, Response,
+    Command, FileInformations, FileInformationsConstructor, PlainNoteWithChannel, Player,
+    PlayerFactory, Response,
 };
 
 use std::convert::TryFrom;
 
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 
 use thread_priority::*;
 
-mod midifactory;
+use self::midiconverter::{convert, create_conversion_from_scale, read_conversion, Conversion};
+
+mod midiconverter;
 
 // 120 bpm default tempo for files that does not have tempo signature in it
 // 48 ticks per quarter note
@@ -136,6 +143,7 @@ impl MidiPlayerFactory {
 
 pub struct MidiFileInformationsConstructor {}
 
+/// file information trait, specific to midi, and midi controlled equipments
 impl FileInformationsConstructor for MidiFileInformationsConstructor {
     fn compute(&mut self, filename: &PathBuf) -> Result<Arc<FileInformations>, Box<dyn Error>> {
         // Load bytes first
@@ -171,7 +179,7 @@ pub struct MidiPlayer {
     isplaying: Arc<Mutex<bool>>,
 
     /// note representation for the display
-    notes: Arc<Mutex<Arc<Vec<Note>>>>,
+    notes: Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>,
 }
 
 impl Drop for MidiPlayer {
@@ -217,7 +225,7 @@ fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
 fn read_midi_file(
     filename: &PathBuf,
     start_wait: Option<f32>,
-) -> Result<(Arc<Vec<Note>>, Ticker, Sheet), Box<dyn Error>> {
+) -> Result<(Arc<Vec<PlainNoteWithChannel>>, Ticker, Sheet), Box<dyn Error>> {
     // Load bytes first
     let file_content_data = std::fs::read(filename)?;
 
@@ -242,9 +250,111 @@ fn read_midi_file(
     Ok((notes, timer, sheet))
 }
 
+fn resolve_conversion(vb: &VirtualBook) -> Result<Option<Conversion>, Box<dyn Error>> {
+    let scale_name = vb.scale.name.clone();
+    let conversion_file = scale_name + ".yml";
+
+    if !std::fs::metadata(&conversion_file).is_ok() {
+        info!("create the conversion from scale definition");
+        return Ok(Some(create_conversion_from_scale(&vb.scale.definition)?));
+    }
+
+    let result_open = File::open(PathBuf::from(&conversion_file));
+    if let Err(e) = result_open {
+        return Err(format!("error opening mapping :{}, : {:?}", &conversion_file, &e).into());
+    }
+    let f_scale = result_open?;
+
+    let mut reader = BufReader::new(f_scale);
+    let conversion = read_conversion(&mut reader)?;
+    return Ok(Some(conversion));
+}
+
+fn read_book_file(
+    filename: &PathBuf, // must be a book
+    // extension : external_dir_for_overload: &PathBuf,
+    start_wait: Option<f32>,
+) -> Result<(Arc<Vec<PlainNoteWithChannel>>, Ticker, Sheet), Box<dyn Error>> {
+    // book parsing
+    let file = File::open(filename)?;
+    let mut reader = BufReader::new(&file);
+    let vb = bookparsing::read_book_stream(&mut reader)?;
+    let found_conversion = resolve_conversion(&vb)?;
+
+    let seconds_duration = match start_wait {
+        Some(secs) => Duration::from_secs_f32(secs),
+        None => Duration::ZERO,
+    };
+
+    return match found_conversion {
+        None => Err(format!("no conversion found for {}", &filename.to_string_lossy()).into()),
+        Some(conversion) => {
+            let resultsmf = convert(&vb, &conversion)?;
+
+            let plain_notes: Arc<Vec<PlainNoteWithChannel>> = Arc::new(
+                vb.holes
+                    .holes
+                    .iter()
+                    .filter(|hole| hole.timestamp >= 0 && hole.length >= 0)
+                    .map(|hole| {
+                        assert!(hole.length >= 0);
+                        assert!(hole.timestamp >= 0);
+
+                        PlainNoteWithChannel {
+                            channel: 0,
+                            start: Duration::from_micros(hole.timestamp as u64) + seconds_duration, // todo check this fact
+                            length: Duration::from_micros(hole.length as u64),
+                            note: hole.track as u8,
+                        }
+                    })
+                    .collect(),
+            );
+
+            // deconstruct the elements
+            let Smf { header, tracks } = resultsmf;
+
+            let mut timer = Ticker::try_from(header.timing)?;
+            debug!("timer : {:?}", &timer);
+            timer.change_tempo(DEFAULT_TEMPO_IF_NOT_SET_IN_FILE);
+
+            let sheet = match header.format {
+                Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),
+                Format::Parallel => Sheet::parallel(&tracks),
+            };
+
+            Ok((plain_notes, timer, sheet))
+        }
+    };
+}
+
+fn read_all_kind_of_files(
+    filename: &PathBuf, // must be a book
+    // extension : external_dir_for_overload: &PathBuf,
+    start_wait: Option<f32>,
+) -> Result<(Arc<Vec<PlainNoteWithChannel>>, Ticker, Sheet), Box<dyn Error>> {
+    info!("reading {:?}", filename);
+    let ext_option = filename.extension();
+    if let Some(ext) = ext_option {
+        match ext.to_ascii_lowercase().to_string_lossy().as_ref() {
+            "mid" => {
+                info!("reading midi file : {:?}", filename);
+                return read_midi_file(filename, start_wait);
+            }
+            "book" => {
+                info!("reading book file : {:?}", filename);
+                return read_book_file(filename, start_wait);
+            }
+            _ => {
+                warn!("this file type : {:?} is not known", filename);
+            }
+        }
+    }
+    return Err(format!("no extension given for the file {:?}", &filename).into());
+}
+
 /// Player trait implementation
 impl Player for MidiPlayer {
-    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>> {
+    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>> {
         Arc::clone(&self.notes)
     }
 
@@ -253,7 +363,6 @@ impl Player for MidiPlayer {
         filename: &PathBuf,
         start_wait: Option<f32>,
     ) -> Result<(), Box<dyn Error>> {
-        // load the midi file
         {
             self.output
                 .lock()
@@ -302,14 +411,21 @@ impl Player for MidiPlayer {
                         .unwrap();
                 }
 
-                let read_result = read_midi_file(&filename_closure, start_wait_closure);
+                let start_time = Instant::now();
+                // load the file
+                let read_result = read_all_kind_of_files(&filename_closure, start_wait_closure);
 
                 match read_result {
                     Err(e) => {
                         error!("error in reading file : {:?}", e);
                     }
 
-                    Ok((notes, mut timer, sheet)) => {
+                    Ok((notes, mut timer, midi_sheet)) => {
+                        info!(
+                            "File read and converted in {} ms",
+                            (Instant::now() - start_time).as_millis()
+                        );
+
                         if let Ok(mut m) = isplaying_info.lock() {
                             *m = true;
                         }
@@ -344,7 +460,7 @@ impl Player for MidiPlayer {
                             thread::sleep(Duration::from_secs_f32(wait))
                         }
 
-                        for moment in sheet {
+                        for moment in midi_sheet {
                             if receiver.try_recv().is_ok() {
                                 // stopped
                                 all_notes_off(&mut con);
@@ -427,7 +543,9 @@ impl Player for MidiPlayer {
     }
 }
 
+/// midi player object/structure
 impl MidiPlayer {
+    /// create a new midi player structure, given the midi output and command/information send channel
     pub fn new(con: MidiOutputConnection, output: Sender<Response>) -> Self {
         let con = Arc::new(Mutex::new(con));
 
@@ -442,6 +560,7 @@ impl MidiPlayer {
         }
     }
 
+    /// silence all notes (sending cmd stop all)
     fn silence(&self) {
         let mut con = self.midi_output_connection.lock().unwrap();
         let _ = con.send(&[0xb0, 123]);
@@ -449,7 +568,11 @@ impl MidiPlayer {
     }
 }
 
-pub fn to_notes(smf: &Smf, start_wait: &Option<f32>) -> Result<Vec<Note>, Box<dyn Error>> {
+/// convert midi file to notes
+pub fn to_notes(
+    smf: &Smf,
+    start_wait: &Option<f32>,
+) -> Result<Vec<PlainNoteWithChannel>, Box<dyn Error>> {
     let Smf { header, tracks } = smf;
     let miditiming = header.timing;
     let mut timer = Ticker::try_from(miditiming)?;
@@ -470,7 +593,7 @@ pub fn to_notes(smf: &Smf, start_wait: &Option<f32>) -> Result<Vec<Note>, Box<dy
 
     // note activation
     let mut note_state: Vec<Vec<Duration>> = vec![vec![]; 16 * 128];
-    let mut notes: Vec<Note> = vec![];
+    let mut notes: Vec<PlainNoteWithChannel> = vec![];
 
     let mut counter = 0_u32;
     let mut total_duration = Duration::new(0, 0);
@@ -492,7 +615,7 @@ pub fn to_notes(smf: &Smf, start_wait: &Option<f32>) -> Result<Vec<Note>, Box<dy
                             let channel_note_vec = &mut note_state[index];
                             if channel_note_vec.len() > 0 {
                                 match channel_note_vec.pop() {
-                                    Some(d) => notes.push(Note {
+                                    Some(d) => notes.push(PlainNoteWithChannel {
                                         channel: uchannel,
                                         note: key,
                                         start: d + shift_duration,
@@ -512,7 +635,7 @@ pub fn to_notes(smf: &Smf, start_wait: &Option<f32>) -> Result<Vec<Note>, Box<dy
                                 let channel_note_vec = &mut note_state[index];
                                 if channel_note_vec.len() > 0 {
                                     match channel_note_vec.pop() {
-                                        Some(d) => notes.push(Note {
+                                        Some(d) => notes.push(PlainNoteWithChannel {
                                             channel: uchannel,
                                             note: key,
                                             start: d + shift_duration,

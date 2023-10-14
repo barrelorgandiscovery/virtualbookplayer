@@ -10,11 +10,11 @@ use std::{
 
 use bookparsing::{Hole, VirtualBook};
 use egui::mutex::RwLock;
-use player::{Command, Note, Player, Response};
+use player::{Command, PlainNoteWithChannel, Player, Response};
 
 use crate::playlist::PlayList;
 
-use log::error;
+use log::{error, warn};
 
 ///
 /// player integrating the playlist, and play mod
@@ -48,7 +48,7 @@ pub struct AppPlayer {
 
 enum AppPlayerThreadCommands {
     /// signal notes have changed
-    NotesChanged(Arc<Mutex<Arc<Vec<Note>>>>),
+    NotesChanged(Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>),
 }
 
 #[allow(unused)]
@@ -85,10 +85,25 @@ impl AppPlayer {
                                 .lock()
                                 .unwrap()
                                 .iter()
-                                .map(|n| Hole {
-                                    timestamp: u64::try_from(n.start.as_micros()).unwrap(),
-                                    length: u64::try_from(n.length.as_micros()).unwrap(),
-                                    track: (127 - n.note).into(),
+                                // .filter(|n| n.length >= Duration::ZERO)
+                                .map(|n| {
+                                    let t = i64::try_from(n.start.as_micros());
+                                    if t.is_err() {
+                                        warn!(
+                                            "error converting timestamp : {}",
+                                            n.start.as_micros()
+                                        );
+                                    }
+                                    let l = i64::try_from(n.length.as_micros());
+                                    if l.is_err() {
+                                        warn!("error converting length : {}", n.length.as_micros());
+                                    }
+
+                                    return Hole {
+                                        timestamp: t.unwrap(),
+                                        length: l.unwrap(),
+                                        track: (127 - n.note).into(),
+                                    };
                                 })
                                 .collect();
 
@@ -179,7 +194,7 @@ impl AppPlayer {
     }
 
     /// get visual notes of the current played file
-    pub fn notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>> {
+    pub fn notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>> {
         if let Some(player) = &self.player {
             let p = player.lock().unwrap();
             return p.associated_notes();

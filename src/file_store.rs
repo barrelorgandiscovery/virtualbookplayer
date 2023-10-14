@@ -79,7 +79,7 @@ impl FileNode {
                     let is_dir = md.is_dir();
 
                     let n = FileNode {
-                        name: filename.to_str().expect("cannot read the file name").into(),
+                        name: filename.to_string_lossy().into(), // display name, may be lossy
                         path: path.clone(),
                         is_folder: is_dir,
                         folder_files: vec![],

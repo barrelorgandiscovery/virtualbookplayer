@@ -10,8 +10,9 @@ use std::{
 
 pub mod midiio;
 
+/// this structure handle a plain note (with start and length)
 #[derive(Debug)]
-pub struct Note {
+pub struct PlainNoteWithChannel {
     pub channel: u16,
     pub note: u8,
     pub start: Duration,
@@ -48,7 +49,7 @@ pub trait Player: Send {
 
     // in milliseconds
     fn current_play_time(&self) -> i64;
-    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<Note>>>>;
+    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>;
 }
 
 pub trait FileInformationsConstructor: Send {
@@ -60,7 +61,7 @@ pub enum Response {
     EndOfFile,
     FileCancelled,
     CurrentPlayTime(Duration),
-    FilePlayStarted((String, Arc<Vec<Note>>)),
+    FilePlayStarted((String, Arc<Vec<PlainNoteWithChannel>>)),
 }
 
 #[derive(Debug)]

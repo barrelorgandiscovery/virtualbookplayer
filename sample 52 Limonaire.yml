@@ -1,0 +1,213 @@
+# sample file to define the track - midi mapping
+name: my transformation 52 limonaire
+global_parameters:
+  read_size: 2.0
+mapping:
+  0:
+    midi_channel: 0
+    note: 69
+    modifier: MECHANICAL_READ
+  1:
+    midi_channel: 0
+    note: 70
+    modifier: MECHANICAL_READ
+  2:
+    midi_channel: 0
+    note: 71
+    modifier: MECHANICAL_READ
+  3:
+    midi_channel: 0
+    note: 72
+    modifier: MECHANICAL_READ
+  4:
+    midi_channel: 0
+    note: 73
+    modifier: MECHANICAL_READ
+  5:
+    midi_channel: 0
+    note: 74
+    modifier: MECHANICAL_READ
+  6:
+    midi_channel: 0
+    note: 75
+    modifier: MECHANICAL_READ
+  7:
+    midi_channel: 0
+    note: 76
+    modifier: MECHANICAL_READ
+  8:
+    midi_channel: 0
+    note: 77
+    modifier: MECHANICAL_READ
+  9:
+    midi_channel: 0
+    note: 78
+    modifier: MECHANICAL_READ
+  10:
+    midi_channel: 0
+    note: 79
+    modifier: MECHANICAL_READ
+  12:
+    midi_channel: 0
+    note: 80
+    modifier: MECHANICAL_READ
+  13:
+    midi_channel: 0
+    note: 81
+    modifier: MECHANICAL_READ
+  14:
+    midi_channel: 0
+    note: 82
+    modifier: MECHANICAL_READ
+  15:
+    midi_channel: 0
+    note: 83
+    modifier: MECHANICAL_READ
+  16:
+    midi_channel: 0
+    note: 84
+    modifier: MECHANICAL_READ
+  17:
+    midi_channel: 0
+    note: 85
+    modifier: MECHANICAL_READ
+  18:
+    midi_channel: 0
+    note: 86
+    modifier: MECHANICAL_READ
+  19:
+    midi_channel: 0
+    note: 87
+    modifier: MECHANICAL_READ
+  20:
+    midi_channel: 0
+    note: 88
+    modifier: MECHANICAL_READ
+  21:
+    midi_channel: 0
+    note: 89
+    modifier: MECHANICAL_READ
+  22:
+    midi_channel: 0
+    note: 90
+    modifier: MECHANICAL_READ
+  23:
+    midi_channel: 0
+    note: 91
+    modifier: MECHANICAL_READ
+  24:
+    midi_channel: 0
+    note: 92
+    modifier: MECHANICAL_READ
+  25:
+    midi_channel: 0
+    note: 93
+    modifier: MECHANICAL_READ
+  26:
+    midi_channel: 0
+    note: 94
+    modifier: MECHANICAL_READ
+  27:
+    midi_channel: 0
+    note: 95
+    modifier: MECHANICAL_READ
+  28:
+    midi_channel: 0
+    note: 96
+    modifier: MECHANICAL_READ
+  29:
+    midi_channel: 0
+    note: 97
+    modifier: MECHANICAL_READ
+  30:
+    midi_channel: 0
+    note: 98
+    modifier: MECHANICAL_READ
+  31:
+    midi_channel: 0
+    note: 99
+    modifier: MECHANICAL_READ
+  32:
+    midi_channel: 0
+    note: 100
+    modifier: MECHANICAL_READ
+  33:
+    midi_channel: 0
+    note: 101
+    modifier: MECHANICAL_READ
+  34:
+    midi_channel: 0
+    note: 102
+    modifier: MECHANICAL_READ
+  35:
+    midi_channel: 0
+    note: 103
+    modifier: MECHANICAL_READ
+  36:
+    midi_channel: 0
+    note: 104
+    modifier: MECHANICAL_READ
+  37:
+    midi_channel: 0
+    note: 105
+    modifier: MECHANICAL_READ
+  38:
+    midi_channel: 0
+    note: 106
+    modifier: MECHANICAL_READ
+  39:
+    midi_channel: 0
+    note: 107
+    modifier: MECHANICAL_READ
+  40:
+    midi_channel: 0
+    note: 108
+    modifier: MECHANICAL_READ
+  41:
+    midi_channel: 0
+    note: 109
+    modifier: MECHANICAL_READ
+  42:
+    midi_channel: 0
+    note: 110
+    modifier: MECHANICAL_READ
+  43:
+    midi_channel: 0
+    note: 111
+    modifier: MECHANICAL_READ
+  44:
+    midi_channel: 0
+    note: 112
+    modifier: MECHANICAL_READ
+  45:
+    midi_channel: 0
+    note: 113
+    modifier: MECHANICAL_READ
+  46:
+    midi_channel: 0
+    note: 114
+    modifier: MECHANICAL_READ
+  47:
+    midi_channel: 0
+    note: 115
+    modifier: MECHANICAL_READ
+  48:
+    midi_channel: 0
+    note: 116
+    modifier: MECHANICAL_READ
+  49:
+    midi_channel: 0
+    note: 117
+    modifier: MECHANICAL_READ
+  50:
+    midi_channel: 0
+    note: 118
+    modifier: MECHANICAL_READ
+  51:
+    midi_channel: 0
+    note: 119
+    modifier: MECHANICAL_READ
+  52:
+    midi_channel: 0
+    note: 120
+    modifier: MECHANICAL_READ

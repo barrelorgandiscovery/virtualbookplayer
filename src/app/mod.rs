@@ -63,6 +63,7 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     file_store: Option<FileStore>,
 
+    #[serde(skip)]
     extensions_filters: Option<Vec<String>>,
 
     #[serde(skip)]
@@ -150,7 +151,7 @@ impl Default for VirtualBookApp {
 
             hidden_number_pad: false,
 
-            extensions_filters: Some(vec![".mid".into(), ".playlist".into()]),
+            extensions_filters: Some(vec![".mid".into(), ".book".into(), ".playlist".into()]),
 
             play_wait: 2.0,
         }
