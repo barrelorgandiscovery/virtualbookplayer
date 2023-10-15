@@ -77,6 +77,7 @@ pub struct ConversionParameters {
     read_size: f32, // read lag from
 }
 
+/// conversion structure holding converting books into midi files
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Conversion {
     /// name of the conversion

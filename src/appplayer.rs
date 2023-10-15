@@ -84,8 +84,7 @@ impl AppPlayer {
                             virt.holes.holes = notes
                                 .lock()
                                 .unwrap()
-                                .iter()
-                                // .filter(|n| n.length >= Duration::ZERO)
+                                .iter()                               
                                 .map(|n| {
                                     let t = i64::try_from(n.start.as_micros());
                                     if t.is_err() {
