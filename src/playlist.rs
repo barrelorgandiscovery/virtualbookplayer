@@ -1,14 +1,18 @@
+//! PlayerList module, manage a playlist, and takes commands on the play
+//!
 use std::{cell::RefCell, error::Error, fs, hash::Hash, path::PathBuf, rc::Rc, time::SystemTime};
 
 use player::FileInformations;
 
 use crate::file_store::{FileNode, FileViewNode};
 
+/// Play list structure, holding the list of file
 pub struct PlayList {
     pub file_list: Vec<PlaylistElement>,
     pub is_dirty: bool,
 }
 
+/// Element in the play list (with additional informations)
 #[derive(Clone)]
 pub struct PlaylistElement {
     // system time when the file has been added
@@ -55,8 +59,9 @@ impl From<&PathBuf> for PlaylistElement {
 }
 
 impl PlayList {
-    pub fn new() -> PlayList {
-        PlayList {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self {
             file_list: vec![],
             is_dirty: false,
         }
@@ -76,6 +81,7 @@ impl PlayList {
         }
     }
 
+    /// add a lonely file node to the playlist
     #[allow(dead_code)]
     pub fn add(&mut self, node: &Rc<RefCell<FileNode>>) {
         let cell = node.borrow();

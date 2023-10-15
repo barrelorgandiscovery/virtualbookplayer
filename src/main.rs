@@ -1,27 +1,28 @@
-//! Virtual book player application, 
+//! Virtual book player application,
 //! this is a graphical application to player midi and output to a midi device
 //!
 //! The application has additional command line arguments :
-//! 
-//! 
+//!
+//!
 //! use@alexa:~/projets/2023-05-01_test_egui_draw/virtualbookplayer$ target/debug/virtualbookplayerapp --help
 //! ```
 //! ==========================================================================
 //! Virtual Book Player 0.0.35 (Patrice Freydiere - BarrelOrganDiscovery)
 //! https://www.barrel-organ-discovery.org
-//!   date: sam. 14 oct. 2023 17:26:47 CEST
-//!   build: c298e0f2cfa10bfaf5dee40b73036b2480df52fe
+//!   date: dim. 15 oct. 2023 08:57:03 CEST
+//!   build: 10adc0cf4a8f004c0f7b969ca69a5b6be5a96de5
 //! ==========================================================================
 //! Usage: virtualbookplayerapp [OPTIONS]
-//! 
+//!
 //! Options:
-//!   -r, --reset-preferences          Name of the person to greet
-//!   -l, --lang-code <LANG_CODE>      
-//!   -f, --full-screen <FULL_SCREEN>  [possible values: true, false]
+//!   -r, --reset-preferences          reset the gui preferences
+//!   -l, --lang-code <LANG_CODE>      choose and force the current language, if not passed the program use environment variables provided by the OS to try to detect the user language
+//!   -f, --full-screen <FULL_SCREEN>  launch the application with no window decoration (best for a fullscreen experience) [possible values: true, false]
 //!   -h, --help                       Print help
 //!   -V, --version                    Print version
+//!
 //! ```
-//! 
+//!
 //! *reset-references* option permit to reset the gui saved elements (windows position, selected folder, and other preferences)
 //! *lang-code* define the gui language (currently two langage are provided french and english, this can be extended in providing label translation in i18n file)
 
@@ -93,7 +94,7 @@ fn main() -> eframe::Result<()> {
         "VirtualBook Player",
         native_options,
         Box::new(move |cc| {
-            Box::new(virtualbookplayerapp::VirtualBookApp::new(
+            Box::new(virtualbookplayer::VirtualBookApp::new(
                 cc,
                 args.reset_preferences,
                 args.lang_code,

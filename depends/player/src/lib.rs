@@ -53,14 +53,13 @@ pub trait PlayerFactory {
     ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
 }
 
-/// Player trait 
+/// Player trait
 pub trait Player: Send {
-
     /// Start playing a file, in asynchronous manner
     /// once the play is started the player send some response to inform :
-    /// 
+    ///
     /// the current timestamp played in the file
-    /// 
+    ///
     fn start_play(
         &mut self,
         filename: &PathBuf,
@@ -80,8 +79,8 @@ pub trait Player: Send {
     fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>;
 }
 
-/// Factory for file information creator, using the compute function this compute the 
-/// associated information on a given file 
+/// Factory for file information creator, using the compute function this compute the
+/// associated information on a given file
 pub trait FileInformationsConstructor: Send {
     /// compute additional information about a given file
     fn compute(&mut self, filename: &PathBuf) -> Result<Arc<FileInformations>, Box<dyn Error>>;

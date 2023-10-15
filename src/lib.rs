@@ -1,9 +1,11 @@
+//! VirtualBookPlayer structure, exposing the several subsystem and functions
+//!
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
-mod appplayer;
-mod file_store;
-mod playlist;
-mod virtualbookcomponent;
+pub mod appplayer;
+pub mod file_store;
+pub mod playlist;
+pub mod virtualbookcomponent;
 
 pub use app::VirtualBookApp;

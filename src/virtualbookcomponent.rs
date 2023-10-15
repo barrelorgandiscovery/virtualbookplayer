@@ -1,3 +1,6 @@
+//! Display component for the book / midi file
+//! using egui rendering
+//!
 use std::{io::Cursor, sync::Arc};
 
 use std::error::Error;
@@ -7,6 +10,7 @@ use egui::*;
 
 use bookparsing::{read_book_stream, VirtualBook};
 
+/// Virtualbook component
 pub struct VirtualBookComponent {
     offset: f32,
     xscale: f32,

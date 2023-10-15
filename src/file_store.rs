@@ -1,3 +1,8 @@
+//! file store module handle a recursive walker to grab the files in a folder,
+//! and give a tree structure to permit to :
+//!   - filter the files dynamically
+//!   - create views
+
 use std::cell::RefCell;
 use std::error::Error;
 use std::fs::metadata;
@@ -7,11 +12,12 @@ use log::{debug, error};
 use std::fmt::{Debug, Display};
 use std::{path::PathBuf, rc::Rc};
 
+/// error assciated to the file store
 #[derive(Debug, Clone)]
 pub struct FileStoreError {
     message: String,
 }
-
+/// implementation of the file store error
 impl FileStoreError {
     pub fn new(message: &str) -> FileStoreError {
         Self {
@@ -32,6 +38,11 @@ impl std::error::Error for FileStoreError {
     }
 }
 
+/// file node are the files in the tree structure,
+/// this gives the label of the file, the path of the file
+/// whether this is a directory or a plain file, and the childrens
+///
+/// a reference to the parent is also maintained
 pub struct FileNode {
     pub name: String,
     pub path: PathBuf,
@@ -116,6 +127,7 @@ pub trait Visitor {
     fn visit(&self, node: &FileNode);
 }
 
+/// root structure for the tree of files and folders
 #[derive(Debug)]
 pub struct FileStore {
     pub base_path: PathBuf,
@@ -129,6 +141,7 @@ pub struct FileStore {
 type ExtensionsFilter = Option<Vec<String>>;
 
 impl FileStore {
+    /// recusive descent to grab and construct the tree of FileNode
     fn recurse_construct(
         path: &PathBuf,
         parent: &Option<Rc<RefCell<FileNode>>>,
@@ -211,6 +224,10 @@ impl FileStore {
         }
     }
 
+    /// construct a view of the tree, using some filters :
+    /// - a name filter (part of the name)
+    /// - a file extension filter
+    ///
     #[allow(clippy::only_used_in_recursion)]
     pub fn recurse_construct_view(
         &self,
@@ -316,6 +333,7 @@ fn test_file_store_and_view() {
     println!("{:?}", &fv2);
 }
 
+/// file node view, constructed from the file store
 #[derive(Debug)]
 pub struct FileViewNode {
     pub node: Rc<RefCell<FileNode>>,
@@ -350,7 +368,7 @@ impl FileViewNode {
         Rc::clone(&self.node)
     }
 
-    /// get the node name
+    /// get the node name of the fileviewnode
     pub fn name(&self) -> String {
         let n = &self.node.borrow();
         n.name.clone()
@@ -378,6 +396,7 @@ impl FileViewNode {
     }
 }
 
+/// root structure for a tree view
 #[derive(Debug)]
 pub struct FileView {
     pub root: Rc<RefCell<FileViewNode>>,

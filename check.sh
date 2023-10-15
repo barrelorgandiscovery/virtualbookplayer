@@ -8,3 +8,5 @@ cargo clippy --workspace --all-targets --all-features --  -D warnings -W clippy:
 cargo clippy 
 cargo test --workspace --all-targets --all-features
 cargo test --workspace --doc
+cargo doc --lib
+cargo doc --bin virtualbookplayerapp

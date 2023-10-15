@@ -1,3 +1,5 @@
+//! Hold the Playlist and Player fusion to provide the gui a unique interface
+
 use std::{
     sync::{
         mpsc::{channel, Receiver, Sender},
@@ -56,12 +58,13 @@ enum AppPlayerEvent {}
 
 /// manage asynchrone actions (play, informations retrieve)
 impl AppPlayer {
-    pub fn new() -> AppPlayer {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         let commands = channel();
 
         let inner_control_thread = channel::<AppPlayerThreadCommands>();
 
-        let appplayer = AppPlayer {
+        let appplayer = Self {
             commands: commands.0,
             player: None,
             playlist: Arc::new(Mutex::new(PlayList::new())),
@@ -84,7 +87,7 @@ impl AppPlayer {
                             virt.holes.holes = notes
                                 .lock()
                                 .unwrap()
-                                .iter()                               
+                                .iter()
                                 .map(|n| {
                                     let t = i64::try_from(n.start.as_micros());
                                     if t.is_err() {

@@ -1,9 +1,13 @@
 [package]
-name = "virtualbookplayerapp"
+name = "virtualbookplayer"
 version = "0.0.35"
 authors = ["frett27@gmail.com"]
 edition = "2021"
 rust-version = "1.65"
+
+[[bin]]
+name = "virtualbookplayerapp"
+path = "src/main.rs"
 
 [dependencies]
 
