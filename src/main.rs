@@ -1,3 +1,30 @@
+//! Virtual book player application, 
+//! this is a graphical application to player midi and output to a midi device
+//!
+//! The application has additional command line arguments :
+//! 
+//! 
+//! use@alexa:~/projets/2023-05-01_test_egui_draw/virtualbookplayer$ target/debug/virtualbookplayerapp --help
+//! ```
+//! ==========================================================================
+//! Virtual Book Player 0.0.35 (Patrice Freydiere - BarrelOrganDiscovery)
+//! https://www.barrel-organ-discovery.org
+//!   date: sam. 14 oct. 2023 17:26:47 CEST
+//!   build: c298e0f2cfa10bfaf5dee40b73036b2480df52fe
+//! ==========================================================================
+//! Usage: virtualbookplayerapp [OPTIONS]
+//! 
+//! Options:
+//!   -r, --reset-preferences          Name of the person to greet
+//!   -l, --lang-code <LANG_CODE>      
+//!   -f, --full-screen <FULL_SCREEN>  [possible values: true, false]
+//!   -h, --help                       Print help
+//!   -V, --version                    Print version
+//! ```
+//! 
+//! *reset-references* option permit to reset the gui saved elements (windows position, selected folder, and other preferences)
+//! *lang-code* define the gui language (currently two langage are provided french and english, this can be extended in providing label translation in i18n file)
+
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
@@ -6,13 +33,15 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
+    /// reset the gui preferences
     #[arg(short, long)]
     reset_preferences: bool,
 
+    /// choose and force the current language, if not passed the program use environment variables provided by the OS to try to detect the user language
     #[arg(short, long)]
     lang_code: Option<String>,
 
+    /// launch the application with no window decoration (best for a fullscreen experience)
     #[arg(short, long)]
     full_screen: Option<bool>,
 }

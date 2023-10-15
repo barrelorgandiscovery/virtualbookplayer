@@ -18,7 +18,7 @@ use std::{
 };
 
 /// midiio module handle the midi output for playing
-mod midiio;
+pub mod midiio;
 
 /// this structure handle a plain note (with start and length)
 #[derive(Debug)]
