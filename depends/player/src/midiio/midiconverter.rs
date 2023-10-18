@@ -245,6 +245,7 @@ pub fn convert<'a>(
         .iter()
         .fold((0, Box::new(vec![])), |t, e| {
             let mut v = t.1;
+
             let delta_in_microseconds: i64 = (e.timestamp - t.0) as i64;
             let delta_in_ticks: u32 =
                 ((delta_in_microseconds * 5000) / 1_000_000 * 120 / 60) as u32;
@@ -252,12 +253,19 @@ pub fn convert<'a>(
                 delta: delta_in_ticks.into(),
                 kind: nodi::midly::TrackEventKind::Midi {
                     channel: e.channel.into(),
-                    message: MidiMessage::NoteOn {
-                        key: e.note.into(),
-                        vel: 127.into(),
+                    message: match e.event_type {
+                        EventType::ACTIVATE => MidiMessage::NoteOn {
+                            key: e.note.into(),
+                            vel: 127.into(),
+                        },
+                        EventType::DEACTIVATE => MidiMessage::NoteOff {
+                            key: e.note.into(),
+                            vel: 127.into(),
+                        },
                     },
                 },
             });
+
             (e.timestamp, v)
         })
         .1;
