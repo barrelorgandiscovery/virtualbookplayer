@@ -444,11 +444,11 @@ impl eframe::App for VirtualBookApp {
                                 };
 
                                 let (_scmd, rcmd) = channel();
-                                let (s, r) = channel();
+                                let (s, player_event_receiver) = channel();
 
                                 match factory.create(s, rcmd) {
                                     Ok(player) => {
-                                        appplayer.player(Some((player, r)));
+                                        appplayer.player(Some((player, player_event_receiver)));
                                     }
                                     Err(e) => {
                                         error!("fail to open device {}", e);

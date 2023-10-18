@@ -30,7 +30,7 @@ pub struct PlainNoteWithChannel {
 }
 
 /// this structure provide additional informations on files (using in the gui to display duration and additional useful informations on the file)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileInformations {
     pub duration: Option<Duration>,
 }
@@ -77,13 +77,19 @@ pub trait Player: Send {
 
     /// grab a copy of the notes of the current file (for display)
     fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>;
+
+    /// get the information associated to a given file,
+    /// return the associated informations
+    fn create_information_getter(
+        &self,
+    ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
 }
 
 /// Factory for file information creator, using the compute function this compute the
 /// associated information on a given file
 pub trait FileInformationsConstructor: Send {
     /// compute additional information about a given file
-    fn compute(&mut self, filename: &PathBuf) -> Result<Arc<FileInformations>, Box<dyn Error>>;
+    fn compute(&mut self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>>;
 }
 
 /// messages from the player

@@ -13,7 +13,7 @@ pub struct PlayList {
 }
 
 /// Element in the play list (with additional informations)
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PlaylistElement {
     // system time when the file has been added
     pub added_at: SystemTime,
@@ -21,6 +21,8 @@ pub struct PlaylistElement {
     pub path: PathBuf,
     pub additional_informations: Option<FileInformations>,
 }
+
+
 
 /// hash implementation for playlist element
 impl Hash for PlaylistElement {

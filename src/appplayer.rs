@@ -1,6 +1,7 @@
 //! Hold the Playlist and Player fusion to provide the gui a unique interface
 
 use std::{
+    collections::HashSet,
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
@@ -12,9 +13,12 @@ use std::{
 
 use bookparsing::{Hole, VirtualBook};
 use egui::mutex::RwLock;
-use player::{Command, PlainNoteWithChannel, Player, Response};
+use player::{
+    midiio::MidiPlayerFactory, Command, FileInformationsConstructor, PlainNoteWithChannel, Player,
+    Response,
+};
 
-use crate::playlist::PlayList;
+use crate::playlist::{PlayList, PlaylistElement};
 
 use log::{error, warn};
 
@@ -112,6 +116,72 @@ impl AppPlayer {
                             let mut wlock = vb_access.write();
                             *wlock = Some(Arc::new(virt));
                         }
+                    }
+                }
+            }
+        });
+
+        let local_playlist = Arc::clone(&appplayer.playlist);
+        let local_appplayer = Arc::new(appplayer);
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_secs(1));
+
+                let mut playlist_copy = HashSet::new();
+                // get list
+                {
+                    if let Ok(playlist) = local_playlist.lock() {
+                        for p in &playlist.file_list {
+                            playlist_copy.insert(p.clone());
+                        }
+                    } else {
+                        error!("error in getting the playerlist lock");
+                        continue;
+                    }
+                }
+
+                {
+                    for mut p in playlist_copy {
+                        if p.additional_informations.is_none() {
+                            // compute the additional informations
+                            let mut local_info_getter: Option<
+                                Box<dyn FileInformationsConstructor>,
+                            > = None;
+
+                            if let Some(some_player) = &local_appplayer.player {
+                                if let Ok(player) = some_player.lock() {
+                                    if let Ok(info_getter) = player.create_information_getter() {
+                                        local_info_getter = Some(info_getter);
+                                    }
+                                } // this unlock the appplayer
+                            }
+
+                            if let Some(mut info_getter) = local_info_getter {
+                                if let Ok(result) = info_getter.compute(&p.path) {
+                                    p.additional_informations = Some(result.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // update list
+                {
+                    if let Ok(mut playlist) = local_playlist.lock() {
+                        for p in &mut playlist.file_list {
+                            if p.additional_informations.is_none() {
+                                // update
+                                for e in playlist_copy {
+                                    if e.added_at == p.added_at {
+                                        p.additional_informations =
+                                            e.additional_informations.clone();
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        error!("error in getting the playerlist lock");
+                        continue;
                     }
                 }
             }

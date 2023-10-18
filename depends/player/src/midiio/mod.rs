@@ -12,7 +12,6 @@ use std::{
 };
 
 use bookparsing::VirtualBook;
-use env_logger::fmt::Timestamp;
 use midir::{MidiOutput, MidiOutputConnection};
 use nodi::{
     midly::{Format, MidiMessage, Smf},
@@ -145,7 +144,7 @@ pub struct MidiFileInformationsConstructor {}
 
 /// file information trait, specific to midi, and midi controlled equipments
 impl FileInformationsConstructor for MidiFileInformationsConstructor {
-    fn compute(&mut self, filename: &PathBuf) -> Result<Arc<FileInformations>, Box<dyn Error>> {
+    fn compute(&mut self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>> {
         // Load bytes first
         let file_content_data = std::fs::read(filename)?;
         // parse it
@@ -158,9 +157,9 @@ impl FileInformationsConstructor for MidiFileInformationsConstructor {
             .fold(Duration::new(0, 0), |acc, n| acc.max(n.start + n.length));
 
         // result
-        Ok(Arc::new(FileInformations {
+        Ok(FileInformations {
             duration: Some(result),
-        }))
+        })
     }
 }
 
@@ -540,6 +539,13 @@ impl Player for MidiPlayer {
 
     fn current_play_time(&self) -> i64 {
         todo!()
+    }
+
+
+    fn create_information_getter(
+        &self,
+    ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>> {
+        Ok(Box::new(MidiFileInformationsConstructor {}))
     }
 }
 
