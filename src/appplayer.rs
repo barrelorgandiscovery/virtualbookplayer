@@ -13,14 +13,11 @@ use std::{
 
 use bookparsing::{Hole, VirtualBook};
 use egui::mutex::RwLock;
-use player::{
-    midiio::MidiPlayerFactory, Command, FileInformationsConstructor, PlainNoteWithChannel, Player,
-    Response,
-};
+use player::{Command, FileInformationsConstructor, PlainNoteWithChannel, Player, Response};
 
-use crate::playlist::{PlayList, PlaylistElement};
+use crate::playlist::PlayList;
 
-use log::{error, warn};
+use log::{debug, error, info, warn};
 
 ///
 /// player integrating the playlist, and play mod
@@ -50,6 +47,8 @@ pub struct AppPlayer {
 
     // appplayer cmd sender
     applayer_sender: Sender<AppPlayerThreadCommands>,
+
+    bgthread_sender: Sender<AppPlayerBackgroundThreadCommands>,
 }
 
 enum AppPlayerThreadCommands {
@@ -60,6 +59,10 @@ enum AppPlayerThreadCommands {
 #[allow(unused)]
 enum AppPlayerEvent {}
 
+enum AppPlayerBackgroundThreadCommands {
+    PlayerChanged(Arc<Mutex<Box<dyn Player>>>),
+}
+
 /// manage asynchrone actions (play, informations retrieve)
 impl AppPlayer {
     #[allow(clippy::new_without_default)]
@@ -67,6 +70,8 @@ impl AppPlayer {
         let commands = channel();
 
         let inner_control_thread = channel::<AppPlayerThreadCommands>();
+
+        let bg_thread_communication = channel::<AppPlayerBackgroundThreadCommands>();
 
         let appplayer = Self {
             commands: commands.0,
@@ -78,6 +83,7 @@ impl AppPlayer {
             start_play_time: Instant::now() - Duration::from_millis(10_000),
             waittime_between_file_play: 0_f32,
             applayer_sender: inner_control_thread.0,
+            bgthread_sender: bg_thread_communication.0,
         };
 
         let vb_access = Arc::clone(&appplayer.virtual_book);
@@ -121,11 +127,27 @@ impl AppPlayer {
             }
         });
 
+        // create the inner
         let local_playlist = Arc::clone(&appplayer.playlist);
-        let local_appplayer = Arc::new(appplayer);
+
         thread::spawn(move || {
+            let mut current_player: Option<Arc<Mutex<Box<dyn Player>>>> = None;
             loop {
-                thread::sleep(Duration::from_secs(1));
+                {
+                    if let Ok(command) = bg_thread_communication
+                        .1
+                        .recv_timeout(Duration::from_secs(2))
+                    {
+                        match command {
+                            AppPlayerBackgroundThreadCommands::PlayerChanged(p) => {
+                                current_player = Some(p);
+                            }
+                        }
+                    } else if current_player.clone().is_none() {
+                        info!("no current player, watch");
+                        continue;
+                    }
+                }
 
                 let mut playlist_copy = HashSet::new();
                 // get list
@@ -140,25 +162,28 @@ impl AppPlayer {
                     }
                 }
 
+                let mut computed = HashSet::new();
                 {
-                    for mut p in playlist_copy {
+                    for p in &playlist_copy {
                         if p.additional_informations.is_none() {
                             // compute the additional informations
                             let mut local_info_getter: Option<
                                 Box<dyn FileInformationsConstructor>,
                             > = None;
 
-                            if let Some(some_player) = &local_appplayer.player {
-                                if let Ok(player) = some_player.lock() {
-                                    if let Ok(info_getter) = player.create_information_getter() {
-                                        local_info_getter = Some(info_getter);
-                                    }
-                                } // this unlock the appplayer
-                            }
+                            if let Ok(player) = &current_player.clone().unwrap().lock() {
+                                if let Ok(info_getter) = player.create_information_getter() {
+                                    local_info_getter = Some(info_getter);
+                                }
+                            } // this unlock the appplayer
 
                             if let Some(mut info_getter) = local_info_getter {
+                                info!("compute informations for {}", &p.path.display());
+
+                                let mut computed_p = p.clone();
                                 if let Ok(result) = info_getter.compute(&p.path) {
-                                    p.additional_informations = Some(result.clone());
+                                    computed_p.additional_informations = Some(result.clone());
+                                    computed.insert(computed_p);
                                 }
                             }
                         }
@@ -168,10 +193,11 @@ impl AppPlayer {
                 // update list
                 {
                     if let Ok(mut playlist) = local_playlist.lock() {
+                        // play list to modify
                         for p in &mut playlist.file_list {
                             if p.additional_informations.is_none() {
                                 // update
-                                for e in playlist_copy {
+                                for e in &computed {
                                     if e.added_at == p.added_at {
                                         p.additional_informations =
                                             e.additional_informations.clone();
@@ -209,6 +235,7 @@ impl AppPlayer {
                 let last_response = Arc::clone(&self.last_response);
 
                 let inner_thread_access = self.applayer_sender.clone();
+                // create inner control thread of the player
                 thread::spawn(move || {
                     // println!("start thread for getting responses");
                     while let Ok(response) = p.1.recv() {
@@ -238,6 +265,15 @@ impl AppPlayer {
                         }
                     }
                 });
+
+                if let Err(e) =
+                    self.bgthread_sender
+                        .send(AppPlayerBackgroundThreadCommands::PlayerChanged(
+                            Arc::clone(&player_reference),
+                        ))
+                {
+                    debug!("fail to send the player to background thread :{}", e);
+                }
 
                 Some(player_reference)
             }

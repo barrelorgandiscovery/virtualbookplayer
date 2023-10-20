@@ -145,21 +145,20 @@ pub struct MidiFileInformationsConstructor {}
 /// file information trait, specific to midi, and midi controlled equipments
 impl FileInformationsConstructor for MidiFileInformationsConstructor {
     fn compute(&mut self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>> {
-        // Load bytes first
-        let file_content_data = std::fs::read(filename)?;
-        // parse it
-        let smf = Smf::parse(&file_content_data)?;
-        // get note display
-        let notes = Arc::new(to_notes(&smf, &None)?);
+        match read_all_kind_of_files(&filename, None) {
+            Ok(res) => {
+                let result = res
+                    .0
+                    .iter()
+                    .fold(Duration::new(0, 0), |acc, n| acc.max(n.start + n.length));
 
-        let result = notes
-            .iter()
-            .fold(Duration::new(0, 0), |acc, n| acc.max(n.start + n.length));
-
-        // result
-        Ok(FileInformations {
-            duration: Some(result),
-        })
+                // result
+                Ok(FileInformations {
+                    duration: Some(result),
+                })
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -540,7 +539,6 @@ impl Player for MidiPlayer {
     fn current_play_time(&self) -> i64 {
         todo!()
     }
-
 
     fn create_information_getter(
         &self,

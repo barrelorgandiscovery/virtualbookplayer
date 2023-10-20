@@ -22,8 +22,6 @@ pub struct PlaylistElement {
     pub additional_informations: Option<FileInformations>,
 }
 
-
-
 /// hash implementation for playlist element
 impl Hash for PlaylistElement {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

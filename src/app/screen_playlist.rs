@@ -6,6 +6,7 @@ use chrono::Local;
 
 use crate::{
     appplayer::AppPlayer,
+    duration_to_mm_ss,
     file_store::{FileStore, FileStoreError, FileViewNode},
     playlist,
     virtualbookcomponent::VirtualBookComponent,
@@ -234,12 +235,17 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                                         if ui.button( egui_phosphor::regular::TRASH)
                                                                                                             .on_hover_text(&app.i18n.remove_file_from_list)
                                                                                                             .clicked() {
-                                                                                                                deleted = Some(index);
+                                                                                                                deleted = Some(index)
                                                                                                         }
                                                                                                         ui.add(
                                                                                                             Label::new(format!("{}:", index + 1))
                                                                                                         );
                                                                                                         ui.label(&item.name);
+                                                                                                        if let Some(additional_informations) = &item.additional_informations {
+                                                                                                                    if let Some(duration) = additional_informations.duration {
+                                                                                                                        ui.label(duration_to_mm_ss(&duration));
+                                                                                                                    }
+                                                                                                        }
                                                                                                     });
 
                                                                                                    ui.end_row();
@@ -265,9 +271,13 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                     }
 
                                                                     if let Some(index) = deleted {
+                                                                        let toremove = match isplaying {
+                                                                            true => index + 1,
+                                                                            false => index
+                                                                        };
                                                                         locked_playlist
                                                                             .file_list
-                                                                            .remove(index);
+                                                                            .remove(toremove);
                                                                     }
                                                                 });
                                                             });

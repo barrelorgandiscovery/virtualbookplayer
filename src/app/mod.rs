@@ -13,7 +13,7 @@ use player::midiio::{DeviceInformation, MidiPlayerFactory};
 use player::{PlayerFactory, Response};
 
 use crate::appplayer::AppPlayer;
-use crate::file_store::*;
+use crate::{duration_to_mm_ss, file_store::*};
 
 use log::{debug, error};
 
@@ -545,7 +545,7 @@ impl eframe::App for VirtualBookApp {
 
                             ui.horizontal(|ui| {
                                 ui.label(rt.monospace());
-                                ui.label(format!("{:.0}s", &current_duration.as_secs_f32()));
+                                ui.label(duration_to_mm_ss(current_duration));
                             });
                         }
                         None => {}

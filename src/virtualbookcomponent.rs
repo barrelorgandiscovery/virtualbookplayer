@@ -116,18 +116,18 @@ impl VirtualBookComponent {
         egui::ScrollArea::horizontal()
             .hscroll(*scrollbars_visible)
             .show(ui, |ui| {
-                let mut book_screen_width = ui.available_width();
+                let mut book_screen_length = ui.available_width();
 
                 if let Some(current_vb) = &self.virtual_book {
                     if let Some(maxtime) = current_vb.max_time() {
-                        book_screen_width = ((maxtime as f64) / *xscale as f64) as f32;
+                        book_screen_length = ((maxtime as f64) / *xscale as f64) as f32;
                     }
                 }
 
-                let offset_with_bar = *offset * book_screen_width - width_container / 2.0;
+                let offset_with_bar = *offset * book_screen_length - width_container / 2.0;
 
                 let (response, painter) = ui.allocate_painter(
-                    Vec2::new(book_screen_width, ui.available_height()),
+                    Vec2::new(book_screen_length, ui.available_height()),
                     Sense::hover(),
                 );
 
@@ -149,7 +149,7 @@ impl VirtualBookComponent {
                         pos2(0.0, 0.0),
                         to_screen
                             * pos2(
-                                book_screen_width,
+                                book_screen_length,
                                 current_vb.scale.definition.width * *yfactor,
                             ),
                     ]);

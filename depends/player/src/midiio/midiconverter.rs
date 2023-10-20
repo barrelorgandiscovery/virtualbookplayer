@@ -2,13 +2,10 @@
 use std::{
     collections::HashMap,
     error::Error,
-    fs::File,
-    io::{BufReader, BufWriter, Read, Write},
-    sync::Arc,
-    time::Instant,
+    io::{Read, Write},
 };
 
-use bookparsing::{Hole, ScaleDefinition, TrackDrum, TrackNote, VirtualBook};
+use bookparsing::{Hole, ScaleDefinition};
 
 use nodi::midly::{Header, MidiMessage, Smf, Track, TrackEvent};
 extern crate serde;
@@ -39,6 +36,7 @@ pub struct HoleEvent {
 
 impl HoleEvent {
     /// Hole Event constructor using the needed elements
+    #[allow(unused)]
     pub fn from(timestamp: i64, channel: u8, note: u8, event_type: EventType) -> HoleEvent {
         HoleEvent {
             timestamp,
@@ -121,9 +119,7 @@ pub fn parse_note(s: &str) -> Result<u8, Box<dyn Error>> {
 pub fn test_parse_note() {
     assert_eq!(parse_note("C0".into()).unwrap(), 12);
     assert_eq!(parse_note("C#0".into()).unwrap(), 13);
-
     assert_eq!(parse_note("A4".into()).unwrap(), 69);
-
     assert_eq!(parse_note("C-1".into()).unwrap(), 0);
     assert_eq!(parse_note("G9".into()).unwrap(), 127);
     // diese test
@@ -180,6 +176,7 @@ pub fn create_conversion_from_scale(scale: &ScaleDefinition) -> Result<Conversio
 }
 
 /// write a conversion to a stream
+#[allow(unused)]
 pub fn write_conversion(
     conversion: &Conversion,
     writer: &mut dyn Write,
