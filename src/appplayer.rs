@@ -13,7 +13,7 @@ use std::{
 
 use bookparsing::{Hole, VirtualBook};
 use egui::mutex::RwLock;
-use player::{Command, FileInformationsConstructor, PlainNoteWithChannel, Player, Response};
+use player::{Command, FileInformationsConstructor, NotesInformations, Player, Response};
 
 use crate::playlist::PlayList;
 
@@ -53,7 +53,7 @@ pub struct AppPlayer {
 
 enum AppPlayerThreadCommands {
     /// signal notes have changed
-    NotesChanged(Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>),
+    NotesChanged(Arc<NotesInformations>),
 }
 
 #[allow(unused)]
@@ -95,8 +95,7 @@ impl AppPlayer {
                         AppPlayerThreadCommands::NotesChanged(notes) => {
                             let mut virt = VirtualBook::midi_scale();
                             virt.holes.holes = notes
-                                .lock()
-                                .unwrap()
+                                .notes
                                 .iter()
                                 .map(|n| {
                                     let t = i64::try_from(n.start.as_micros());
@@ -114,10 +113,18 @@ impl AppPlayer {
                                     Hole {
                                         timestamp: t.unwrap(),
                                         length: l.unwrap(),
-                                        track: (127 - n.note).into(),
+                                        track: n.track,
                                     }
                                 })
                                 .collect();
+
+                            virt.scale.definition.width = notes.display_informations.width;
+                            virt.scale.definition.defaulttrackheight =
+                                notes.display_informations.track_width;
+                            virt.scale.definition.firsttrackdistance =
+                                notes.display_informations.first_axis;
+                            virt.scale.definition.intertrackdistance =
+                                notes.display_informations.inter_axis;
 
                             let mut wlock = vb_access.write();
                             *wlock = Some(Arc::new(virt));
@@ -246,10 +253,8 @@ impl AppPlayer {
                             Response::EndOfFile => {}
                             Response::FileCancelled => {}
                             Response::FilePlayStarted((_filename, notes)) => {
-                                if let Err(e) =
-                                    inner_thread_access.send(AppPlayerThreadCommands::NotesChanged(
-                                        Arc::new(Mutex::new(Arc::clone(notes))),
-                                    ))
+                                if let Err(e) = inner_thread_access
+                                    .send(AppPlayerThreadCommands::NotesChanged(Arc::clone(notes)))
                                 {
                                     error!(
                                         "error when sending notes changed for app player : {:?}",
@@ -302,12 +307,12 @@ impl AppPlayer {
     }
 
     /// get visual notes of the current played file
-    pub fn notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>> {
+    pub fn notes(&self) -> Arc<NotesInformations> {
         if let Some(player) = &self.player {
             let p = player.lock().unwrap();
             return p.associated_notes();
         }
-        Arc::new(Mutex::new(Arc::new(vec![])))
+        Arc::new(NotesInformations::default())
     }
 
     /// stop the play

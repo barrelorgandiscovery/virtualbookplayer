@@ -20,8 +20,8 @@ use nodi::{
 };
 
 use crate::{
-    Command, FileInformations, FileInformationsConstructor, PlainNoteWithChannel, Player,
-    PlayerFactory, Response,
+    Command, FileInformations, FileInformationsConstructor, NotesDisplayInformations,
+    NotesInformations, PlainNoteWithChannel, Player, PlayerFactory, Response,
 };
 
 use std::convert::TryFrom;
@@ -68,7 +68,7 @@ impl PlayerFactory for MidiPlayerFactory {
             output: Arc::new(Mutex::new(sender)),
             cancel: cancels.0,
             isplaying: Arc::new(Mutex::new(false)),
-            notes: Arc::new(Mutex::new(Arc::new(vec![]))),
+            notes: Arc::new(Mutex::new(Arc::new(NotesInformations::default()))),
         }))
     }
 
@@ -149,6 +149,7 @@ impl FileInformationsConstructor for MidiFileInformationsConstructor {
             Ok(res) => {
                 let result = res
                     .0
+                    .notes
                     .iter()
                     .fold(Duration::new(0, 0), |acc, n| acc.max(n.start + n.length));
 
@@ -177,7 +178,8 @@ pub struct MidiPlayer {
     isplaying: Arc<Mutex<bool>>,
 
     /// note representation for the display
-    notes: Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>,
+    // shared between threads
+    notes: Arc<Mutex<Arc<NotesInformations>>>,
 }
 
 impl Drop for MidiPlayer {
@@ -223,7 +225,7 @@ fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
 fn read_midi_file(
     filename: &PathBuf,
     start_wait: Option<f32>,
-) -> Result<(Arc<Vec<PlainNoteWithChannel>>, Ticker, Sheet), Box<dyn Error>> {
+) -> Result<(Arc<NotesInformations>, Ticker, Sheet), Box<dyn Error>> {
     // Load bytes first
     let file_content_data = std::fs::read(filename)?;
 
@@ -245,7 +247,10 @@ fn read_midi_file(
         Format::Parallel => Sheet::parallel(&tracks),
     };
 
-    Ok((notes, timer, sheet))
+    let mut notes_informations = NotesInformations::default();
+    notes_informations.notes = notes;
+
+    Ok((Arc::new(notes_informations), timer, sheet))
 }
 
 fn resolve_conversion(vb: &VirtualBook) -> Result<Option<Conversion>, Box<dyn Error>> {
@@ -272,7 +277,7 @@ fn read_book_file(
     filename: &PathBuf, // must be a book
     // extension : external_dir_for_overload: &PathBuf,
     start_wait: Option<f32>,
-) -> Result<(Arc<Vec<PlainNoteWithChannel>>, Ticker, Sheet), Box<dyn Error>> {
+) -> Result<(Arc<NotesInformations>, Ticker, Sheet), Box<dyn Error>> {
     // book parsing
     let file = File::open(filename)?;
     let mut reader = BufReader::new(&file);
@@ -303,6 +308,7 @@ fn read_book_file(
                             start: Duration::from_micros(hole.timestamp as u64) + seconds_duration, // todo check this fact
                             length: Duration::from_micros(hole.length as u64),
                             note: hole.track as u8,
+                            track: hole.track,
                         }
                     })
                     .collect(),
@@ -320,7 +326,16 @@ fn read_book_file(
                 Format::Parallel => Sheet::parallel(&tracks),
             };
 
-            Ok((plain_notes, timer, sheet))
+            let mut notes_informations = NotesInformations::default();
+            notes_informations.notes = plain_notes;
+            notes_informations.display_informations = NotesDisplayInformations {
+                first_axis: vb.scale.definition.firsttrackdistance,
+                inter_axis: vb.scale.definition.intertrackdistance,
+                track_width: vb.scale.definition.defaulttrackheight,
+                width: vb.scale.definition.width,
+            };
+
+            Ok((Arc::new(notes_informations), timer, sheet))
         }
     };
 }
@@ -329,7 +344,7 @@ fn read_all_kind_of_files(
     filename: &PathBuf, // must be a book
     // extension : external_dir_for_overload: &PathBuf,
     start_wait: Option<f32>,
-) -> Result<(Arc<Vec<PlainNoteWithChannel>>, Ticker, Sheet), Box<dyn Error>> {
+) -> Result<(Arc<NotesInformations>, Ticker, Sheet), Box<dyn Error>> {
     info!("reading {:?}", filename);
     let ext_option = filename.extension();
     if let Some(ext) = ext_option {
@@ -352,8 +367,8 @@ fn read_all_kind_of_files(
 
 /// Player trait implementation
 impl Player for MidiPlayer {
-    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>> {
-        Arc::clone(&self.notes)
+    fn associated_notes(&self) -> Arc<NotesInformations> {
+        Arc::clone(&self.notes.lock().unwrap())
     }
 
     fn start_play(
@@ -418,7 +433,7 @@ impl Player for MidiPlayer {
                         error!("error in reading file : {:?}", e);
                     }
 
-                    Ok((notes, mut timer, midi_sheet)) => {
+                    Ok((notes_informations, mut timer, midi_sheet)) => {
                         info!(
                             "File read and converted in {} ms",
                             (Instant::now() - start_time).as_millis()
@@ -428,8 +443,9 @@ impl Player for MidiPlayer {
                             *m = true;
                         }
                         {
+                            // change the note informations
                             let mut note_guard = notes_access.try_lock().unwrap();
-                            *note_guard = Arc::clone(&notes);
+                            *note_guard = Arc::clone(&notes_informations);
                         }
 
                         // send message
@@ -438,7 +454,7 @@ impl Player for MidiPlayer {
                             if let Err(err_send_file_started) =
                                 output_locked.send(Response::FilePlayStarted((
                                     String::from(filename.to_string_lossy()),
-                                    notes,
+                                    notes_informations,
                                 )))
                             {
                                 error!(
@@ -560,7 +576,7 @@ impl MidiPlayer {
             cancel: c.0,
             midi_output_connection: con,
             isplaying: Arc::new(Mutex::new(false)),
-            notes: Arc::new(Mutex::new(Arc::new(vec![]))),
+            notes: Arc::new(Mutex::new(Arc::new(NotesInformations::default()))),
         }
     }
 
@@ -622,6 +638,7 @@ pub fn to_notes(
                                     Some(d) => notes.push(PlainNoteWithChannel {
                                         channel: uchannel,
                                         note: key,
+                                        track: key as u16,
                                         start: d + shift_duration,
                                         length: total_duration - d,
                                     }),
@@ -642,6 +659,7 @@ pub fn to_notes(
                                         Some(d) => notes.push(PlainNoteWithChannel {
                                             channel: uchannel,
                                             note: key,
+                                            track: key as u16,
                                             start: d + shift_duration,
                                             length: total_duration - d,
                                         }),

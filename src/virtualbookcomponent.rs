@@ -144,14 +144,13 @@ impl VirtualBookComponent {
                     if *fit_to_height {
                         *yfactor = response.rect.size().y / current_vb.scale.definition.width;
                     }
-
+                    // info!("fit to height : {}", *fit_to_height);
+                    // info!("width {}, size, {} and yfactor ! {}", current_vb.scale.definition.width, response.rect.size().y, *yfactor);
+                    //info!("virtual book definition : {:?}", &current_vb.scale.definition);
+                    // background draw
                     let book_background = Rect::from_points(&[
                         pos2(0.0, 0.0),
-                        to_screen
-                            * pos2(
-                                book_screen_length,
-                                current_vb.scale.definition.width * *yfactor,
-                            ),
+                        to_screen * pos2(book_screen_length, response.rect.size().y),
                     ]);
                     painter.add(RectShape::filled(
                         book_background,
@@ -159,6 +158,7 @@ impl VirtualBookComponent {
                         Color32::from_rgb(255, 255, 255),
                     ));
 
+                    // notes draw
                     let rects: Vec<(Rect, Color32)> = current_vb
                         .holes
                         .holes
@@ -214,14 +214,14 @@ impl VirtualBookComponent {
                     for (r, c) in rects.iter() {
                         painter.add(RectShape::filled(*r, Rounding::default(), *c));
                     }
-
+                    // blue bar
                     let bar = Rect::from_points(&[
                         to_screen * pos2(midx - 1.0, 0.0),
                         to_screen * pos2(midx + 1.0, maxy + 10.0),
                     ]);
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
                 } else {
-                    // some virtualbook
+                    // no virtualbook
 
                     let to_screen = emath::RectTransform::from_to(
                         Rect::from_min_size(Pos2::ZERO, response.rect.size()),
@@ -246,7 +246,7 @@ impl VirtualBookComponent {
                 }
                 ui.ctx().request_repaint();
                 ui.interact(response.rect, Id::new("area"), Sense::click())
-                //response
+                //response from the area
             })
             .inner
     }

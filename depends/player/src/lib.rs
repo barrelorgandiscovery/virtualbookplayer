@@ -25,6 +25,7 @@ pub mod midiio;
 pub struct PlainNoteWithChannel {
     pub channel: u16,
     pub note: u8,
+    pub track: u16,
     pub start: Duration,
     pub length: Duration,
 }
@@ -53,6 +54,34 @@ pub trait PlayerFactory {
     ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
 }
 
+#[derive(Debug)]
+pub struct NotesDisplayInformations {
+    pub width: f32,
+    pub first_axis: f32,
+    pub inter_axis: f32,
+    pub track_width: f32,
+}
+
+#[derive(Debug)]
+pub struct NotesInformations {
+    pub notes: Arc<Vec<PlainNoteWithChannel>>,
+    pub display_informations: NotesDisplayInformations,
+}
+
+impl Default for NotesInformations {
+    fn default() -> Self {
+        NotesInformations {
+            notes: Arc::new(vec![]),
+            display_informations: NotesDisplayInformations {
+                width: 128.0,
+                first_axis: 1.0,
+                inter_axis: 1.0,
+                track_width: 1.0,
+            },
+        }
+    }
+}
+
 /// Player trait
 pub trait Player: Send {
     /// Start playing a file, in asynchronous manner
@@ -76,7 +105,7 @@ pub trait Player: Send {
     fn current_play_time(&self) -> i64;
 
     /// grab a copy of the notes of the current file (for display)
-    fn associated_notes(&self) -> Arc<Mutex<Arc<Vec<PlainNoteWithChannel>>>>;
+    fn associated_notes(&self) -> Arc<NotesInformations>;
 
     /// get the information associated to a given file,
     /// return the associated informations
@@ -98,7 +127,7 @@ pub enum Response {
     EndOfFile,
     FileCancelled,
     CurrentPlayTime(Duration),
-    FilePlayStarted((String, Arc<Vec<PlainNoteWithChannel>>)),
+    FilePlayStarted((String, Arc<NotesInformations>)),
 }
 
 /// commands that can be sent to the player
