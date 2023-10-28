@@ -2,6 +2,7 @@
 //! using egui rendering
 //!
 use std::collections::BTreeSet;
+use std::thread::current;
 use std::{io::Cursor, sync::Arc};
 
 use std::error::Error;
@@ -267,6 +268,14 @@ impl VirtualBookComponent {
                         })
                         .collect();
 
+                    let mappingy = |y| {
+                        if current_vb.virtualbook.scale.definition.ispreferredviewinverted {
+                            response.rect.size().y - y
+                        } else {
+                            y
+                        }
+                    };
+
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Display Holes");
                     // notes draw
@@ -276,7 +285,7 @@ impl VirtualBookComponent {
                             [
                                 pos2(
                                     (h.hole_ref.timestamp as f64 / *xscale as f64) as f32,
-                                    (h.hole_ref.track as f32
+                                    mappingy((h.hole_ref.track as f32
                                         * current_vb
                                             .virtualbook
                                             .scale
@@ -293,13 +302,13 @@ impl VirtualBookComponent {
                                             .definition
                                             .defaulttrackheight
                                             / 2.0)
-                                        * *yfactor,
+                                        * *yfactor),
                                 ),
                                 pos2(
                                     ((h.hole_ref.timestamp + h.hole_ref.length) as f64
                                         / *xscale as f64)
                                         as f32,
-                                    (h.hole_ref.track as f32
+                                    mappingy((h.hole_ref.track as f32
                                         * current_vb
                                             .virtualbook
                                             .scale
@@ -316,7 +325,7 @@ impl VirtualBookComponent {
                                             .definition
                                             .defaulttrackheight
                                             / 2.0)
-                                        * *yfactor,
+                                        * *yfactor),
                                 ),
                             ]
                         })
