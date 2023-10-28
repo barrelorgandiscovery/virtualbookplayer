@@ -94,7 +94,7 @@ impl AppPlayer {
             loop {
                 while let Ok(cmd) = receiver.recv() {
                     match cmd {
-                        AppPlayerThreadCommands::NotesChanged(notes) => {
+                        AppPlayerThreadCommands::NotesChanged(notes) => {                            
                             let mut virt = VirtualBook::midi_scale();
                             virt.holes.holes = notes
                                 .notes
@@ -127,6 +127,8 @@ impl AppPlayer {
                                 notes.display_informations.first_axis;
                             virt.scale.definition.intertrackdistance =
                                 notes.display_informations.inter_axis;
+                            virt.scale.definition.ispreferredviewinverted = 
+                                notes.display_informations.preferred_view_inversed;
 
                             let mut wlock = vb_access.write();
                             *wlock = Some(Arc::new(IndexedVirtualBook::from(&Arc::new(virt))));
@@ -238,6 +240,8 @@ impl AppPlayer {
             old_player.stop();
             drop(old_player);
         }
+
+        self.play_mod = false; // reset the automatic play when the player changed
 
         self.player = match player {
             None => None,

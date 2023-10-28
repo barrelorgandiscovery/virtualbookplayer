@@ -338,6 +338,7 @@ fn read_book_file(
                 inter_axis: vb.scale.definition.intertrackdistance,
                 track_width: vb.scale.definition.defaulttrackheight,
                 width: vb.scale.definition.width,
+                preferred_view_inversed: vb.scale.definition.ispreferredviewinverted,
             };
 
             Ok((Arc::new(notes_informations), timer, sheet))

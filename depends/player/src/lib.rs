@@ -12,7 +12,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{Receiver, Sender},
-        Arc, Mutex,
+        Arc,
     },
     time::Duration,
 };
@@ -60,6 +60,7 @@ pub struct NotesDisplayInformations {
     pub first_axis: f32,
     pub inter_axis: f32,
     pub track_width: f32,
+    pub preferred_view_inversed: bool,
 }
 
 #[derive(Debug)]
@@ -77,6 +78,7 @@ impl Default for NotesInformations {
                 first_axis: 1.0,
                 inter_axis: 1.0,
                 track_width: 1.0,
+                preferred_view_inversed: true,
             },
         }
     }

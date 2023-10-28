@@ -2,7 +2,6 @@
 //! using egui rendering
 //!
 use std::collections::BTreeSet;
-use std::thread::current;
 use std::{io::Cursor, sync::Arc};
 
 use std::error::Error;

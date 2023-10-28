@@ -427,6 +427,30 @@ impl eframe::App for VirtualBookApp {
                             ui.close_menu();
                         }
                         ui.separator();
+                        if ui
+                            .button(format!(
+                                "{} {}",
+                                egui_phosphor::regular::RECYCLE,
+                                &i18n.reload_folder
+                            ))
+                            .clicked()
+                        {
+                            if let Some(current_path) = &self.file_store_path {
+                                let new_filestore = FileStore::new(current_path);
+                                if let Ok(new_store) = new_filestore {
+                                    self.file_store = new_store.map(|mut fs| {
+                                        if let Ok(v) = fs.view(&None, &self.extensions_filters) {
+                                            fs.default_view = Some(v);                                            
+                                        } 
+                                        fs
+                                    });
+                                }
+                               
+                            }
+                            ui.close_menu();
+                        };
+
+                        ui.separator();
 
                         ui.label("midi out interfaces");
                         for device in &self.current_devices {
@@ -446,6 +470,7 @@ impl eframe::App for VirtualBookApp {
 
                                 match factory.create(s, rcmd) {
                                     Ok(player) => {
+                                        // change the player
                                         appplayer.player(Some((player, player_event_receiver)));
                                     }
                                     Err(e) => {
@@ -496,22 +521,6 @@ impl eframe::App for VirtualBookApp {
                 );
 
                 let play_mod = &mut appplayer.play_mod;
-                // if ui
-                //     .toggle_value(
-                //         play_mod,
-                //         RichText::new('\u{F04B}')
-                //             .color(Color32::GREEN)
-                //             .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
-                //     )
-                //     .on_hover_text(&i18n.play)
-                //     .clicked()
-                // {
-                //     if *play_mod {
-                //         appplayer.play_file_on_top();
-                //     } else {
-                //         appplayer.stop();
-                //     }
-                // }
 
                 let indicator_play_button = IndicatorButton::new(play_mod)
                     .label("On Air")
