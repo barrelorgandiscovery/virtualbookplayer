@@ -440,12 +440,11 @@ impl eframe::App for VirtualBookApp {
                                 if let Ok(new_store) = new_filestore {
                                     self.file_store = new_store.map(|mut fs| {
                                         if let Ok(v) = fs.view(&None, &self.extensions_filters) {
-                                            fs.default_view = Some(v);                                            
-                                        } 
+                                            fs.default_view = Some(v);
+                                        }
                                         fs
                                     });
                                 }
-                               
                             }
                             ui.close_menu();
                         };

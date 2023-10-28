@@ -94,7 +94,7 @@ impl AppPlayer {
             loop {
                 while let Ok(cmd) = receiver.recv() {
                     match cmd {
-                        AppPlayerThreadCommands::NotesChanged(notes) => {                            
+                        AppPlayerThreadCommands::NotesChanged(notes) => {
                             let mut virt = VirtualBook::midi_scale();
                             virt.holes.holes = notes
                                 .notes
@@ -127,7 +127,7 @@ impl AppPlayer {
                                 notes.display_informations.first_axis;
                             virt.scale.definition.intertrackdistance =
                                 notes.display_informations.inter_axis;
-                            virt.scale.definition.ispreferredviewinverted = 
+                            virt.scale.definition.ispreferredviewinverted =
                                 notes.display_informations.preferred_view_inversed;
 
                             let mut wlock = vb_access.write();
