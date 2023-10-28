@@ -21,6 +21,7 @@ use super::Screen;
 pub const BACKSPACE: &str = "<-";
 pub const ENTER: &str = "Enter";
 
+#[cfg_attr(any(feature = "profiling"), profiling::function)]
 pub fn handling_key(
     no: &str,
     current_typed_no: &mut String,
@@ -89,6 +90,7 @@ pub fn handling_key(
     }
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::function)]
 pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mut Ui) {
     let file_store = &mut app.file_store;
     let current_typed_no = &mut app.current_typed_no;
@@ -141,6 +143,7 @@ pub(crate) fn ui_button_panel(app: &mut VirtualBookApp, _ctx: &egui::Context, ui
         });
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::function)]
 pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
     StripBuilder::new(ui)
         .size(Size::remainder())
@@ -305,6 +308,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
         });
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::function)]
 /// recursive function to display files
 fn display_tree(
     appplayer: &mut AppPlayer,
@@ -396,6 +400,7 @@ fn display_tree(
     Ok(file_selected)
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::function)]
 pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
     // let dark_mode = ui.visuals().dark_mode;
     // let faded_color = ui.visuals().window_fill();
@@ -493,10 +498,10 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
 
                         strip.cell(|ui| {
                             // draw book vignette
-                            let foffset: f32 = app.pid_regulated_offset as f32;
+                            let foffset: f64 = app.pid_regulated_offset;
 
                             // display virtualbook
-                            let mut c = VirtualBookComponent::from_some_virtualbook(
+                            let mut c = VirtualBookComponent::from_some_indexedvirtualbook(
                                 app.appplayer.virtual_book.read().clone(),
                             )
                             .offset(foffset)

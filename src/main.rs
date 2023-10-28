@@ -66,8 +66,8 @@ pub(crate) fn load_icon() -> eframe::IconData {
 }
 
 fn main() -> eframe::Result<()> {
-    // Log to stdout (if you run with `RUST_LOG=debug`).
-    tracing_subscriber::fmt::init();
+    // // Log to stdout (if you run with `RUST_LOG=debug`).
+    // tracing_subscriber::fmt::init();
 
     println!("==========================================================================");
     let version = env!("CARGO_PKG_VERSION");
@@ -81,6 +81,9 @@ fn main() -> eframe::Result<()> {
     println!("  build: {}", std::env!("GIT_HASH"));
     println!("==========================================================================");
 
+    #[cfg(feature = "profiling")]
+    tracy_client::Client::start();
+
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);
 
@@ -89,6 +92,7 @@ fn main() -> eframe::Result<()> {
         native_options.fullscreen = fs;
         native_options.decorated = false;
     }
+
     native_options.icon_data = Some(load_icon());
     eframe::run_native(
         "VirtualBook Player",
