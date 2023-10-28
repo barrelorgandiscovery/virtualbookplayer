@@ -47,6 +47,7 @@ pub struct MidiPlayerFactory {
     pub device_no: usize,
 }
 
+#[profiling::all_functions]
 impl PlayerFactory for MidiPlayerFactory {
     fn create(
         &self,
@@ -59,7 +60,7 @@ impl PlayerFactory for MidiPlayerFactory {
 
         let midi_out = MidiPlayerFactory::get_connection(self.device_no)?;
 
-        println!("\nOpening connection");
+        println!("Opening connection");
 
         let cancels = channel();
 
@@ -85,6 +86,7 @@ pub struct DeviceInformation {
     pub label: String,
 }
 
+#[profiling::all_functions]
 impl MidiPlayerFactory {
     pub fn get_connection(n: usize) -> Result<MidiOutputConnection, Box<dyn Error>> {
         let midi_out = MidiOutput::new("play_midi")?;
@@ -222,6 +224,7 @@ fn all_notes_off(con: &mut MutexGuard<MidiOutputConnection>) {
     }
 }
 
+#[profiling::function]
 fn read_midi_file(
     filename: &PathBuf,
     start_wait: Option<f32>,
@@ -253,6 +256,7 @@ fn read_midi_file(
     Ok((Arc::new(notes_informations), timer, sheet))
 }
 
+#[profiling::function]
 fn resolve_conversion(vb: &VirtualBook) -> Result<Option<Conversion>, Box<dyn Error>> {
     let scale_name = vb.scale.name.clone();
     let conversion_file = scale_name + ".yml";
@@ -273,6 +277,7 @@ fn resolve_conversion(vb: &VirtualBook) -> Result<Option<Conversion>, Box<dyn Er
     return Ok(Some(conversion));
 }
 
+#[profiling::function]
 fn read_book_file(
     filename: &PathBuf, // must be a book
     // extension : external_dir_for_overload: &PathBuf,
@@ -340,6 +345,7 @@ fn read_book_file(
     };
 }
 
+#[profiling::function]
 fn read_all_kind_of_files(
     filename: &PathBuf, // must be a book
     // extension : external_dir_for_overload: &PathBuf,
@@ -366,6 +372,7 @@ fn read_all_kind_of_files(
 }
 
 /// Player trait implementation
+#[profiling::all_functions]
 impl Player for MidiPlayer {
     fn associated_notes(&self) -> Arc<NotesInformations> {
         Arc::clone(&self.notes.lock().unwrap())
@@ -376,6 +383,9 @@ impl Player for MidiPlayer {
         filename: &PathBuf,
         start_wait: Option<f32>,
     ) -> Result<(), Box<dyn Error>> {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("Prepare start play");
+
         {
             self.output
                 .lock()
@@ -405,6 +415,7 @@ impl Player for MidiPlayer {
 
         // thread spawned interpret the Midi event and send them on the line
         thread::spawn(move || {
+            profiling::register_thread!("player thread");
             if let Err(e) = set_current_thread_priority(ThreadPriority::Max) {
                 warn!("fail to set max priority to player thread : {:?}", e);
             }
@@ -496,6 +507,8 @@ impl Player for MidiPlayer {
                                 total_duration += d;
 
                                 ticks_counter = 0;
+                                #[cfg(feature = "profiling")]
+                                profiling::scope!("play moment events");
                                 for event in &moment.events {
                                     match event {
                                         Event::Tempo(val) => timer.change_tempo(*val),
@@ -563,6 +576,7 @@ impl Player for MidiPlayer {
     }
 }
 
+#[profiling::all_functions]
 /// midi player object/structure
 impl MidiPlayer {
     /// create a new midi player structure, given the midi output and command/information send channel

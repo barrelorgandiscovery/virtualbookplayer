@@ -68,6 +68,7 @@ name = "bookparsing"
 version = "0.1.0"
 dependencies = [
  "log",
+ "profiling",
  "serde",
  "thiserror",
  "xml-rs",
@@ -470,6 +471,7 @@ dependencies = [
  "log",
  "midir 0.9.1",
  "nodi",
+ "profiling",
  "serde",
  "serde_yaml",
  "thread-priority",
@@ -482,6 +484,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134c189feb4956b20f6f547d2cf727d4c0fe06722b20a0eec87ed445a97f92da"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "profiling"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f89dff0959d98c9758c88826cc002e2c3d0b9dfac4139711d1f30de442f1139b"
+dependencies = [
+ "profiling-procmacros",
+]
+
+[[package]]
+name = "profiling-procmacros"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb156a45b6b9fe8027497422179fb65afc84d36707a7ca98297bf06bccb8d43f"
+dependencies = [
+ "quote",
+ "syn 2.0.38",
 ]
 
 [[package]]

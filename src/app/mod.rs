@@ -44,6 +44,7 @@ pub struct VirtualBookApp {
 
     xscale: f32,
 
+    /// offset in the play (in seconds)
     #[serde(skip)]
     offset: f32,
 
@@ -262,18 +263,17 @@ impl VirtualBookApp {
     }
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl eframe::App for VirtualBookApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
+    #[cfg_attr(any(feature = "profiling"), profiling::function)]
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // self.frame_history
-        //     .on_new_frame(ctx.input(|i| i.time), _frame.info().cpu_usage);
-
         let old = if self.islight {
             Visuals::light()
         } else {
@@ -321,12 +321,10 @@ impl eframe::App for VirtualBookApp {
         // evaluated every 100ms
         {
             let delta = Instant::now().duration_since(*adjusted_start_time);
-            if let Some(vb) = appplayer.virtual_book.read().as_deref() {
-                if let Some(max_time) = vb.max_time() {
-                    *current_duration = delta;
-                    self.offset = delta.as_micros() as f32 / max_time as f32;
-                    self.pid_controller.set_target(self.offset.into());
-                }
+            if let Some(_vb) = appplayer.virtual_book.read().as_deref() {
+                *current_duration = delta;
+                self.offset = delta.as_micros() as f32;
+                self.pid_controller.set_target(self.offset.into());
             }
         }
 

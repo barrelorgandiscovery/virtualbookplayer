@@ -15,7 +15,7 @@ use bookparsing::{Hole, VirtualBook};
 use egui::mutex::RwLock;
 use player::{Command, FileInformationsConstructor, NotesInformations, Player, Response};
 
-use crate::playlist::PlayList;
+use crate::{playlist::PlayList, virtualbookcomponent::IndexedVirtualBook};
 
 use log::{debug, error, info, warn};
 
@@ -40,7 +40,7 @@ pub struct AppPlayer {
     pub start_play_time: Instant,
 
     /// virtual book
-    pub virtual_book: Arc<RwLock<Option<Arc<VirtualBook>>>>,
+    pub virtual_book: Arc<RwLock<Option<Arc<IndexedVirtualBook>>>>,
 
     // starting time wait
     pub waittime_between_file_play: f32,
@@ -88,6 +88,8 @@ impl AppPlayer {
 
         let vb_access = Arc::clone(&appplayer.virtual_book);
         thread::spawn(move || {
+            #[cfg(feature = "profiling")]
+            profiling::register_thread!("AppPlayerThreadCommands");
             let receiver = inner_control_thread.1;
             loop {
                 while let Ok(cmd) = receiver.recv() {
@@ -127,7 +129,7 @@ impl AppPlayer {
                                 notes.display_informations.inter_axis;
 
                             let mut wlock = vb_access.write();
-                            *wlock = Some(Arc::new(virt));
+                            *wlock = Some(Arc::new(IndexedVirtualBook::from(&Arc::new(virt))));
                         }
                     }
                 }
@@ -138,6 +140,8 @@ impl AppPlayer {
         let local_playlist = Arc::clone(&appplayer.playlist);
 
         thread::spawn(move || {
+            #[cfg(feature = "profiling")]
+            profiling::register_thread!("AppPlayer inner player command receiver");
             let mut current_player: Option<Arc<Mutex<Box<dyn Player>>>> = None;
             loop {
                 {
@@ -244,6 +248,8 @@ impl AppPlayer {
                 let inner_thread_access = self.applayer_sender.clone();
                 // create inner control thread of the player
                 thread::spawn(move || {
+                    #[cfg(feature = "profiling")]
+                    profiling::register_thread!("player commands receiver");
                     // println!("start thread for getting responses");
                     while let Ok(response) = p.1.recv() {
                         // println!("received a response from inner player : {:?}", response);
