@@ -267,9 +267,6 @@ impl VirtualBookComponent {
                         })
                         .collect();
 
-                    println!("offset {}, size {}", *offset_in_micros, visible.len());
-                    println!("offset with bar : {}", offset_with_bar_in_pixels);
-
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Display Holes");
                     // notes draw
