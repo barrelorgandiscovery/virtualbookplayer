@@ -6,7 +6,8 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 
 ## Features:
 
-- Play MIDI files only (for now).
+- Play MIDI files.
+- Play Book Files (barrelorgandiscovery aprint software), with custom midi events to trigger elements
 - View the playback in piano roll format.
 - Large and clear tree view for files.
 - Load prepopulated playlists (text files containing lists of files).
@@ -15,6 +16,7 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 - Skip the current playing file for exploration.
 - Send panic or note-off messages to all channels when starting/stopping playback.
 - Adjust zoom factor for touch and reading from a distance.
+- Work on linux, windows (macos untested)
 
 ## Download and install
 
