@@ -46,10 +46,10 @@ pub struct VirtualBookApp {
 
     /// offset in the play (in seconds)
     #[serde(skip)]
-    offset: f32,
+    offset_ms: f64,
 
     #[serde(skip)]
-    pid_regulated_offset: f64,
+    pid_regulated_offset_ms: f64,
     #[serde(skip)]
     pid_controller: Controller,
 
@@ -98,6 +98,8 @@ pub struct VirtualBookApp {
 
     islight: bool,
 
+    play_lattency_ms: u64,
+
     /// display the number pad
     hidden_number_pad: bool,
 
@@ -119,9 +121,9 @@ impl Default for VirtualBookApp {
         Self {
             lang: None,
 
-            offset: 0.0,
-            pid_regulated_offset: 0.0,
-            pid_controller: Controller::new(0.0, 0.15, 0.005, 0.05),
+            offset_ms: 0.0,
+            pid_regulated_offset_ms: 0.0,
+            pid_controller: Controller::new(0.0, 0.20, 0.007, 0.05),
 
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
@@ -145,6 +147,8 @@ impl Default for VirtualBookApp {
 
             latest_duration_time: Duration::new(0, 0),
             adjusted_start_time: Instant::now(), // start time since we start the play
+
+            play_lattency_ms: 0, // 0 ms lattency
 
             i18n: create_i18n_message_with_lang(None),
 
@@ -308,6 +312,7 @@ impl eframe::App for VirtualBookApp {
             hidden_number_pad,
             extensions_filters,
             play_wait,
+            play_lattency_ms,
             ..
         } = self;
 
@@ -318,19 +323,21 @@ impl eframe::App for VirtualBookApp {
         // handling smooth
         if appplayer.is_playing()
             && *adjusted_start_time + Duration::from_millis(100) < Instant::now()
-        // evaluated every 100ms
+        // evaluated every 100ms, if the events
         {
             let delta = Instant::now().duration_since(*adjusted_start_time);
             if let Some(_vb) = appplayer.virtual_book.read().as_deref() {
                 *current_duration = delta;
-                self.offset = delta.as_micros() as f32;
-                self.pid_controller.set_target(self.offset.into());
+                self.offset_ms = delta.as_millis() as f64;
+                self.pid_controller.set_target(
+                    self.offset_ms + Duration::from_millis(*play_lattency_ms).as_millis() as f64,
+                );
             }
         }
 
         // compute smoothed values for nice display
         //self.pid_regulated_offset
-        self.pid_regulated_offset = self.pid_controller.update(self.pid_regulated_offset);
+        self.pid_regulated_offset_ms = self.pid_controller.update(self.pid_regulated_offset_ms);
 
         // handling messages
         if let Ok(mut opt_last_response) = last_response_arc.lock() {
@@ -343,6 +350,16 @@ impl eframe::App for VirtualBookApp {
                     Response::CurrentPlayTime(duration) => {
                         *latest_duration_time = *duration;
                         *adjusted_start_time = Instant::now() - *duration;
+
+                        // depending on the midi control, some may have a
+                        // time shift
+                        // accordingly,
+
+                        self.pid_controller.set_target(
+                            (*duration + Duration::from_millis(*play_lattency_ms)).as_micros()
+                                as f64
+                                / 1000.0,
+                        );
                     }
                     Response::FileCancelled => {}
                     Response::FilePlayStarted((_filename, _notes)) => {}
@@ -390,6 +407,7 @@ impl eframe::App for VirtualBookApp {
 
             ctx.set_visuals(visual_mut);
 
+            // file menu
             egui::menu::bar(ui, |ui| {
                 #[allow(clippy::blocks_in_if_conditions)]
                 if ui
@@ -495,6 +513,7 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
+                // preferences menu
                 ui.menu_button(
                     format!(
                         "{} {}",
@@ -516,6 +535,12 @@ impl eframe::App for VirtualBookApp {
                         if time_slider.ui(ui).changed() {
                             appplayer.set_waittime_between_file_play(*play_wait);
                         }
+
+                        ui.separator();
+
+                        ui.label("Play lattency (ms):");
+                        let play_lattency_slider = egui::Slider::new(play_lattency_ms, 0..=4_000);
+                        ui.add(play_lattency_slider);
                     },
                 );
 

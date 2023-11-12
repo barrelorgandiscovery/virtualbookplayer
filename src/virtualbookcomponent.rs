@@ -78,7 +78,7 @@ impl IndexedVirtualBook {
 /// Virtualbook component
 pub struct VirtualBookComponent {
     // offset of display in milliseconds
-    offset: f64,
+    offset_ms: f64,
     xscale: f32,
     yfactor: f32,
     fit_to_height: bool,
@@ -92,7 +92,7 @@ pub struct VirtualBookComponent {
 impl Default for VirtualBookComponent {
     fn default() -> Self {
         Self {
-            offset: 0.0,
+            offset_ms: 0.0,
             xscale: 3_000f32,
             yfactor: 3.0f32,
             fit_to_height: true,
@@ -160,8 +160,8 @@ impl VirtualBookComponent {
     }
 
     /// percentage of the display
-    pub fn offset(mut self, offset: f64) -> Self {
-        self.offset = offset;
+    pub fn offset_ms(mut self, offset: f64) -> Self {
+        self.offset_ms = offset;
         self
     }
 
@@ -177,7 +177,7 @@ impl VirtualBookComponent {
 
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let Self {
-            offset: offset_in_micros,
+            offset_ms: offset_in_millis,
             xscale,
             yfactor,
             fit_to_height,
@@ -195,20 +195,6 @@ impl VirtualBookComponent {
         egui::ScrollArea::horizontal()
             //.hscroll(*scrollbars_visible)
             .show(ui, |ui| {
-                #[allow(unused_assignments)]
-                let mut book_screen_length_in_pixels = ui.available_width();
-                let mut offset_with_bar_in_pixels = 0.0;
-                if let Some(current_vb) = &self.virtual_book {
-                    if let Some(maxtime_in_micros) = current_vb.max_time() {
-                        book_screen_length_in_pixels =
-                            ((maxtime_in_micros as f64) / (*xscale as f64)) as f32;
-                        offset_with_bar_in_pixels = (*offset_in_micros
-                            / (maxtime_in_micros as f64))
-                            * book_screen_length_in_pixels as f64
-                            - width_container as f64 / 2.0;
-                    }
-                }
-
                 let (response, painter) = ui.allocate_painter(
                     Vec2::new(width_container, ui.available_height()),
                     Sense::hover(),
@@ -247,7 +233,7 @@ impl VirtualBookComponent {
                         .range(std::ops::Range {
                             start: OrdHole {
                                 hole_ref: Hole {
-                                    timestamp: (*offset_in_micros
+                                    timestamp: (*offset_in_millis * 1000.0
                                         - width_container as f64 / 2.0 * *xscale as f64)
                                         as i64,
                                     track: 0,
@@ -257,7 +243,7 @@ impl VirtualBookComponent {
 
                             end: OrdHole {
                                 hole_ref: Hole {
-                                    timestamp: (*offset_in_micros
+                                    timestamp: (*offset_in_millis * 1000.0
                                         + width_container as f64 / 2.0 * *xscale as f64)
                                         as i64,
                                     track: 0,
@@ -288,7 +274,10 @@ impl VirtualBookComponent {
                         .map(|h| {
                             [
                                 pos2(
-                                    (h.hole_ref.timestamp as f64 / *xscale as f64) as f32,
+                                    (((h.hole_ref.timestamp as f64 - *offset_in_millis * 1000.0)
+                                        / *xscale as f64)
+                                        + width_container as f64 / 2.0)
+                                        as f32,
                                     mappingy(
                                         (h.hole_ref.track as f32
                                             * current_vb
@@ -311,8 +300,10 @@ impl VirtualBookComponent {
                                     ),
                                 ),
                                 pos2(
-                                    ((h.hole_ref.timestamp + h.hole_ref.length) as f64
+                                    ((((h.hole_ref.timestamp + h.hole_ref.length) as f64
+                                        - *offset_in_millis * 1000.0)
                                         / *xscale as f64)
+                                        + width_container as f64 / 2.0)
                                         as f32,
                                     mappingy(
                                         (h.hole_ref.track as f32
@@ -339,17 +330,8 @@ impl VirtualBookComponent {
                         })
                         .enumerate()
                         .map(|(i, h)| {
-                            let points_in_screen: Vec<Pos2> = h
-                                .iter()
-                                .map(|p| {
-                                    to_screen
-                                        * (*p
-                                            - Vec2 {
-                                                x: offset_with_bar_in_pixels as f32,
-                                                y: 0.0,
-                                            })
-                                })
-                                .collect();
+                            let points_in_screen: Vec<Pos2> =
+                                h.iter().map(|p| to_screen * (*p)).collect();
 
                             let rect = Rect::from_points(&points_in_screen);
                             let point_response =

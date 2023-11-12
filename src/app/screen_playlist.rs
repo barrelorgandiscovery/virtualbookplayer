@@ -498,13 +498,13 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
 
                         strip.cell(|ui| {
                             // draw book vignette
-                            let foffset: f64 = app.pid_regulated_offset;
+                            let foffset: f64 = app.pid_regulated_offset_ms;
 
                             // display virtualbook
                             let mut c = VirtualBookComponent::from_some_indexedvirtualbook(
                                 app.appplayer.virtual_book.read().clone(),
                             )
-                            .offset(foffset)
+                            .offset_ms(foffset)
                             .xscale(app.xscale)
                             .hide_scrollbar();
 

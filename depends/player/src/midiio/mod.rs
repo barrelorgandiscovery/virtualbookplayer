@@ -7,7 +7,7 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex, MutexGuard,
     },
-    thread,
+    thread::{self, sleep},
     time::{Duration, Instant},
 };
 
@@ -460,6 +460,12 @@ impl Player for MidiPlayer {
                             *note_guard = Arc::clone(&notes_informations);
                         }
 
+                        let wait_time = if let Some(w) = start_wait {
+                            Duration::from_secs_f32(w)
+                        } else {
+                            Duration::ZERO
+                        };
+
                         // send message
                         if let Ok(output_locked) = output_reference.lock() {
                             let filename = filename_closure.clone();
@@ -476,14 +482,18 @@ impl Player for MidiPlayer {
                             }
                         }
 
-                        let wait_time = if let Some(w) = start_wait {
-                            Duration::from_secs_f32(w)
-                        } else {
-                            Duration::ZERO
-                        };
+                        let start_wait_time = Instant::now();
 
-                        if let Some(wait) = start_wait {
-                            thread::sleep(Duration::from_secs_f32(wait))
+                        while Instant::now() < start_wait_time + wait_time {
+                            if let Ok(output_locked) = output_reference.lock() {
+                                output_locked
+                                    .send(Response::CurrentPlayTime(
+                                        Instant::now() - start_wait_time,
+                                    ))
+                                    .unwrap();
+                            }
+
+                            sleep(Duration::from_millis(500));
                         }
 
                         for moment in midi_sheet {
