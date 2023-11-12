@@ -123,7 +123,7 @@ impl Default for VirtualBookApp {
 
             offset_ms: 0.0,
             pid_regulated_offset_ms: 0.0,
-            pid_controller: Controller::new(0.0, 0.20, 0.007, 0.05),
+            pid_controller: Controller::new(0.0, 0.30, 0.010, 0.05),
 
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
@@ -320,7 +320,7 @@ impl eframe::App for VirtualBookApp {
 
         let last_response_arc = Arc::clone(&appplayer.last_response);
 
-        // handling smooth
+        // // handling smooth
         if appplayer.is_playing()
             && *adjusted_start_time + Duration::from_millis(100) < Instant::now()
         // evaluated every 100ms, if the events
