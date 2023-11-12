@@ -12,7 +12,7 @@ use player::midiio::to_notes;
 
 #[test]
 pub fn test_reading_midifile() -> Result<(), Box<dyn Error>> {
-    let filename = &PathBuf::from("chopin-nocturne-op9-no2.mid");
+    let filename = &PathBuf::from("autumn_no3_allegro_gp.mid");
 
     // load the midi file
     let file_content_data = std::fs::read(filename)?;

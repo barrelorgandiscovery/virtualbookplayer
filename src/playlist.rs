@@ -58,6 +58,7 @@ impl From<&PathBuf> for PlaylistElement {
     }
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl PlayList {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {

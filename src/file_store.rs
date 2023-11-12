@@ -140,6 +140,7 @@ pub struct FileStore {
 
 type ExtensionsFilter = Option<Vec<String>>;
 
+#[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl FileStore {
     /// recusive descent to grab and construct the tree of FileNode
     fn recurse_construct(
@@ -317,6 +318,9 @@ impl FileStore {
 
 #[test]
 fn test_file_node() {
+    #[cfg(feature = "profiling")]
+    tracy_client::Client::start();
+
     let f = FileStore::recurse_construct(&PathBuf::from("/home/use/tmp/t"), &None);
     // cannot display the file node
     println!("{:?}", &f);
@@ -324,6 +328,9 @@ fn test_file_node() {
 
 #[test]
 fn test_file_store_and_view() {
+    #[cfg(feature = "profiling")]
+    tracy_client::Client::start();
+
     let f = FileStore::new(&PathBuf::from("/home/use/tmp/t")).unwrap();
 
     let fstore = f.unwrap();

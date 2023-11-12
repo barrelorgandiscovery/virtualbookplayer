@@ -16,6 +16,8 @@ thread-priority = "0.13.1"
 
 bookparsing = {path = "../book-lib-rs"}
 
+profiling = {version = "1.0.11"}
+
 # for input / output conversions, configurations
 
 serde = {version = "1.0.160", features = ["derive"]}
