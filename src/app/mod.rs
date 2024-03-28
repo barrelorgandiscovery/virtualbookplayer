@@ -15,7 +15,7 @@ use player::{PlayerFactory, Response};
 use crate::appplayer::AppPlayer;
 use crate::{duration_to_mm_ss, file_store::*};
 
-use log::{debug, error};
+use log::{debug, error, info};
 
 use self::i18n::{create_i18n_message_with_lang, I18NMessages};
 
@@ -420,10 +420,12 @@ impl eframe::App for VirtualBookApp {
                             }
 
                             //let repaint_signal = ctx.repaint_signal();
-                            if let Err(_result_open_signle_dir) =
+                            if let Err(_result_open_single_dir) =
                                 file_path_dialog.open_single_dir(location)
                             {
                                 error!("fail to open dir dialog");
+                            } else {
+                                info!("dialog opened");
                             }
 
                             ui.close_menu();
