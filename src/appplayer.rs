@@ -291,7 +291,7 @@ impl AppPlayer {
             p.stop();
             let locked_playlist = self.playlist.lock().expect("fail to get lock on playlist");
             if !locked_playlist.file_list.is_empty() {
-                if let Some(n) = locked_playlist.file_list.get(0) {
+                if let Some(n) = locked_playlist.file_list.first() {
                     self.start_play_time = Instant::now(); // before play
                     if let Err(e) = p.start_play(&n.path, Some(self.waittime_between_file_play)) {
                         error!("error in playing file : {}", e);
