@@ -393,7 +393,7 @@ impl eframe::App for VirtualBookApp {
             ctx.set_visuals(visual_mut);
 
             egui::menu::bar(ui, |ui| {
-                #[allow(clippy::blocks_in_if_conditions)]
+                #[allow(clippy::blocks_in_conditions)]
                 if ui
                     .menu_button(&i18n.file, |ui| {
                         if ui
