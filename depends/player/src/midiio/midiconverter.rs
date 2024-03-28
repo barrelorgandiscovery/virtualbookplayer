@@ -222,12 +222,27 @@ pub fn convert<'a>(
     book: &bookparsing::VirtualBook,
     conversion: &Conversion,
 ) -> Result<Smf<'a>, Box<dyn Error>> {
-    let all_events = book
-        .holes
+    let all_holes = &book.holes;
+
+    // shift the result when there are some negative elements in the book
+    let smallest = all_holes.holes.iter().fold(0, |a, e| {
+        if e.timestamp < a {
+            e.timestamp
+        } else {
+            a
+        }
+    });
+
+    let all_events = all_holes
         .holes
         .iter()
         .filter(|hole| hole.length > 0)
-        .map(|h| conversion.convert(h))
+        .map( |h| Hole {
+            timestamp: h.timestamp - smallest,
+            length: h.length,
+            track: h.track
+        })
+        .map(|h| conversion.convert(&h))
         .flat_map(|e| e);
 
     let mut sorted_result: Box<Vec<HoleEvent>> = Box::new(all_events.collect());
