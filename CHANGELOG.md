@@ -11,4 +11,5 @@
 ### 2023-09-23: 
 - add icons on buttons, simplify the gui
 
-
+### 2024-03:
+- fix on book reading

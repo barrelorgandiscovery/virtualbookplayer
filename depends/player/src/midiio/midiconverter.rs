@@ -225,22 +225,19 @@ pub fn convert<'a>(
     let all_holes = &book.holes;
 
     // shift the result when there are some negative elements in the book
-    let smallest = all_holes.holes.iter().fold(0, |a, e| {
-        if e.timestamp < a {
-            e.timestamp
-        } else {
-            a
-        }
-    });
+    let smallest = all_holes
+        .holes
+        .iter()
+        .fold(0, |a, e| if e.timestamp < a { e.timestamp } else { a });
 
     let all_events = all_holes
         .holes
         .iter()
         .filter(|hole| hole.length > 0)
-        .map( |h| Hole {
+        .map(|h| Hole {
             timestamp: h.timestamp - smallest,
             length: h.length,
-            track: h.track
+            track: h.track,
         })
         .map(|h| conversion.convert(&h))
         .flat_map(|e| e);

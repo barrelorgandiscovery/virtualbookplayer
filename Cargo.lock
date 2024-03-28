@@ -322,6 +322,7 @@ name = "bookparsing"
 version = "0.1.0"
 dependencies = [
  "log",
+ "profiling",
  "serde",
  "thiserror",
  "xml-rs",
@@ -2037,6 +2038,19 @@ name = "profiling"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f89dff0959d98c9758c88826cc002e2c3d0b9dfac4139711d1f30de442f1139b"
+dependencies = [
+ "profiling-procmacros",
+]
+
+[[package]]
+name = "profiling-procmacros"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8021cf59c8ec9c432cfc2526ac6b8aa508ecaf29cd415f271b8406c1b851c3fd"
+dependencies = [
+ "quote",
+ "syn 2.0.38",
+]
 
 [[package]]
 name = "quote"

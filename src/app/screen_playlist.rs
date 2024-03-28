@@ -397,13 +397,6 @@ fn display_tree(
 }
 
 pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
-    // let dark_mode = ui.visuals().dark_mode;
-    // let faded_color = ui.visuals().window_fill();
-    // let _faded_color = |color: Color32| -> Color32 {
-    //     let t = if dark_mode { 0.95 } else { 0.8 };
-    //     egui::lerp(Rgba::from(color)..=Rgba::from(faded_color), t).into()
-    // };
-
     StripBuilder::new(ui)
         .size(Size::relative(0.5))
         .size(Size::relative(0.5))
