@@ -1,0 +1,35 @@
+[package]
+name = "egui_extras_xt"
+version = "0.1.0"
+authors = ["Nagy Tibor <xnagytibor@protonmail.com>"]
+description = "Widget library for egui"
+license = "MIT"
+edition = "2021"
+repository = "https://github.com/xTibor/egui_extras_xt"
+homepage = "https://github.com/xTibor/egui_extras_xt"
+categories = ["gui"]
+keywords = ["ui", "gui", "egui", "widgets", "interface"]
+publish = false
+
+[badges]
+maintenance = { status = "as-is" }
+
+[dependencies]
+ecolor = "0.27.2"
+egui = "0.27.2"
+emath = "0.27.2"
+epaint = "0.27.2"
+itertools = "0.12.0"
+strum = { version = "0.26.2", features = ["derive"] }
+
+barcoders = { version = "1.0.2", optional = true }
+datamatrix = { version = "0.3.0", optional = true, default-features = false }
+qrcode = { version = "0.13.0", optional = true, default-features = false }
+
+[features]
+barcodes = ["dep:barcoders", "dep:datamatrix", "dep:qrcode"]
+compasses = []
+displays = []
+filesystem = []
+knobs = []
+ui = []

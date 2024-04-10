@@ -30,6 +30,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use clap::Parser;
+use egui::{IconData, ViewportBuilder};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -47,7 +48,7 @@ struct Args {
     full_screen: Option<bool>,
 }
 
-pub(crate) fn load_icon() -> eframe::IconData {
+pub(crate) fn load_icon() -> IconData {
     let (icon_rgba, icon_width, icon_height) = {
         let icon = include_bytes!("../assets/icon.png");
         let image = image::load_from_memory(icon)
@@ -58,7 +59,7 @@ pub(crate) fn load_icon() -> eframe::IconData {
         (rgba, width, height)
     };
 
-    eframe::IconData {
+    IconData {
         rgba: icon_rgba,
         width: icon_width,
         height: icon_height,
@@ -84,12 +85,17 @@ fn main() -> eframe::Result<()> {
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);
 
-    let mut native_options = eframe::NativeOptions::default();
+    let mut viewport_build = ViewportBuilder::default();
     if let Some(fs) = args.full_screen {
-        native_options.fullscreen = fs;
-        native_options.decorated = false;
+        viewport_build = viewport_build.with_fullscreen(fs).with_decorations(false);
     }
-    native_options.icon_data = Some(load_icon());
+    viewport_build = viewport_build.with_icon(load_icon());
+
+    let native_options = eframe::NativeOptions {
+        viewport: viewport_build,
+        ..Default::default()
+    };
+
     eframe::run_native(
         "VirtualBook Player",
         native_options,

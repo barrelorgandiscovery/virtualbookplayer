@@ -12,7 +12,7 @@ use crate::{
     virtualbookcomponent::VirtualBookComponent,
     VirtualBookApp,
 };
-use egui::*;
+use egui::{epaint::Shadow, *};
 use egui_dnd::dnd;
 use egui_extras::{Size, StripBuilder};
 
@@ -397,114 +397,143 @@ fn display_tree(
 }
 
 pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
-    StripBuilder::new(ui)
-        .size(Size::relative(0.5))
-        .size(Size::relative(0.5))
-        .horizontal(|mut strip| {
-            strip.cell(|ui| {
-                egui::ScrollArea::both().show(ui, |ui| {
-                    StripBuilder::new(ui)
-                        .size(Size::initial(6.0))
-                        .size(Size::remainder())
-                        .vertical(|mut strip| {
-                            strip.cell(|ui| {
-                                ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
-                                    if !app.current_typed_no.is_empty() {
-                                        let s = app.i18n.filter.clone()
-                                            + &format!(" : {}", app.current_typed_no);
-                                        ui.group(|ui| ui.label(s.as_str()));
-                                    }
-                                });
-                            });
-                            strip.cell(|ui| {
-                                if let Some(filestore) = &mut app.file_store {
-                                    let current_view = match app.current_typed_no.is_empty() {
-                                        true => &mut filestore.default_view,
-                                        false => &mut filestore.filtered_view,
-                                    };
-
-                                    if let Some(view) = current_view {
-                                        match display_tree(
-                                            &mut app.appplayer,
-                                            &mut app.current_typed_no,
-                                            &mut view.root,
-                                            ui,
-                                        ) {
-                                            Err(e) => {
-                                                error!("error in display tree: {}", e);
-                                            }
-                                            Ok(_returned_value) => {}
-                                        }
-                                    } else {
-                                        ui.label(&app.i18n.aucun_fichiers);
-                                    }
+    egui::SidePanel::left("tree_panel")
+        .resizable(true)
+        .default_width(200.0)
+        .width_range(80.0..=500.0)
+        .frame(Frame {
+            inner_margin: Margin::symmetric(5.0, 0.0),
+            outer_margin: Margin::ZERO,
+            rounding: Rounding::ZERO,
+            shadow: Shadow::NONE,
+            fill: Color32::TRANSPARENT,
+            ..Default::default()
+        })
+        .show_inside(ui, |ui| {
+            egui::ScrollArea::both().show(ui, |ui| {
+                StripBuilder::new(ui)
+                    .size(Size::initial(6.0))
+                    .size(Size::remainder())
+                    .vertical(|mut strip| {
+                        strip.cell(|ui| {
+                            ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
+                                if !app.current_typed_no.is_empty() {
+                                    let s = app.i18n.filter.clone()
+                                        + &format!(" : {}", app.current_typed_no);
+                                    ui.group(|ui| ui.label(s.as_str()));
                                 }
                             });
                         });
-                });
-            });
-            strip.cell(|ui| {
-                StripBuilder::new(ui)
-                    // .size(Size::initial(12.0))
-                    .size(Size::initial(100.0))
-                    .size(Size::remainder())
-                    .vertical(|mut strip| {
-                        // strip.cell(|ui| {
-                        //     // name of the element
-                        //     ui.vertical_centered(|ui| {
-                        //         if app.appplayer.is_playing() {
-                        //             let cell = &app
-                        //                 .appplayer
-                        //                 .playlist
-                        //                 .lock()
-                        //                 .expect("fail to lock playlist")
-                        //                 .current();
-                        //             match cell {
-                        //                 Some(t) => {
-                        //                     let name = t.name.clone();
-                        //                     let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
-
-                        //                     rt = rt.background_color(
-                        //                         ui.style().visuals.selection.bg_fill,
-                        //                     );
-                        //                     rt =
-                        //                         rt.color(ui.style().visuals.selection.stroke.color);
-
-                        //                     ui.horizontal(|ui| {
-                        //                         ui.label(rt.monospace());
-                        //                         ui.label(format!(
-                        //                             "{:.0}s",
-                        //                             &app.current_duration.as_secs_f32()
-                        //                         ));
-                        //                     });
-                        //                 }
-                        //                 None => {}
-                        //             }
-                        //         }
-                        //     });
-                        // });
-
                         strip.cell(|ui| {
-                            // draw book vignette
-                            let foffset: f32 = app.pid_regulated_offset as f32;
+                            if let Some(filestore) = &mut app.file_store {
+                                let current_view = match app.current_typed_no.is_empty() {
+                                    true => &mut filestore.default_view,
+                                    false => &mut filestore.filtered_view,
+                                };
 
-                            // display virtualbook
-                            let mut c = VirtualBookComponent::from_some_virtualbook(
-                                app.appplayer.virtual_book.read().clone(),
-                            )
-                            .offset(foffset)
-                            .xscale(app.xscale)
-                            .hide_scrollbar();
-
-                            if c.ui_content(ui).clicked() {
-                                app.screen = Screen::Display;
+                                if let Some(view) = current_view {
+                                    match display_tree(
+                                        &mut app.appplayer,
+                                        &mut app.current_typed_no,
+                                        &mut view.root,
+                                        ui,
+                                    ) {
+                                        Err(e) => {
+                                            error!("error in display tree: {}", e);
+                                        }
+                                        Ok(_returned_value) => {}
+                                    }
+                                } else {
+                                    ui.label(&app.i18n.aucun_fichiers);
+                                }
                             }
-                        });
-                        strip.cell(|ui| {
-                            // render playlist panel
-                            ui_playlist_right_panel(app, ctx, ui);
                         });
                     });
             });
         });
+
+    egui::CentralPanel::default()
+        .frame(Frame {
+            inner_margin: Margin::ZERO,
+            outer_margin: Margin::ZERO,
+            rounding: Rounding::ZERO,
+            shadow: Shadow::NONE,
+            fill: Color32::TRANSPARENT,
+            ..Default::default()
+        })
+        .show_inside(ui, |ui| {
+            StripBuilder::new(ui)
+                // .size(Size::initial(12.0))
+                .size(Size::initial(100.0))
+                .size(Size::remainder())
+                .vertical(|mut strip| {
+                    // strip.cell(|ui| {
+                    //     // name of the element
+                    //     ui.vertical_centered(|ui| {
+                    //         if app.appplayer.is_playing() {
+                    //             let cell = &app
+                    //                 .appplayer
+                    //                 .playlist
+                    //                 .lock()
+                    //                 .expect("fail to lock playlist")
+                    //                 .current();
+                    //             match cell {
+                    //                 Some(t) => {
+                    //                     let name = t.name.clone();
+                    //                     let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+
+                    //                     rt = rt.background_color(
+                    //                         ui.style().visuals.selection.bg_fill,
+                    //                     );
+                    //                     rt =
+                    //                         rt.color(ui.style().visuals.selection.stroke.color);
+
+                    //                     ui.horizontal(|ui| {
+                    //                         ui.label(rt.monospace());
+                    //                         ui.label(format!(
+                    //                             "{:.0}s",
+                    //                             &app.current_duration.as_secs_f32()
+                    //                         ));
+                    //                     });
+                    //                 }
+                    //                 None => {}
+                    //             }
+                    //         }
+                    //     });
+                    // });
+
+                    strip.cell(|ui| {
+                        // draw book vignette
+                        let foffset: f32 = app.pid_regulated_offset as f32;
+
+                        // display virtualbook
+                        let mut c = VirtualBookComponent::from_some_virtualbook(
+                            app.appplayer.virtual_book.read().clone(),
+                        )
+                        .offset(foffset)
+                        .xscale(app.xscale)
+                        .hide_scrollbar();
+
+                        if c.ui_content(ui).clicked() {
+                            app.screen = Screen::Display;
+                        }
+                    });
+                    strip.cell(|ui| {
+                        // render playlist panel
+                        ui_playlist_right_panel(app, ctx, ui);
+                    });
+                });
+        });
+
+    // StripBuilder::new(ui)
+    //     .size(Size::relative(0.5))
+    //     .size(Size::relative(0.5))
+    //     .horizontal(|mut strip| {
+    //         strip.cell(|ui| {
+
+    // });
+    // strip.cell(|ui| {
+
+    // });
+    // });
 }

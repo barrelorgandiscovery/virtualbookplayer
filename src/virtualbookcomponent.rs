@@ -106,8 +106,8 @@ impl VirtualBookComponent {
         } = self;
 
         let mut style = ui.style_mut().clone();
-        style.spacing.scroll_bar_width = self.scrollbats_width;
-        style.spacing.scroll_handle_min_length = 50.0;
+        style.spacing.scroll.bar_width = self.scrollbats_width;
+        style.spacing.scroll.handle_min_length = 50.0;
 
         ui.set_style(style);
 

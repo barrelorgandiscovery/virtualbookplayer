@@ -471,7 +471,33 @@ impl Player for MidiPlayer {
                         };
 
                         if let Some(wait) = start_wait {
-                            thread::sleep(Duration::from_secs_f32(wait))
+                            let mut remain = wait;
+                            const INCREMENT: f32 = 0.2;
+                            while remain > 0.0f32 {
+                                thread::sleep(Duration::from_secs_f32(INCREMENT));
+                                remain -= INCREMENT;
+
+                                // check stopped
+                                if receiver.try_recv().is_ok() {
+                                    // stopped
+                                    all_notes_off(&mut con);
+                                    if let Ok(mut m) = isplaying_info.lock() {
+                                        *m = false;
+                                    }
+                                    if let Ok(output_locked) = output_reference.lock() {
+                                        output_locked.send(Response::FileCancelled).unwrap();
+                                    }
+                                    return;
+                                }
+
+                                if let Ok(output_locked) = output_reference.lock() {
+                                    output_locked
+                                        .send(Response::CurrentPlayTime(Duration::from_secs_f32(
+                                            wait - remain,
+                                        )))
+                                        .unwrap();
+                                }
+                            }
                         }
 
                         for moment in midi_sheet {

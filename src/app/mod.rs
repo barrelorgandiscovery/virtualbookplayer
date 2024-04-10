@@ -164,7 +164,7 @@ impl VirtualBookApp {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
-        let mut fonts = FontDefinitions::default();
+        let mut fonts = egui::FontDefinitions::default();
 
         // Install my own font (maybe supporting non-latin characters):
         fonts.font_data.insert(
@@ -393,7 +393,7 @@ impl eframe::App for VirtualBookApp {
             ctx.set_visuals(visual_mut);
 
             egui::menu::bar(ui, |ui| {
-                #[allow(clippy::blocks_in_conditions)]
+                #[allow(clippy::blocks_in_if_conditions)]
                 if ui
                     .menu_button(&i18n.file, |ui| {
                         if ui
@@ -464,7 +464,7 @@ impl eframe::App for VirtualBookApp {
                         ui.separator();
 
                         if ui.button(&i18n.quit).clicked() {
-                            _frame.close();
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     })
                     .response
@@ -521,6 +521,7 @@ impl eframe::App for VirtualBookApp {
                     .label("On Air")
                     .width(32.0)
                     .height(24.0);
+
                 if ui.add(indicator_play_button).changed() {
                     if *play_mod {
                         appplayer.play_file_on_top();
@@ -655,6 +656,7 @@ impl eframe::App for VirtualBookApp {
                         TextureOptions {
                             magnification: TextureFilter::Nearest,
                             minification: TextureFilter::Linear,
+                            wrap_mode: TextureWrapMode::Repeat,
                         },
                     );
                     self1.texture_handle = Some(textureid);
