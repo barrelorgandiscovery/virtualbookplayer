@@ -15,7 +15,7 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 - Remove a file from the playlist by clicking on it.
 - Skip the current playing file for exploration.
 - Send panic or note-off messages to all channels when starting/stopping playback.
-- Adjust zoom factor for touch and reading from a distance.
+- Adjust zoom factor for touch and reading from far await.
 - Work on linux, windows (macos untested)
 
 ## Download and install
