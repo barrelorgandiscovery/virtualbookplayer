@@ -51,13 +51,13 @@ impl HoleEvent {
             HoleEvent {
                 timestamp: hole.timestamp,
                 channel: mapping.midi_channel as u8,
-                note: mapping.note as u8,
+                note: mapping.note,
                 event_type: EventType::ACTIVATE,
             },
             HoleEvent {
                 timestamp: hole.timestamp + hole.length,
                 channel: mapping.midi_channel as u8,
-                note: mapping.note as u8,
+                note: mapping.note,
                 event_type: EventType::DEACTIVATE,
             },
         )
@@ -87,17 +87,17 @@ pub struct Conversion {
 impl Conversion {
     pub fn convert(&self, hole: &Hole) -> Vec<HoleEvent> {
         if let Some(m) = self.mapping.get(&hole.track) {
-            let result = HoleEvent::from_hole(&hole, &m);
+            let result = HoleEvent::from_hole(hole, m);
             return vec![result.0, result.1];
         }
 
-        return vec![];
+        vec![]
     }
 }
 
 /// this function parse a string defining a midi code (ex : A3, B7 ...)
 pub fn parse_note(s: &str) -> Result<u8, Box<dyn Error>> {
-    let mut notes = vec![
+    let mut notes = [
         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
     ];
     notes.reverse(); // for check (diese must be checked first)
@@ -240,7 +240,7 @@ pub fn convert<'a>(
             track: h.track,
         })
         .map(|h| conversion.convert(&h))
-        .flat_map(|e| e);
+        .flatten();
 
     let mut sorted_result: Box<Vec<HoleEvent>> = Box::new(all_events.collect());
     sorted_result.sort_by_key(|e| e.timestamp);
@@ -252,10 +252,10 @@ pub fn convert<'a>(
 
     let midi_events = sorted_result
         .iter()
-        .fold((0, Box::new(vec![])), |t, e| {
+        .fold((0, Box::<Vec<TrackEvent<'_>>>::default()), |t, e| {
             let mut v = t.1;
 
-            let delta_in_microseconds: i64 = (e.timestamp - t.0) as i64;
+            let delta_in_microseconds: i64 = e.timestamp - t.0;
             let delta_in_ticks: u32 =
                 ((delta_in_microseconds * 5000) / 1_000_000 * 120 / 60) as u32;
             v.push(TrackEvent {

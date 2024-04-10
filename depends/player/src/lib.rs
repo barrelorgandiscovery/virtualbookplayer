@@ -12,7 +12,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{Receiver, Sender},
-        Arc, Mutex,
+        Arc,
     },
     time::Duration,
 };

@@ -121,10 +121,7 @@ impl MidiPlayerFactory {
                         .as_deref()
                         .unwrap_or("<no device name>")
                 );
-                returned.push(DeviceInformation {
-                    no: i,
-                    label: label,
-                });
+                returned.push(DeviceInformation { no: i, label });
             }
         }
         Ok(returned)
@@ -145,7 +142,7 @@ pub struct MidiFileInformationsConstructor {}
 /// file information trait, specific to midi, and midi controlled equipments
 impl FileInformationsConstructor for MidiFileInformationsConstructor {
     fn compute(&mut self, filename: &PathBuf) -> Result<FileInformations, Box<dyn Error>> {
-        match read_all_kind_of_files(&filename, None) {
+        match read_all_kind_of_files(filename, None) {
             Ok(res) => {
                 let result = res
                     .0
@@ -257,7 +254,7 @@ fn resolve_conversion(vb: &VirtualBook) -> Result<Option<Conversion>, Box<dyn Er
     let scale_name = vb.scale.name.clone();
     let conversion_file = scale_name + ".yml";
 
-    if !std::fs::metadata(&conversion_file).is_ok() {
+    if std::fs::metadata(&conversion_file).is_err() {
         info!("create the conversion from scale definition");
         return Ok(Some(create_conversion_from_scale(&vb.scale.definition)?));
     }
@@ -270,7 +267,7 @@ fn resolve_conversion(vb: &VirtualBook) -> Result<Option<Conversion>, Box<dyn Er
 
     let mut reader = BufReader::new(f_scale);
     let conversion = read_conversion(&mut reader)?;
-    return Ok(Some(conversion));
+    Ok(Some(conversion))
 }
 
 fn read_book_file(
@@ -362,7 +359,7 @@ fn read_all_kind_of_files(
             }
         }
     }
-    return Err(format!("no extension given for the file {:?}", &filename).into());
+    Err(format!("no extension given for the file {:?}", &filename).into())
 }
 
 /// Player trait implementation
@@ -399,7 +396,7 @@ impl Player for MidiPlayer {
         let output_reference = Arc::clone(&self.output);
 
         let filename_closure = filename.clone();
-        let start_wait_closure = start_wait.clone();
+        let start_wait_closure = start_wait;
 
         let notes_access = Arc::clone(&self.notes);
 
@@ -627,8 +624,8 @@ pub fn to_notes(
     timer.change_tempo(DEFAULT_TEMPO_IF_NOT_SET_IN_FILE);
 
     let sheet = match header.format {
-        Format::SingleTrack | Format::Sequential => Sheet::sequential(&tracks),
-        Format::Parallel => Sheet::parallel(&tracks),
+        Format::SingleTrack | Format::Sequential => Sheet::sequential(tracks),
+        Format::Parallel => Sheet::parallel(tracks),
     };
 
     let shift_duration = if start_wait.is_some() {
@@ -659,7 +656,7 @@ pub fn to_notes(
                             let key = key.as_int();
                             let index: usize = (uchannel as usize) * 128 + key as usize;
                             let channel_note_vec = &mut note_state[index];
-                            if channel_note_vec.len() > 0 {
+                            if !channel_note_vec.is_empty() {
                                 match channel_note_vec.pop() {
                                     Some(d) => notes.push(PlainNoteWithChannel {
                                         channel: uchannel,
@@ -680,7 +677,7 @@ pub fn to_notes(
                             if vel == 0 {
                                 // note off
                                 let channel_note_vec = &mut note_state[index];
-                                if channel_note_vec.len() > 0 {
+                                if !channel_note_vec.is_empty() {
                                     match channel_note_vec.pop() {
                                         Some(d) => notes.push(PlainNoteWithChannel {
                                             channel: uchannel,
