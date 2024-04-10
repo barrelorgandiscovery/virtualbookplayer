@@ -508,19 +508,19 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                     // });
 
                     strip.cell(|ui| {
-                          // draw book vignette
-                          let foffset: f64 = app.pid_regulated_offset_ms;
+                        // draw book vignette
+                        let foffset: f64 = app.pid_regulated_offset_ms;
 
-                          // display virtualbook
-                          let mut c = VirtualBookComponent::from_some_indexedvirtualbook(
-                              app.appplayer.virtual_book.read().clone(),
-                          )
-                          .offset_ms(foffset)
-                          .xscale(app.xscale)
-                          .hide_scrollbar();
+                        // display virtualbook
+                        let mut c = VirtualBookComponent::from_some_indexedvirtualbook(
+                            app.appplayer.virtual_book.read().clone(),
+                        )
+                        .offset_ms(foffset)
+                        .xscale(app.xscale)
+                        .hide_scrollbar();
 
-                          if c.ui_content(ui).clicked() {
-                              app.screen = Screen::Display;
+                        if c.ui_content(ui).clicked() {
+                            app.screen = Screen::Display;
                         }
                     });
                     strip.cell(|ui| {
