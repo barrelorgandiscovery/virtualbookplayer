@@ -44,11 +44,12 @@ pub struct VirtualBookApp {
 
     xscale: f32,
 
+    /// offset in the play (in seconds)
     #[serde(skip)]
-    offset: f32,
+    offset_ms: f64,
 
     #[serde(skip)]
-    pid_regulated_offset: f64,
+    pid_regulated_offset_ms: f64,
     #[serde(skip)]
     pid_controller: Controller,
 
@@ -97,6 +98,8 @@ pub struct VirtualBookApp {
 
     islight: bool,
 
+    play_lattency_ms: u64,
+
     /// display the number pad
     hidden_number_pad: bool,
 
@@ -118,9 +121,9 @@ impl Default for VirtualBookApp {
         Self {
             lang: None,
 
-            offset: 0.0,
-            pid_regulated_offset: 0.0,
-            pid_controller: Controller::new(0.0, 0.15, 0.005, 0.05),
+            offset_ms: 0.0,
+            pid_regulated_offset_ms: 0.0,
+            pid_controller: Controller::new(0.0, 0.30, 0.010, 0.05),
 
             xscale: 3_000f32,
             screen: Screen::PlayListConstruction,
@@ -144,6 +147,8 @@ impl Default for VirtualBookApp {
 
             latest_duration_time: Duration::new(0, 0),
             adjusted_start_time: Instant::now(), // start time since we start the play
+
+            play_lattency_ms: 0, // 0 ms lattency
 
             i18n: create_i18n_message_with_lang(None),
 
@@ -262,18 +267,17 @@ impl VirtualBookApp {
     }
 }
 
+#[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl eframe::App for VirtualBookApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
+    #[cfg_attr(any(feature = "profiling"), profiling::function)]
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // self.frame_history
-        //     .on_new_frame(ctx.input(|i| i.time), _frame.info().cpu_usage);
-
         let old = if self.islight {
             Visuals::light()
         } else {
@@ -308,6 +312,7 @@ impl eframe::App for VirtualBookApp {
             hidden_number_pad,
             extensions_filters,
             play_wait,
+            play_lattency_ms,
             ..
         } = self;
 
@@ -315,24 +320,24 @@ impl eframe::App for VirtualBookApp {
 
         let last_response_arc = Arc::clone(&appplayer.last_response);
 
-        // handling smooth
+        // // handling smooth
         if appplayer.is_playing()
             && *adjusted_start_time + Duration::from_millis(100) < Instant::now()
-        // evaluated every 100ms
+        // evaluated every 100ms, if the events
         {
             let delta = Instant::now().duration_since(*adjusted_start_time);
-            if let Some(vb) = appplayer.virtual_book.read().as_deref() {
-                if let Some(max_time) = vb.max_time() {
-                    *current_duration = delta;
-                    self.offset = delta.as_micros() as f32 / max_time as f32;
-                    self.pid_controller.set_target(self.offset.into());
-                }
+            if let Some(_vb) = appplayer.virtual_book.read().as_deref() {
+                *current_duration = delta;
+                self.offset_ms = delta.as_millis() as f64;
+                self.pid_controller.set_target(
+                    self.offset_ms + Duration::from_millis(*play_lattency_ms).as_millis() as f64,
+                );
             }
         }
 
         // compute smoothed values for nice display
         //self.pid_regulated_offset
-        self.pid_regulated_offset = self.pid_controller.update(self.pid_regulated_offset);
+        self.pid_regulated_offset_ms = self.pid_controller.update(self.pid_regulated_offset_ms);
 
         // handling messages
         if let Ok(mut opt_last_response) = last_response_arc.lock() {
@@ -345,6 +350,16 @@ impl eframe::App for VirtualBookApp {
                     Response::CurrentPlayTime(duration) => {
                         *latest_duration_time = *duration;
                         *adjusted_start_time = Instant::now() - *duration;
+
+                        // depending on the midi control, some may have a
+                        // time shift
+                        // accordingly,
+
+                        self.pid_controller.set_target(
+                            (*duration + Duration::from_millis(*play_lattency_ms)).as_micros()
+                                as f64
+                                / 1000.0,
+                        );
                     }
                     Response::FileCancelled => {}
                     Response::FilePlayStarted((_filename, _notes)) => {}
@@ -392,6 +407,7 @@ impl eframe::App for VirtualBookApp {
 
             ctx.set_visuals(visual_mut);
 
+            // file menu
             egui::menu::bar(ui, |ui| {
                 #[allow(clippy::blocks_in_conditions)]
                 if ui
@@ -431,6 +447,29 @@ impl eframe::App for VirtualBookApp {
                             ui.close_menu();
                         }
                         ui.separator();
+                        if ui
+                            .button(format!(
+                                "{} {}",
+                                egui_phosphor::regular::RECYCLE,
+                                &i18n.reload_folder
+                            ))
+                            .clicked()
+                        {
+                            if let Some(current_path) = &self.file_store_path {
+                                let new_filestore = FileStore::new(current_path);
+                                if let Ok(new_store) = new_filestore {
+                                    self.file_store = new_store.map(|mut fs| {
+                                        if let Ok(v) = fs.view(&None, &self.extensions_filters) {
+                                            fs.default_view = Some(v);
+                                        }
+                                        fs
+                                    });
+                                }
+                            }
+                            ui.close_menu();
+                        };
+
+                        ui.separator();
 
                         ui.label("midi out interfaces");
                         for device in &self.current_devices {
@@ -450,6 +489,7 @@ impl eframe::App for VirtualBookApp {
 
                                 match factory.create(s, rcmd) {
                                     Ok(player) => {
+                                        // change the player
                                         appplayer.player(Some((player, player_event_receiver)));
                                     }
                                     Err(e) => {
@@ -475,6 +515,7 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
+                // preferences menu
                 ui.menu_button(
                     format!(
                         "{} {}",
@@ -496,26 +537,16 @@ impl eframe::App for VirtualBookApp {
                         if time_slider.ui(ui).changed() {
                             appplayer.set_waittime_between_file_play(*play_wait);
                         }
+
+                        ui.separator();
+
+                        ui.label("Play lattency (ms):");
+                        let play_lattency_slider = egui::Slider::new(play_lattency_ms, 0..=4_000);
+                        ui.add(play_lattency_slider);
                     },
                 );
 
                 let play_mod = &mut appplayer.play_mod;
-                // if ui
-                //     .toggle_value(
-                //         play_mod,
-                //         RichText::new('\u{F04B}')
-                //             .color(Color32::GREEN)
-                //             .font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
-                //     )
-                //     .on_hover_text(&i18n.play)
-                //     .clicked()
-                // {
-                //     if *play_mod {
-                //         appplayer.play_file_on_top();
-                //     } else {
-                //         appplayer.stop();
-                //     }
-                // }
 
                 let indicator_play_button = IndicatorButton::new(play_mod)
                     .label("On Air")

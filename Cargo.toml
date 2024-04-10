@@ -56,6 +56,14 @@ eframe = { version="0.27.2" , default-features = false, features = [
 ] }
 
 
+profiling = {version = "1.0.11", features=["profile-with-tracy"], optional=true }
+tracy-client = { version = "0.16.3", optional = true }
+
+[features]
+default = []
+profiling = ["dep:tracy-client", "dep:profiling"]
+
+
 [profile.release]
 opt-level = 2
 

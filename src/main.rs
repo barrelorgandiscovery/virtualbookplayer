@@ -67,8 +67,8 @@ pub(crate) fn load_icon() -> IconData {
 }
 
 fn main() -> eframe::Result<()> {
-    // Log to stdout (if you run with `RUST_LOG=debug`).
-    tracing_subscriber::fmt::init();
+    // // Log to stdout (if you run with `RUST_LOG=debug`).
+    // tracing_subscriber::fmt::init();
 
     println!("==========================================================================");
     let version = env!("CARGO_PKG_VERSION");
@@ -82,6 +82,9 @@ fn main() -> eframe::Result<()> {
     println!("  build: {}", std::env!("GIT_HASH"));
     println!("==========================================================================");
 
+    #[cfg(feature = "profiling")]
+    tracy_client::Client::start();
+
     let args = Args::parse();
     log::debug!("commandline arguments : {:?}", args);
 
@@ -89,6 +92,7 @@ fn main() -> eframe::Result<()> {
     if let Some(fs) = args.full_screen {
         viewport_build = viewport_build.with_fullscreen(fs).with_decorations(false);
     }
+
     viewport_build = viewport_build.with_icon(load_icon());
 
     let native_options = eframe::NativeOptions {

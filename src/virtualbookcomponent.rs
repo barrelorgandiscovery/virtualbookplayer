@@ -1,6 +1,7 @@
 //! Display component for the book / midi file
 //! using egui rendering
 //!
+use std::collections::BTreeSet;
 use std::{io::Cursor, sync::Arc};
 
 use std::error::Error;
@@ -8,11 +9,76 @@ use std::error::Error;
 use egui::epaint::*;
 use egui::*;
 
-use bookparsing::{read_book_stream, VirtualBook};
+use bookparsing::{read_book_stream, Hole, VirtualBook};
+
+pub struct IndexedVirtualBook {
+    pub virtualbook: Arc<VirtualBook>,
+    pub index_start: BTreeSet<OrdHole>,
+    pub max_time: Option<i64>,
+    pub min_time: Option<i64>,
+}
+
+pub struct OrdHole {
+    hole_ref: Hole,
+}
+
+impl Ord for OrdHole {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.hole_ref.timestamp.cmp(&other.hole_ref.timestamp) {
+            std::cmp::Ordering::Equal => match self.hole_ref.track.cmp(&other.hole_ref.track) {
+                std::cmp::Ordering::Equal => self.hole_ref.length.cmp(&other.hole_ref.length),
+                e => e,
+            },
+            e => e,
+        }
+    }
+}
+
+impl PartialEq for OrdHole {
+    fn eq(&self, other: &Self) -> bool {
+        self.hole_ref.track == other.hole_ref.track
+            && self.hole_ref.timestamp == other.hole_ref.timestamp
+            && self.hole_ref.length == other.hole_ref.length
+    }
+}
+
+impl Eq for OrdHole {}
+
+impl PartialOrd for OrdHole {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.hole_ref.timestamp.cmp(&other.hole_ref.timestamp))
+    }
+}
+
+impl IndexedVirtualBook {
+    pub fn from(vb: &Arc<VirtualBook>) -> Self {
+        Self {
+            virtualbook: Arc::clone(vb),
+            index_start: vb
+                .holes
+                .holes
+                .iter()
+                .cloned()
+                .map(|h| OrdHole { hole_ref: h })
+                .collect(),
+            min_time: vb.min_time(),
+            max_time: vb.max_time(),
+        }
+    }
+
+    pub fn min_time(&self) -> Option<i64> {
+        self.min_time
+    }
+
+    pub fn max_time(&self) -> Option<i64> {
+        self.max_time
+    }
+}
 
 /// Virtualbook component
 pub struct VirtualBookComponent {
-    offset: f32,
+    // offset of display in milliseconds
+    offset_ms: f64,
     xscale: f32,
     yfactor: f32,
     fit_to_height: bool,
@@ -20,13 +86,13 @@ pub struct VirtualBookComponent {
     scrollbars_visible: bool,
     scrollbats_width: f32,
 
-    virtual_book: Option<Arc<VirtualBook>>,
+    virtual_book: Option<Arc<IndexedVirtualBook>>,
 }
 
 impl Default for VirtualBookComponent {
     fn default() -> Self {
         Self {
-            offset: 0.0,
+            offset_ms: 0.0,
             xscale: 3_000f32,
             yfactor: 3.0f32,
             fit_to_height: true,
@@ -36,22 +102,34 @@ impl Default for VirtualBookComponent {
         }
     }
 }
-
+#[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl VirtualBookComponent {
     /// create the component state from the virtual book
-    pub fn from(virtual_book: Arc<VirtualBook>) -> VirtualBookComponent {
+    pub fn from(virtual_book: &Arc<VirtualBook>) -> VirtualBookComponent {
         VirtualBookComponent {
-            virtual_book: Some(virtual_book),
+            virtual_book: Some(Arc::new(IndexedVirtualBook::from(virtual_book))),
             ..Default::default()
         }
     }
 
-    /// create the component state from the virtual book
-    pub fn from_some_virtualbook(
-        some_virtual_book: Option<Arc<VirtualBook>>,
+    pub fn from_some_indexedvirtualbook(
+        indexed: Option<Arc<IndexedVirtualBook>>,
     ) -> VirtualBookComponent {
         VirtualBookComponent {
-            virtual_book: some_virtual_book,
+            virtual_book: indexed,
+            ..Default::default()
+        }
+    }
+    /// create the component state from the virtual book
+    pub fn from_some_virtualbook(
+        some_virtual_book: &Option<Arc<VirtualBook>>,
+    ) -> VirtualBookComponent {
+        let index = some_virtual_book
+            .as_ref()
+            .map(|vb| Arc::new(IndexedVirtualBook::from(vb)));
+
+        VirtualBookComponent {
+            virtual_book: index,
             ..Default::default()
         }
     }
@@ -70,7 +148,9 @@ impl VirtualBookComponent {
         file_string_content: String,
     ) -> Result<(), Box<dyn Error>> {
         let mut c = Cursor::new(file_string_content.as_bytes().to_vec());
-        self.virtual_book = Some(Arc::new(read_book_stream(&mut c)?));
+        self.virtual_book = Some(Arc::new(IndexedVirtualBook::from(&Arc::new(
+            read_book_stream(&mut c)?,
+        ))));
         Ok(())
     }
 
@@ -80,8 +160,8 @@ impl VirtualBookComponent {
     }
 
     /// percentage of the display
-    pub fn offset(mut self, offset: f32) -> Self {
-        self.offset = offset;
+    pub fn offset_ms(mut self, offset: f64) -> Self {
+        self.offset_ms = offset;
         self
     }
 
@@ -97,11 +177,10 @@ impl VirtualBookComponent {
 
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let Self {
-            offset,
+            offset_ms: offset_in_millis,
             xscale,
             yfactor,
             fit_to_height,
-            scrollbars_visible,
             ..
         } = self;
 
@@ -114,26 +193,15 @@ impl VirtualBookComponent {
         let width_container = ui.available_width();
 
         egui::ScrollArea::horizontal()
-            .hscroll(*scrollbars_visible)
+            //.hscroll(*scrollbars_visible)
             .show(ui, |ui| {
-                let mut book_screen_length = ui.available_width();
-
-                if let Some(current_vb) = &self.virtual_book {
-                    if let Some(maxtime) = current_vb.max_time() {
-                        book_screen_length = ((maxtime as f64) / *xscale as f64) as f32;
-                    }
-                }
-
-                let offset_with_bar = *offset * book_screen_length - width_container / 2.0;
-
                 let (response, painter) = ui.allocate_painter(
-                    Vec2::new(book_screen_length, ui.available_height()),
+                    Vec2::new(width_container, ui.available_height()),
                     Sense::hover(),
                 );
 
                 let midx = width_container / 2.0f32;
                 let maxy = response.rect.height();
-                // println!("midx {}, maxy {}", midx,maxy);
 
                 if let Some(current_vb) = &mut self.virtual_book {
                     let to_screen = emath::RectTransform::from_to(
@@ -142,15 +210,14 @@ impl VirtualBookComponent {
                     );
 
                     if *fit_to_height {
-                        *yfactor = response.rect.size().y / current_vb.scale.definition.width;
+                        *yfactor =
+                            response.rect.size().y / current_vb.virtualbook.scale.definition.width;
                     }
-                    // info!("fit to height : {}", *fit_to_height);
-                    // info!("width {}, size, {} and yfactor ! {}", current_vb.scale.definition.width, response.rect.size().y, *yfactor);
-                    //info!("virtual book definition : {:?}", &current_vb.scale.definition);
+
                     // background draw
                     let book_background = Rect::from_points(&[
                         pos2(0.0, 0.0),
-                        to_screen * pos2(book_screen_length, response.rect.size().y),
+                        to_screen * pos2(width_container, response.rect.size().y),
                     ]);
                     painter.add(RectShape::filled(
                         book_background,
@@ -158,44 +225,113 @@ impl VirtualBookComponent {
                         Color32::from_rgb(255, 255, 255),
                     ));
 
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("Filtering Holes");
+                    // range search for speed up the display
+                    let visible: Vec<&OrdHole> = current_vb
+                        .index_start
+                        .range(std::ops::Range {
+                            start: OrdHole {
+                                hole_ref: Hole {
+                                    timestamp: (*offset_in_millis * 1000.0
+                                        - width_container as f64 / 2.0 * *xscale as f64)
+                                        as i64,
+                                    track: 0,
+                                    length: 0,
+                                },
+                            },
+
+                            end: OrdHole {
+                                hole_ref: Hole {
+                                    timestamp: (*offset_in_millis * 1000.0
+                                        + width_container as f64 / 2.0 * *xscale as f64)
+                                        as i64,
+                                    track: 0,
+                                    length: 0,
+                                },
+                            },
+                        })
+                        .collect();
+
+                    let mappingy = |y| {
+                        if current_vb
+                            .virtualbook
+                            .scale
+                            .definition
+                            .ispreferredviewinverted
+                        {
+                            response.rect.size().y - y
+                        } else {
+                            y
+                        }
+                    };
+
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("Display Holes");
                     // notes draw
-                    let rects: Vec<(Rect, Color32)> = current_vb
-                        .holes
-                        .holes
-                        .iter()
+                    let rects: Vec<(Rect, Color32)> = visible
+                        .into_iter()
                         .map(|h| {
                             [
                                 pos2(
-                                    (h.timestamp as f64 / *xscale as f64) as f32,
-                                    (h.track as f32
-                                        * current_vb.scale.definition.intertrackdistance
-                                        + current_vb.scale.definition.firsttrackdistance
-                                        - current_vb.scale.definition.defaulttrackheight / 2.0)
-                                        * *yfactor,
+                                    (((h.hole_ref.timestamp as f64 - *offset_in_millis * 1000.0)
+                                        / *xscale as f64)
+                                        + width_container as f64 / 2.0)
+                                        as f32,
+                                    mappingy(
+                                        (h.hole_ref.track as f32
+                                            * current_vb
+                                                .virtualbook
+                                                .scale
+                                                .definition
+                                                .intertrackdistance
+                                            + current_vb
+                                                .virtualbook
+                                                .scale
+                                                .definition
+                                                .firsttrackdistance
+                                            - current_vb
+                                                .virtualbook
+                                                .scale
+                                                .definition
+                                                .defaulttrackheight
+                                                / 2.0)
+                                            * *yfactor,
+                                    ),
                                 ),
                                 pos2(
-                                    ((h.timestamp + h.length) as f64 / *xscale as f64) as f32,
-                                    (h.track as f32
-                                        * current_vb.scale.definition.intertrackdistance
-                                        + current_vb.scale.definition.firsttrackdistance
-                                        + current_vb.scale.definition.defaulttrackheight / 2.0)
-                                        * *yfactor,
+                                    ((((h.hole_ref.timestamp + h.hole_ref.length) as f64
+                                        - *offset_in_millis * 1000.0)
+                                        / *xscale as f64)
+                                        + width_container as f64 / 2.0)
+                                        as f32,
+                                    mappingy(
+                                        (h.hole_ref.track as f32
+                                            * current_vb
+                                                .virtualbook
+                                                .scale
+                                                .definition
+                                                .intertrackdistance
+                                            + current_vb
+                                                .virtualbook
+                                                .scale
+                                                .definition
+                                                .firsttrackdistance
+                                            + current_vb
+                                                .virtualbook
+                                                .scale
+                                                .definition
+                                                .defaulttrackheight
+                                                / 2.0)
+                                            * *yfactor,
+                                    ),
                                 ),
                             ]
                         })
                         .enumerate()
                         .map(|(i, h)| {
-                            let points_in_screen: Vec<Pos2> = h
-                                .iter()
-                                .map(|p| {
-                                    to_screen
-                                        * (*p
-                                            - Vec2 {
-                                                x: offset_with_bar,
-                                                y: 0.0,
-                                            })
-                                })
-                                .collect();
+                            let points_in_screen: Vec<Pos2> =
+                                h.iter().map(|p| to_screen * (*p)).collect();
 
                             let rect = Rect::from_points(&points_in_screen);
                             let point_response =
@@ -254,6 +390,7 @@ impl VirtualBookComponent {
 
 /// widget implementation
 impl Widget for VirtualBookComponent {
+    #[cfg_attr(any(feature = "profiling"), profiling::function)]
     fn ui(mut self, ui: &mut Ui) -> Response {
         self.ui_content(ui)
     }

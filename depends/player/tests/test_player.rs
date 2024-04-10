@@ -28,18 +28,15 @@ pub fn test_player_informations() {
 
 #[test]
 pub fn test_player() {
-    let f = MidiPlayerFactory { device_no: 0 };
+    let f = MidiPlayerFactory { device_no: 1 };
 
     let (sender, receiver) = channel();
     let (sendercmd, receivercmd) = channel();
 
     thread::spawn(move || {
         let mut p = f.create(sender, receivercmd).unwrap();
-        p.start_play(
-            &PathBuf::from("debussy_63503a_arabesque_2_e_major_(nc)smythe.mid"),
-            None,
-        )
-        .unwrap();
+        p.start_play(&PathBuf::from("autumn_no3_allegro_gp.mid"), None)
+            .unwrap();
     });
 
     loop {
