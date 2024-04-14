@@ -20,6 +20,8 @@ pub struct I18NMessages {
     pub remove_file_from_list: String,
     pub button_remove: String,
     pub go_to_next_file: String,
+    pub hover_click_to_enlarge_view: String,
+    pub hover_activate_the_play_of_the_playlist: String,
 }
 
 fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
@@ -85,6 +87,9 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         button_remove: "Remove".into(),
         go_to_next_file: "Go to next file".into(),
         time_between_file: "Additional Time at the beginning (s):".into(),
+
+        hover_click_to_enlarge_view: "Click to enlarge the view".into(),
+        hover_activate_the_play_of_the_playlist: "Activate the play of the playlist".into(),
     })
 }
 
@@ -111,5 +116,8 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         button_remove: "Enlever".into(),
         remove_file_from_list: "Enlever le fichier de la liste".into(),
         go_to_next_file: "Lire le fichier suivant".into(),
+
+        hover_click_to_enlarge_view: "Clickez pour agrandir".into(),
+        hover_activate_the_play_of_the_playlist: "Activer le jeu de la playlist".into(),
     })
 }

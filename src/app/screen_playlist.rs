@@ -165,16 +165,25 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                         ui.add_enabled_ui(!appplayer.is_playlist_empty() , |ui| {
                                                             ui.label(RichText::new(format!("{} {}", egui_phosphor::regular::FILES ,"PlayList : ")).heading());
 
-                                                            if  crate::app::font_button(ui, '\u{23E9}')
-                                                                .on_hover_text(&app.i18n.go_to_next_file)
+
+                                                            let play_mod = &appplayer.play_mod;
+                                                            if !*play_mod && ui.button(egui_phosphor::regular::PLAY)
+                                                                    .on_hover_text_at_pointer(&app.i18n.go_to_next_file)
+                                                                    .clicked() {
+                                                                        appplayer.play_file_on_top();
+                                                            }
+
+                                                            if   ui.button(egui_phosphor::regular::FAST_FORWARD)
+                                                                .on_hover_text_at_pointer(&app.i18n.go_to_next_file)
                                                                 .clicked() {
                                                                 appplayer.next();
                                                             }
+
                                                         });
                                                         if let Some(path_buf) = &app.file_store_path {
                                                                 ui.separator();
-                                                                if ui.button( egui_phosphor::regular::LIST_PLUS)
-                                                                    .on_hover_text(&app.i18n.save_playlist)
+                                                                if ui.button(egui_phosphor::regular::LIST_PLUS)
+                                                                    .on_hover_text_at_pointer(&app.i18n.save_playlist)
                                                                     .clicked()
                                                                 {
                                                                     let date = Local::now();
@@ -236,7 +245,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                                     ui.horizontal_wrapped(|ui| {
                                                                                                         ui.spacing();
                                                                                                         if ui.button( egui_phosphor::regular::TRASH)
-                                                                                                            .on_hover_text(&app.i18n.remove_file_from_list)
+                                                                                                            .on_hover_text_at_pointer(&app.i18n.remove_file_from_list)
                                                                                                             .clicked() {
                                                                                                                 deleted = Some(index)
                                                                                                         }
@@ -472,41 +481,6 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                 .size(Size::initial(100.0))
                 .size(Size::remainder())
                 .vertical(|mut strip| {
-                    // strip.cell(|ui| {
-                    //     // name of the element
-                    //     ui.vertical_centered(|ui| {
-                    //         if app.appplayer.is_playing() {
-                    //             let cell = &app
-                    //                 .appplayer
-                    //                 .playlist
-                    //                 .lock()
-                    //                 .expect("fail to lock playlist")
-                    //                 .current();
-                    //             match cell {
-                    //                 Some(t) => {
-                    //                     let name = t.name.clone();
-                    //                     let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
-
-                    //                     rt = rt.background_color(
-                    //                         ui.style().visuals.selection.bg_fill,
-                    //                     );
-                    //                     rt =
-                    //                         rt.color(ui.style().visuals.selection.stroke.color);
-
-                    //                     ui.horizontal(|ui| {
-                    //                         ui.label(rt.monospace());
-                    //                         ui.label(format!(
-                    //                             "{:.0}s",
-                    //                             &app.current_duration.as_secs_f32()
-                    //                         ));
-                    //                     });
-                    //                 }
-                    //                 None => {}
-                    //             }
-                    //         }
-                    //     });
-                    // });
-
                     strip.cell(|ui| {
                         // draw book vignette
                         let foffset: f64 = app.pid_regulated_offset_ms;
@@ -519,9 +493,13 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                         .xscale(app.xscale)
                         .hide_scrollbar();
 
-                        if c.ui_content(ui).clicked() {
+                        let response_ui_component = c.ui_content(ui);
+
+                        if response_ui_component.clicked() {
                             app.screen = Screen::Display;
                         }
+                        response_ui_component
+                            .on_hover_text_at_pointer(&app.i18n.hover_click_to_enlarge_view);
                     });
                     strip.cell(|ui| {
                         // render playlist panel
@@ -529,16 +507,4 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                     });
                 });
         });
-
-    // StripBuilder::new(ui)
-    //     .size(Size::relative(0.5))
-    //     .size(Size::relative(0.5))
-    //     .horizontal(|mut strip| {
-    //         strip.cell(|ui| {
-
-    // });
-    // strip.cell(|ui| {
-
-    // });
-    // });
 }

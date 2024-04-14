@@ -1,6 +1,14 @@
 //! PlayerList module, manage a playlist, and takes commands on the play
 //!
-use std::{cell::RefCell, error::Error, fs, hash::Hash, path::PathBuf, rc::Rc, time::SystemTime};
+use std::{
+    cell::RefCell,
+    error::Error,
+    fs,
+    hash::Hash,
+    path::PathBuf,
+    rc::Rc,
+    time::{Duration, SystemTime},
+};
 
 use player::FileInformations;
 
@@ -10,6 +18,7 @@ use crate::file_store::{FileNode, FileViewNode};
 pub struct PlayList {
     pub file_list: Vec<PlaylistElement>,
     pub is_dirty: bool,
+    pub computed_length: Option<Duration>,
 }
 
 /// Element in the play list (with additional informations)
@@ -65,6 +74,7 @@ impl PlayList {
         Self {
             file_list: vec![],
             is_dirty: false,
+            computed_length: None,
         }
     }
 
@@ -147,6 +157,7 @@ pub fn load(filepath: &PathBuf) -> Result<PlayList, Box<dyn Error>> {
     Ok(PlayList {
         file_list,
         is_dirty: true,
+        computed_length: None,
     })
 }
 

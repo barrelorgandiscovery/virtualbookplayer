@@ -79,7 +79,7 @@ impl IndexedVirtualBook {
 pub struct VirtualBookComponent {
     // offset of display in milliseconds
     offset_ms: f64,
-    xscale: f32,
+    xscale: f64,
     yfactor: f32,
     fit_to_height: bool,
 
@@ -92,8 +92,8 @@ pub struct VirtualBookComponent {
 impl Default for VirtualBookComponent {
     fn default() -> Self {
         Self {
-            offset_ms: 0.0,
-            xscale: 3_000f32,
+            offset_ms: 0.0_f64,
+            xscale: 3_000f64,
             yfactor: 3.0f32,
             fit_to_height: true,
             scrollbars_visible: true,
@@ -154,7 +154,7 @@ impl VirtualBookComponent {
         Ok(())
     }
 
-    pub fn xscale(mut self, xscale: f32) -> Self {
+    pub fn xscale(mut self, xscale: f64) -> Self {
         self.xscale = xscale;
         self
     }
@@ -210,8 +210,8 @@ impl VirtualBookComponent {
                     );
 
                     if *fit_to_height {
-                        *yfactor =
-                            response.rect.size().y / current_vb.virtualbook.scale.definition.width;
+                        *yfactor = (response.rect.size().y)
+                            / (current_vb.virtualbook.scale.definition.width);
                     }
 
                     // background draw
@@ -227,14 +227,15 @@ impl VirtualBookComponent {
 
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Filtering Holes");
-                    // range search for speed up the display
+
+                    // range search for speed up the display (use index)
                     let visible: Vec<&OrdHole> = current_vb
                         .index_start
                         .range(std::ops::Range {
                             start: OrdHole {
                                 hole_ref: Hole {
                                     timestamp: (*offset_in_millis * 1000.0
-                                        - width_container as f64 / 2.0 * *xscale as f64)
+                                        - width_container as f64 / 2.0 * *xscale)
                                         as i64,
                                     track: 0,
                                     length: 0,
@@ -244,7 +245,7 @@ impl VirtualBookComponent {
                             end: OrdHole {
                                 hole_ref: Hole {
                                     timestamp: (*offset_in_millis * 1000.0
-                                        + width_container as f64 / 2.0 * *xscale as f64)
+                                        + width_container as f64 / 2.0 * *xscale)
                                         as i64,
                                     track: 0,
                                     length: 0,
@@ -275,7 +276,7 @@ impl VirtualBookComponent {
                             [
                                 pos2(
                                     (((h.hole_ref.timestamp as f64 - *offset_in_millis * 1000.0)
-                                        / *xscale as f64)
+                                        / *xscale)
                                         + width_container as f64 / 2.0)
                                         as f32,
                                     mappingy(
@@ -302,8 +303,8 @@ impl VirtualBookComponent {
                                 pos2(
                                     ((((h.hole_ref.timestamp + h.hole_ref.length) as f64
                                         - *offset_in_millis * 1000.0)
-                                        / *xscale as f64)
-                                        + width_container as f64 / 2.0)
+                                        / *xscale)
+                                        + (width_container as f64 / 2.0))
                                         as f32,
                                     mappingy(
                                         (h.hole_ref.track as f32

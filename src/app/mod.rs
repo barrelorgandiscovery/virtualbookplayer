@@ -3,6 +3,7 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Local};
 use egui::epaint::*;
 use egui::*;
 
@@ -42,7 +43,7 @@ pub struct VirtualBookApp {
     screen_zoom_factor: f32,
     slider_selected_zoom_factor: f32,
 
-    xscale: f32,
+    xscale: f64,
 
     /// offset in the play (in seconds)
     #[serde(skip)]
@@ -92,6 +93,13 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     adjusted_start_time: Instant,
 
+    //date code when the user has the last interaction with the application
+    #[serde(skip)]
+    last_user_application_date: DateTime<Local>,
+
+    // automatic switch for display the whole
+    automatic_switch_to_display_after: Option<u16>,
+
     /// associated language strings
     #[serde(skip)]
     i18n: Box<I18NMessages>,
@@ -125,7 +133,7 @@ impl Default for VirtualBookApp {
             pid_regulated_offset_ms: 0.0,
             pid_controller: Controller::new(0.0, 0.30, 0.010, 0.05),
 
-            xscale: 3_000f32,
+            xscale: 3_000f64,
             screen: Screen::PlayListConstruction,
             screen_zoom_factor: 2.0,
             slider_selected_zoom_factor: 2.0,
@@ -159,6 +167,9 @@ impl Default for VirtualBookApp {
             extensions_filters: Some(vec![".mid".into(), ".book".into(), ".playlist".into()]),
 
             play_wait: 2.0,
+
+            last_user_application_date: chrono::Local::now(),
+            automatic_switch_to_display_after: Some(10),
         }
     }
 }
@@ -207,6 +218,8 @@ impl VirtualBookApp {
         cc.egui_ctx.set_fonts(fonts);
 
         if !reset {
+            // user ask to reset the stored values
+
             // Load previous app state (if any).
             // Note that you must enable the `persistence` feature for this to work.
             if let Some(storage) = cc.storage {
@@ -254,6 +267,11 @@ impl VirtualBookApp {
                 old_storage.i18n = create_i18n_message_with_lang(lang);
 
                 old_storage.screen_zoom_factor = old_storage.slider_selected_zoom_factor;
+
+                // define the wait time on restoration
+                old_storage
+                    .appplayer
+                    .set_waittime_between_file_play(old_storage.play_wait);
 
                 return old_storage;
             }
@@ -313,6 +331,7 @@ impl eframe::App for VirtualBookApp {
             extensions_filters,
             play_wait,
             play_lattency_ms,
+            automatic_switch_to_display_after,
             ..
         } = self;
 
@@ -411,102 +430,160 @@ impl eframe::App for VirtualBookApp {
             egui::menu::bar(ui, |ui| {
                 #[allow(clippy::blocks_in_conditions)]
                 if ui
-                    .menu_button(&i18n.file, |ui| {
-                        if ui
-                            .button(format!(
-                                "{} {}",
-                                egui_phosphor::regular::FOLDER_OPEN,
-                                &i18n.open_folder
-                            ))
-                            .clicked()
-                        {
-                            let mut location: Option<PathBuf> = self.file_store_path.clone();
-                            if let Some(loc) = &location {
-                                // check l,ocation exists
-                                match loc.metadata() {
-                                    Ok(_r) => {
-                                        if !_r.is_dir() {
+                    .menu_button(
+                        format!(
+                            "{} {}",
+                            egui_phosphor::variants::regular::HOUSE_LINE,
+                            &i18n.file
+                        ),
+                        |ui| {
+                            if ui
+                                .button(format!(
+                                    "{} {}",
+                                    egui_phosphor::regular::FOLDER_OPEN,
+                                    &i18n.open_folder
+                                ))
+                                .clicked()
+                            {
+                                let mut location: Option<PathBuf> = self.file_store_path.clone();
+                                if let Some(loc) = &location {
+                                    // check l,ocation exists
+                                    match loc.metadata() {
+                                        Ok(_r) => {
+                                            if !_r.is_dir() {
+                                                location = None;
+                                            }
+                                        }
+                                        Err(_e) => {
                                             location = None;
                                         }
                                     }
-                                    Err(_e) => {
-                                        location = None;
-                                    }
                                 }
-                            }
 
-                            //let repaint_signal = ctx.repaint_signal();
-                            if let Err(_result_open_single_dir) =
-                                file_path_dialog.open_single_dir(location)
-                            {
-                                error!("fail to open dir dialog");
-                            } else {
-                                info!("dialog opened");
-                            }
-
-                            ui.close_menu();
-                        }
-                        ui.separator();
-                        if ui
-                            .button(format!(
-                                "{} {}",
-                                egui_phosphor::regular::RECYCLE,
-                                &i18n.reload_folder
-                            ))
-                            .clicked()
-                        {
-                            if let Some(current_path) = &self.file_store_path {
-                                let new_filestore = FileStore::new(current_path);
-                                if let Ok(new_store) = new_filestore {
-                                    self.file_store = new_store.map(|mut fs| {
-                                        if let Ok(v) = fs.view(&None, &self.extensions_filters) {
-                                            fs.default_view = Some(v);
-                                        }
-                                        fs
-                                    });
-                                }
-                            }
-                            ui.close_menu();
-                        };
-
-                        ui.separator();
-
-                        ui.label("midi out interfaces");
-                        for device in &self.current_devices {
-                            let selected = *selected_device == device.no;
-                            if ui.radio(selected, &device.label).clicked() {
-                                if let Some(_old_player) = &appplayer.player {}
-
-                                println!("Open the device");
-                                *selected_device = device.no;
-
-                                let factory = MidiPlayerFactory {
-                                    device_no: *selected_device,
-                                };
-
-                                let (_scmd, rcmd) = channel();
-                                let (s, player_event_receiver) = channel();
-
-                                match factory.create(s, rcmd) {
-                                    Ok(player) => {
-                                        // change the player
-                                        appplayer.player(Some((player, player_event_receiver)));
-                                    }
-                                    Err(e) => {
-                                        error!("fail to open device {}", e);
-                                    }
+                                //let repaint_signal = ctx.repaint_signal();
+                                if let Err(_result_open_single_dir) =
+                                    file_path_dialog.open_single_dir(location)
+                                {
+                                    error!("fail to open dir dialog");
+                                } else {
+                                    info!("dialog opened");
                                 }
 
                                 ui.close_menu();
                             }
-                        }
+                            ui.separator();
+                            if ui
+                                .button(format!(
+                                    "{} {}",
+                                    egui_phosphor::regular::RECYCLE,
+                                    &i18n.reload_folder
+                                ))
+                                .clicked()
+                            {
+                                if let Some(current_path) = &self.file_store_path {
+                                    let new_filestore = FileStore::new(current_path);
+                                    if let Ok(new_store) = new_filestore {
+                                        self.file_store = new_store.map(|mut fs| {
+                                            if let Ok(v) = fs.view(&None, &self.extensions_filters)
+                                            {
+                                                fs.default_view = Some(v);
+                                            }
+                                            fs
+                                        });
+                                    }
+                                }
+                                ui.close_menu();
+                            };
 
-                        ui.separator();
+                            ui.separator();
+                            // preferences menu
+                            ui.menu_button(
+                                format!(
+                                    "{} {}",
+                                    egui_phosphor::variants::regular::GEAR_SIX,
+                                    &i18n.preferences
+                                ),
+                                |ui| {
+                                    ui.label(&i18n.zoom);
+                                    let result = ui.add(egui::Slider::new(
+                                        slider_selected_zoom_factor,
+                                        1.5..=6.0,
+                                    ));
+                                    if !result.is_pointer_button_down_on() {
+                                        *screen_zoom_factor = *slider_selected_zoom_factor;
+                                    };
 
-                        if ui.button(&i18n.quit).clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
-                    })
+                                    ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
+                                    ui.checkbox(islight, &i18n.dark_light);
+                                    ui.label(&i18n.time_between_file);
+                                    let time_slider = egui::Slider::new(play_wait, 0.0..=30.0);
+                                    if time_slider.ui(ui).changed() {
+                                        appplayer.set_waittime_between_file_play(*play_wait);
+                                    }
+                                    ui.separator();
+                                    let mut hasvalue = automatic_switch_to_display_after.is_some();
+                                    if ui.checkbox(&mut hasvalue, "Automatic Switch").changed() {
+                                        if !hasvalue {
+                                            *automatic_switch_to_display_after = None;
+                                        } else {
+                                            *automatic_switch_to_display_after = Some(10);
+                                        }
+                                    }
+
+                                    if let Some(value) = automatic_switch_to_display_after {
+                                        let automatic_switch_value =
+                                            egui::Slider::new(value, 5..=300);
+                                        ui.add(automatic_switch_value);
+                                    }
+
+                                    ui.separator();
+
+                                    ui.label("Play lattency (ms):");
+                                    let play_lattency_slider =
+                                        egui::Slider::new(play_lattency_ms, 0..=4_000);
+                                    ui.add(play_lattency_slider);
+                                },
+                            );
+
+                            ui.separator();
+
+                            ui.label("midi out interfaces");
+                            for device in &self.current_devices {
+                                let selected = *selected_device == device.no;
+                                if ui.radio(selected, &device.label).clicked() {
+                                    if let Some(_old_player) = &appplayer.player {}
+
+                                    println!("Open the device");
+                                    *selected_device = device.no;
+
+                                    let factory = MidiPlayerFactory {
+                                        device_no: *selected_device,
+                                    };
+
+                                    let (_scmd, rcmd) = channel();
+                                    let (s, player_event_receiver) = channel();
+
+                                    match factory.create(s, rcmd) {
+                                        Ok(player) => {
+                                            // change the player
+                                            appplayer.player(Some((player, player_event_receiver)));
+                                        }
+                                        Err(e) => {
+                                            error!("fail to open device {}", e);
+                                        }
+                                    }
+
+                                    ui.close_menu();
+                                }
+                            }
+
+                            ui.separator();
+
+                            if ui.button(&i18n.quit).clicked() {
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                        },
+                    )
                     .response
                     .clicked()
                 {
@@ -515,45 +592,21 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
-                // preferences menu
-                ui.menu_button(
-                    format!(
-                        "{} {}",
-                        egui_phosphor::variants::regular::GEAR_SIX,
-                        &i18n.preferences
-                    ),
-                    |ui| {
-                        ui.label(&i18n.zoom);
-                        let result =
-                            ui.add(egui::Slider::new(slider_selected_zoom_factor, 1.5..=6.0));
-                        if !result.is_pointer_button_down_on() {
-                            *screen_zoom_factor = *slider_selected_zoom_factor;
-                        };
-
-                        ui.checkbox(hidden_number_pad, &i18n.hide_num_pad);
-                        ui.checkbox(islight, &i18n.dark_light);
-                        ui.label(&i18n.time_between_file);
-                        let time_slider = egui::Slider::new(play_wait, 0.0..=30.0);
-                        if time_slider.ui(ui).changed() {
-                            appplayer.set_waittime_between_file_play(*play_wait);
-                        }
-
-                        ui.separator();
-
-                        ui.label("Play lattency (ms):");
-                        let play_lattency_slider = egui::Slider::new(play_lattency_ms, 0..=4_000);
-                        ui.add(play_lattency_slider);
-                    },
-                );
-
                 let play_mod = &mut appplayer.play_mod;
+                let play_mod_value = *play_mod;
 
                 let indicator_play_button = IndicatorButton::new(play_mod)
-                    .label("On Air")
+                    .label(if !play_mod_value {
+                        egui_phosphor::regular::PLAY
+                    } else {
+                        egui_phosphor::regular::STOP
+                    })
                     .width(32.0)
                     .height(24.0);
 
-                if ui.add(indicator_play_button).changed() {
+                let indicator_play_response = ui.add(indicator_play_button);
+
+                if indicator_play_response.changed() {
                     if *play_mod {
                         appplayer.play_file_on_top();
                     } else {
@@ -561,28 +614,35 @@ impl eframe::App for VirtualBookApp {
                     }
                 }
 
+                indicator_play_response
+                    .on_hover_text_at_pointer(&i18n.hover_activate_the_play_of_the_playlist);
+
                 // playing title
 
                 if appplayer.is_playing() {
-                    let cell = &appplayer
-                        .playlist
-                        .lock()
-                        .expect("fail to lock playlist")
-                        .current();
-                    match cell {
-                        Some(t) => {
-                            let name = t.name.clone();
-                            let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+                    let current_playlist =
+                        &appplayer.playlist.lock().expect("fail to lock playlist");
+                    let cell = current_playlist.current();
+                    if let Some(t) = cell {
+                        let name = t.name.clone();
+                        let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
 
-                            rt = rt.background_color(ui.style().visuals.selection.bg_fill);
-                            rt = rt.color(ui.style().visuals.selection.stroke.color);
+                        rt = rt.background_color(ui.style().visuals.selection.bg_fill);
+                        rt = rt.color(ui.style().visuals.selection.stroke.color);
 
-                            ui.horizontal(|ui| {
-                                ui.label(rt.monospace());
-                                ui.label(duration_to_mm_ss(current_duration));
-                            });
-                        }
-                        None => {}
+                        ui.horizontal(|ui| {
+                            let mut total_duration = String::from("-");
+                            if let Some(duration) = current_playlist.computed_length {
+                                total_duration = duration_to_mm_ss(&duration);
+                            }
+                            ui.label(format!(
+                                "{} / {}",
+                                duration_to_mm_ss(current_duration),
+                                total_duration
+                            ));
+
+                            ui.label(rt.monospace());
+                        });
                     }
                 }
             });
@@ -602,6 +662,10 @@ impl eframe::App for VirtualBookApp {
                 let extensions_filter = &self1.extensions_filters;
                 let file_store1 = &mut self1.file_store;
                 let current_typed_no1 = &mut self1.current_typed_no;
+                let last_user_interaction = &mut self1.last_user_application_date;
+                let screen = &mut self1.screen;
+                let automatic_switch_to_display_after =
+                    &mut self1.automatic_switch_to_display_after;
                 {
                     let appplayer = &mut self1.appplayer;
 
@@ -620,6 +684,20 @@ impl eframe::App for VirtualBookApp {
                     ];
 
                     ui.input(|i| {
+                        if i.pointer.is_moving() {
+                            *last_user_interaction = chrono::Local::now();
+                        }
+
+                        let difference_non_interaction = Local::now() - *last_user_interaction;
+
+                        if *screen != Screen::Display && appplayer.is_playing() {
+                            if let Some(timeout) = automatic_switch_to_display_after {
+                                if difference_non_interaction.num_seconds() > *timeout as i64 {
+                                    *screen = Screen::Display;
+                                }
+                            }
+                        }
+
                         // top level key handling
 
                         let mut consumed = false;
@@ -728,7 +806,11 @@ impl eframe::App for VirtualBookApp {
                                 .horizontal(|mut strip| {
                                     strip.cell(|ui| {
                                         ui.centered_and_justified(|ui| {
-                                            if ui.button("<").clicked() {
+                                            if ui
+                                                .button(egui_phosphor::regular::PLAYLIST)
+                                                .on_hover_text_at_pointer("back to playlist")
+                                                .clicked()
+                                            {
                                                 self1.screen = Screen::PlayListConstruction
                                             }
                                         });
@@ -756,10 +838,4 @@ impl eframe::App for VirtualBookApp {
         }
         ctx.request_repaint();
     }
-}
-
-pub fn font_button(ui: &mut egui::Ui, icon_character: char) -> egui::Response {
-    ui.button(
-        RichText::new(icon_character).font(FontId::new(26.0, FontFamily::Name("icon_font".into()))),
-    )
 }

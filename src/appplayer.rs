@@ -218,6 +218,18 @@ impl AppPlayer {
                                 }
                             }
                         }
+
+                        let mut total_duration: Duration = Duration::ZERO;
+                        // update the global time of the playlist
+                        for p in &playlist.file_list {
+                            if let Some(additional) = &p.additional_informations {
+                                if let Some(length) = &additional.duration {
+                                    total_duration += *length;
+                                }
+                            }
+                        }
+
+                        playlist.computed_length = Some(total_duration);
                     } else {
                         error!("error in getting the playerlist lock");
                         continue;
@@ -305,6 +317,8 @@ impl AppPlayer {
                     self.start_play_time = Instant::now(); // before play
                     if let Err(e) = p.start_play(&n.path, Some(self.waittime_between_file_play)) {
                         error!("error in playing file : {}", e);
+                    } else {
+                        self.play_mod = true;
                     }
                 }
             }

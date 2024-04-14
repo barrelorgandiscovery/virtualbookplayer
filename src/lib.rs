@@ -15,5 +15,11 @@ pub use app::VirtualBookApp;
 pub fn duration_to_mm_ss(duration: &Duration) -> String {
     let seconds = duration.as_secs() % 60;
     let minutes = (duration.as_secs() / 60) % 60;
-    format!("{:0>2}:{:0>2}", minutes, seconds)
+
+    let hours = duration.as_secs() / 3600;
+    let mut prefix = String::from("");
+    if hours > 0 {
+        prefix = format!("{}:", hours);
+    }
+    format!("{}{:0>2}:{:0>2}", prefix, minutes, seconds)
 }
