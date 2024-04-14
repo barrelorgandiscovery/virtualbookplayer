@@ -2,6 +2,9 @@
 
 A cross-platform MIDI and virtual book jukebox player. It only includes the necessary functionalities to play MIDIfied instruments, such as Yamaha pianos and barrel/fair/dance organs. This program transforms a standard x64 touch PC tablet into a playback screen device.
 
+This software is a simplier "Vanbasco player" alternative.
+
+
 ![](doc/tablet.png)
 
 ## Features:
@@ -15,7 +18,7 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 - Remove a file from the playlist by clicking on it.
 - Skip the current playing file for exploration.
 - Send panic or note-off messages to all channels when starting/stopping playback.
-- Adjust zoom factor for touch and reading from a distance.
+- Adjust zoom factor for touch and reading from far await.
 - Work on linux, windows (macos untested)
 
 ## Download and install
