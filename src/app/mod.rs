@@ -522,7 +522,7 @@ impl eframe::App for VirtualBookApp {
                                     }
                                     ui.separator();
                                     let mut hasvalue = automatic_switch_to_display_after.is_some();
-                                    if ui.checkbox(&mut hasvalue, "Automatic Switch").changed() {
+                                    if ui.checkbox(&mut hasvalue, &i18n.switch_auto).changed() {
                                         if !hasvalue {
                                             *automatic_switch_to_display_after = None;
                                         } else {
@@ -538,7 +538,7 @@ impl eframe::App for VirtualBookApp {
 
                                     ui.separator();
 
-                                    ui.label("Play lattency (ms):");
+                                    ui.label(&i18n.lattence_jeu);
                                     let play_lattency_slider =
                                         egui::Slider::new(play_lattency_ms, 0..=4_000);
                                     ui.add(play_lattency_slider);
@@ -808,7 +808,9 @@ impl eframe::App for VirtualBookApp {
                                         ui.centered_and_justified(|ui| {
                                             if ui
                                                 .button(egui_phosphor::regular::PLAYLIST)
-                                                .on_hover_text_at_pointer("back to playlist")
+                                                .on_hover_text_at_pointer(
+                                                    &self1.i18n.hover_retour_a_la_playlist,
+                                                )
                                                 .clicked()
                                             {
                                                 self1.screen = Screen::PlayListConstruction
