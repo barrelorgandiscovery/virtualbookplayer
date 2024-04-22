@@ -261,7 +261,6 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                                         }
 
                                                                                                         ui.label(&display_compute_name).on_hover_text_at_pointer(&item.name);
-                                                                                                        
 
                                                                                                         if let Some(additional_informations) = &item.additional_informations {
                                                                                                                     if let Some(duration) = additional_informations.duration {
