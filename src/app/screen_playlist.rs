@@ -252,7 +252,17 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                                         ui.add(
                                                                                                             Label::new(format!("{}:", index + 1))
                                                                                                         );
-                                                                                                        ui.label(&item.name);
+
+                                                                                                        // compute size to strip the label
+                                                                                                        let mut display_compute_name = item.name.clone();
+                                                                                                        let mean_displayed_letter = (item_size.x / 10.0) as usize;
+                                                                                                        if display_compute_name.len() > mean_displayed_letter {
+                                                                                                            display_compute_name = String::from(display_compute_name.char_range(0..mean_displayed_letter)) + "...";
+                                                                                                        }
+
+                                                                                                        ui.label(&display_compute_name).on_hover_text_at_pointer(&item.name);
+                                                                                                        
+
                                                                                                         if let Some(additional_informations) = &item.additional_informations {
                                                                                                                     if let Some(duration) = additional_informations.duration {
                                                                                                                         ui.label(duration_to_mm_ss(&duration));
