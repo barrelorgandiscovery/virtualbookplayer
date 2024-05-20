@@ -31,7 +31,6 @@
 
 use clap::Parser;
 use egui::{IconData, ViewportBuilder};
-use egui_phosphor::regular::WIND;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -101,8 +100,7 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-    const VERSION_STRING: &'static str =
-    concat!("VirtualBookPlayer - v", env!("CARGO_PKG_VERSION"));
+    const VERSION_STRING: &str = concat!("VirtualBookPlayer - v", env!("CARGO_PKG_VERSION"));
 
     eframe::run_native(
         VERSION_STRING,

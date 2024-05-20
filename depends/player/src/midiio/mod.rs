@@ -519,7 +519,7 @@ impl Player for MidiPlayer {
                                 }
                             }
                         }
-                    
+
                         let mut iter_moment = midi_sheet.iter();
 
                         loop {
@@ -607,7 +607,7 @@ impl Player for MidiPlayer {
                             } else {
                                 info!("end of moments");
                                 break;
-                            }                           
+                            }
                         }
 
                         if let Ok(mut m) = isplaying_info.lock() {

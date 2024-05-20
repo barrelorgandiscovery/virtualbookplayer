@@ -350,7 +350,7 @@ impl VirtualBookComponent {
                             }
 
                             if rect.x_range().intersects(bar.x_range()) {
-                                color = Color32::from_rgb(255,0,0);
+                                color = Color32::from_rgb(255, 0, 0);
                             }
 
                             (rect, color)

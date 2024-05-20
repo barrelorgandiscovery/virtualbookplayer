@@ -63,6 +63,8 @@ enum AppPlayerBackgroundThreadCommands {
     PlayerChanged(Arc<Mutex<Box<dyn Player>>>),
 }
 
+type PlayerTriplet = (Box<dyn Player>, Receiver<Response>, Sender<Command>);
+
 /// manage asynchrone actions (play, informations retrieve)
 impl AppPlayer {
     #[allow(clippy::new_without_default)]
@@ -246,10 +248,7 @@ impl AppPlayer {
     }
 
     /// define the current player, with associated receiver for the player response
-    pub fn player(
-        &mut self,
-        player: Option<(Box<dyn Player>, Receiver<Response>, Sender<Command>)>,
-    ) {
+    pub fn player(&mut self, player: Option<PlayerTriplet>) {
         if let Some(old_player_mutex) = &self.player {
             let mut old_player = old_player_mutex.lock().unwrap();
             old_player.stop();
