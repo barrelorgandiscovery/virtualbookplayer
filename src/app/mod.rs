@@ -237,7 +237,7 @@ impl VirtualBookApp {
 
                 match factory.create(s, rcmd) {
                     Ok(player) => {
-                        old_storage.appplayer.player(Some((player, r)));
+                        old_storage.appplayer.player(Some((player, r, _scmd)));
                     }
                     Err(e) => {
                         error!("fail to open device {}", e);
@@ -566,7 +566,11 @@ impl eframe::App for VirtualBookApp {
                                     match factory.create(s, rcmd) {
                                         Ok(player) => {
                                             // change the player
-                                            appplayer.player(Some((player, player_event_receiver)));
+                                            appplayer.player(Some((
+                                                player,
+                                                player_event_receiver,
+                                                _scmd,
+                                            )));
                                         }
                                         Err(e) => {
                                             error!("fail to open device {}", e);
@@ -617,6 +621,10 @@ impl eframe::App for VirtualBookApp {
                 indicator_play_response
                     .on_hover_text_at_pointer(&i18n.hover_activate_the_play_of_the_playlist);
 
+                if ui.add(Button::new("pause")).clicked() {
+                    appplayer.pause();
+                }
+
                 // playing title
 
                 if appplayer.is_playing() {
@@ -626,7 +634,7 @@ impl eframe::App for VirtualBookApp {
                     if let Some(t) = cell {
                         let name = t.name.clone();
                         let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
-
+                        rt = rt.font(FontId::proportional(12.0));
                         rt = rt.background_color(ui.style().visuals.selection.bg_fill);
                         rt = rt.color(ui.style().visuals.selection.stroke.color);
 
@@ -635,9 +643,26 @@ impl eframe::App for VirtualBookApp {
                             if let Some(duration) = current_playlist.computed_length {
                                 total_duration = duration_to_mm_ss(&duration);
                             }
+
+                            let mut current_file_remaining_duration = String::from("");
+                            if let Some(current_play) = current_playlist.current() {
+                                if let Some(additional_info) = current_play.additional_informations
+                                {
+                                    if let Some(dur) = additional_info.duration {
+                                        if dur > *current_duration {
+                                            let remaining_current = dur - *current_duration;
+
+                                            current_file_remaining_duration =
+                                                duration_to_mm_ss(&remaining_current);
+                                        }
+                                    }
+                                }
+                            }
+
                             ui.label(format!(
                                 "{} / {}",
-                                duration_to_mm_ss(current_duration),
+                                // duration_to_mm_ss(current_duration),
+                                current_file_remaining_duration,
                                 total_duration
                             ));
 
@@ -747,6 +772,9 @@ impl eframe::App for VirtualBookApp {
                                             appplayer,
                                             extensions_filter,
                                         );
+
+                                        *last_user_interaction = chrono::Local::now();
+                                        *screen = Screen::PlayListConstruction;
                                     }
                                 }
                             }

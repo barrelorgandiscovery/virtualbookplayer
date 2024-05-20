@@ -234,8 +234,8 @@ impl VirtualBookComponent {
                         .range(std::ops::Range {
                             start: OrdHole {
                                 hole_ref: Hole {
-                                    timestamp: (*offset_in_millis * 1000.0
-                                        - width_container as f64 / 2.0 * *xscale)
+                                    timestamp: (*offset_in_millis * 1000.0_f64
+                                        - (2.0 * width_container) as f64 / 2.0_f64 * *xscale)
                                         as i64,
                                     track: 0,
                                     length: 0,
@@ -244,8 +244,8 @@ impl VirtualBookComponent {
 
                             end: OrdHole {
                                 hole_ref: Hole {
-                                    timestamp: (*offset_in_millis * 1000.0
-                                        + width_container as f64 / 2.0 * *xscale)
+                                    timestamp: (*offset_in_millis * 1000.0_f64
+                                        + width_container as f64 / 2.0_f64 * *xscale)
                                         as i64,
                                     track: 0,
                                     length: 0,
@@ -266,6 +266,12 @@ impl VirtualBookComponent {
                             y
                         }
                     };
+
+                    // blue bar
+                    let bar = Rect::from_points(&[
+                        to_screen * pos2(midx - 1.0, 0.0),
+                        to_screen * pos2(midx + 1.0, maxy + 10.0),
+                    ]);
 
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Display Holes");
@@ -340,7 +346,11 @@ impl VirtualBookComponent {
 
                             let mut color = Color32::from_rgb(100, 100, 100);
                             if point_response.hovered() {
-                                color = Color32::from_rgb(50, 50, 50);
+                                color = Color32::from_rgb(50, 0, 0);
+                            }
+
+                            if rect.x_range().intersects(bar.x_range()) {
+                                color = Color32::from_rgb(255,0,0);
                             }
 
                             (rect, color)
@@ -351,11 +361,7 @@ impl VirtualBookComponent {
                     for (r, c) in rects.iter() {
                         painter.add(RectShape::filled(*r, Rounding::default(), *c));
                     }
-                    // blue bar
-                    let bar = Rect::from_points(&[
-                        to_screen * pos2(midx - 1.0, 0.0),
-                        to_screen * pos2(midx + 1.0, maxy + 10.0),
-                    ]);
+
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
                 } else {
                     // no virtualbook

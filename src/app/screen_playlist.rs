@@ -1,6 +1,6 @@
 use log::{debug, error};
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use chrono::Local;
 
@@ -13,7 +13,7 @@ use crate::{
     VirtualBookApp,
 };
 use egui::{epaint::Shadow, *};
-use egui_dnd::dnd;
+use egui_dnd::{dnd, DragDropConfig};
 use egui_extras::{Size, StripBuilder};
 
 use super::Screen;
@@ -236,6 +236,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                     // see https://github.com/lucasmerlin/hello_egui/blob/main/fancy-example/src/main.rs
                                                                     // for dnd examples
                                                                     let response = dnd(ui, "playlist_dnd")
+                                                                    .with_mouse_config( DragDropConfig::touch_scroll() )
                                                                         .show_custom(|ui, iter| {
                                                                             working_list.iter_mut().enumerate().for_each(|(index, item)| {
                                                                                      iter.next(ui, Id::new(&item), index, true, |ui, item_handle| {

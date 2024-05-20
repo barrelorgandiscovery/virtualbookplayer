@@ -246,7 +246,10 @@ impl AppPlayer {
     }
 
     /// define the current player, with associated receiver for the player response
-    pub fn player(&mut self, player: Option<(Box<dyn Player>, Receiver<Response>)>) {
+    pub fn player(
+        &mut self,
+        player: Option<(Box<dyn Player>, Receiver<Response>, Sender<Command>)>,
+    ) {
         if let Some(old_player_mutex) = &self.player {
             let mut old_player = old_player_mutex.lock().unwrap();
             old_player.stop();
@@ -255,7 +258,7 @@ impl AppPlayer {
 
         self.play_mod = false; // reset the automatic play when the player changed
 
-        self.player = match player {
+        if let Some((private_player, private_command_sender)) = match player {
             None => None,
             Some(p) => {
                 let player_reference = Arc::new(Mutex::new(p.0));
@@ -302,9 +305,14 @@ impl AppPlayer {
                     debug!("fail to send the player to background thread :{}", e);
                 }
 
-                Some(player_reference)
+                Some((player_reference, p.2))
             }
-        };
+        } {
+            self.player = Some(private_player);
+            self.commands = private_command_sender;
+        } else {
+            self.player = None;
+        }
     }
 
     pub fn play_file_on_top(&mut self) {
@@ -373,6 +381,13 @@ impl AppPlayer {
             p.is_playing()
         } else {
             false
+        }
+    }
+
+    pub fn pause(&self) {
+        // send pause
+        if let Err(error) = self.commands.send(Command::Pause) {
+            debug!("error in sending command :{}", error);
         }
     }
 }

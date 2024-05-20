@@ -100,6 +100,9 @@ pub trait Player: Send {
     /// Stop the current play
     fn stop(&mut self);
 
+    // is in pause ?
+    fn is_paused(&self) -> bool;
+
     /// inform if the player is in state "playing"
     fn is_playing(&self) -> bool;
 
@@ -140,6 +143,7 @@ pub enum Command {
     Reset,
     Solo,
     Info,
+    Pause,
     /// Changes the speed by the value given.
     Speed(f32),
 }

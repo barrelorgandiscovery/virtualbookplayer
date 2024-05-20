@@ -52,7 +52,7 @@ impl PlayerFactory for MidiPlayerFactory {
     fn create(
         &self,
         sender: Sender<Response>,
-        _receiver: Receiver<Command>,
+        receiver: Receiver<Command>,
     ) -> Result<Box<dyn Player>, Box<dyn Error>> {
         println!("List connections");
 
@@ -68,6 +68,8 @@ impl PlayerFactory for MidiPlayerFactory {
             midi_output_connection: Arc::new(Mutex::new(midi_out)),
             output: Arc::new(Mutex::new(sender)),
             cancel: cancels.0,
+            commands: Arc::new(Mutex::new(receiver)),
+            ispaused: Arc::new(Mutex::new(false)),
             isplaying: Arc::new(Mutex::new(false)),
             notes: Arc::new(Mutex::new(Arc::new(NotesInformations::default()))),
         }))
@@ -168,10 +170,16 @@ pub struct MidiPlayer {
     midi_output_connection: Arc<Mutex<MidiOutputConnection>>,
 
     /// channel to send message to outbox application
+    /// send informations / response to owner
     output: Arc<Mutex<Sender<Response>>>,
 
     /// cancel channel
     cancel: Sender<bool>,
+
+    // commands
+    commands: Arc<Mutex<Receiver<Command>>>,
+
+    ispaused: Arc<Mutex<bool>>,
 
     /// is playing, is the engine is playing a file, this return true
     isplaying: Arc<Mutex<bool>>,
@@ -372,10 +380,6 @@ fn read_all_kind_of_files(
 /// Player trait implementation
 #[profiling::all_functions]
 impl Player for MidiPlayer {
-    fn associated_notes(&self) -> Arc<NotesInformations> {
-        Arc::clone(&self.notes.lock().unwrap())
-    }
-
     fn start_play(
         &mut self,
         filename: &PathBuf,
@@ -410,6 +414,11 @@ impl Player for MidiPlayer {
         let start_wait_closure = start_wait;
 
         let notes_access = Arc::clone(&self.notes);
+
+        let commands = Arc::clone(&self.commands);
+
+        let ispaused = Arc::new(Mutex::new(false));
+        self.ispaused = ispaused.clone();
 
         // thread spawned interpret the Midi event and send them on the line
         thread::spawn(move || {
@@ -463,7 +472,7 @@ impl Player for MidiPlayer {
                             Duration::ZERO
                         };
 
-                        // send message
+                        // send message FilePlayStarted
                         if let Ok(output_locked) = output_reference.lock() {
                             let filename = filename_closure.clone();
                             if let Err(err_send_file_started) =
@@ -479,6 +488,7 @@ impl Player for MidiPlayer {
                             }
                         }
 
+                        // start waiting, before the play
                         let start_wait_time = Instant::now();
                         if let Some(wait) = start_wait {
                             let mut remain = wait;
@@ -509,9 +519,13 @@ impl Player for MidiPlayer {
                                 }
                             }
                         }
+                    
+                        let mut iter_moment = midi_sheet.iter();
 
-                        for moment in midi_sheet {
+                        loop {
+                            // for moment in midi_sheet {
                             if receiver.try_recv().is_ok() {
+                                // cancel received
                                 // stopped
                                 all_notes_off(&mut con);
                                 if let Ok(mut m) = isplaying_info.lock() {
@@ -523,38 +537,77 @@ impl Player for MidiPlayer {
                                 return;
                             }
 
-                            if !moment.is_empty() {
-                                if let Ok(mut m) = isplaying_info.lock() {
-                                    *m = true;
-                                }
-                                timer.sleep(ticks_counter);
-                                let d = timer.sleep_duration(ticks_counter);
-                                total_duration += d;
-
-                                ticks_counter = 0;
-                                #[cfg(feature = "profiling")]
-                                profiling::scope!("play moment events");
-                                for event in &moment.events {
-                                    match event {
-                                        Event::Tempo(val) => timer.change_tempo(*val),
-
-                                        Event::Midi(msg) => {
-                                            buf.clear();
-                                            let _ = msg.write(&mut buf);
-                                            let _ = con.send(&buf);
+                            if let Ok(receiver) = commands.lock() {
+                                if let Ok(command) = receiver.try_recv() {
+                                    match command {
+                                        Command::Pause => {
+                                            if let Ok(mut p) = ispaused.lock() {
+                                                let readvalue: bool = *p;
+                                                *p = !readvalue;
+                                            }
                                         }
-                                        _ => (),
-                                    };
-                                }
 
-                                if let Ok(output_locked) = output_reference.lock() {
-                                    output_locked
-                                        .send(Response::CurrentPlayTime(total_duration + wait_time))
-                                        .unwrap();
+                                        e => {
+                                            debug!("command not yet supported");
+                                        }
+                                    }
                                 }
                             }
 
-                            ticks_counter += 1;
+                            if let Ok(p) = ispaused.lock() {
+                                if *p {
+                                    thread::sleep(Duration::from_millis(100));
+                                    if let Ok(output_locked) = output_reference.lock() {
+                                        output_locked
+                                            .send(Response::CurrentPlayTime(
+                                                total_duration + wait_time,
+                                            ))
+                                            .unwrap();
+                                    }
+                                    continue;
+                                }
+                            }
+
+                            let current = iter_moment.next();
+                            if let Some(moment) = current {
+                                if !moment.is_empty() {
+                                    if let Ok(mut m) = isplaying_info.lock() {
+                                        *m = true;
+                                    }
+                                    timer.sleep(ticks_counter);
+                                    let d = timer.sleep_duration(ticks_counter);
+                                    total_duration += d;
+
+                                    ticks_counter = 0;
+                                    #[cfg(feature = "profiling")]
+                                    profiling::scope!("play moment events");
+                                    for event in &moment.events {
+                                        match event {
+                                            Event::Tempo(val) => timer.change_tempo(*val),
+
+                                            Event::Midi(msg) => {
+                                                buf.clear();
+                                                let _ = msg.write(&mut buf);
+                                                let _ = con.send(&buf);
+                                            }
+                                            _ => (),
+                                        };
+                                    }
+
+                                    if let Ok(output_locked) = output_reference.lock() {
+                                        output_locked
+                                            .send(Response::CurrentPlayTime(
+                                                total_duration + wait_time,
+                                            ))
+                                            .unwrap();
+                                    }
+                                }
+
+                                ticks_counter += 1;
+                            } else {
+                                info!("end of moments");
+                                break;
+                            }                           
                         }
 
                         if let Ok(mut m) = isplaying_info.lock() {
@@ -576,6 +629,15 @@ impl Player for MidiPlayer {
         Ok(())
     }
 
+    // is in pause ?
+    fn is_paused(&self) -> bool {
+        if let Ok(paused) = self.ispaused.lock() {
+            *paused
+        } else {
+            false
+        }
+    }
+
     fn stop(&mut self) {
         if let Err(e) = self.cancel.send(true) {
             error!("fail to send cancel order : {}", e);
@@ -594,6 +656,10 @@ impl Player for MidiPlayer {
         todo!()
     }
 
+    fn associated_notes(&self) -> Arc<NotesInformations> {
+        Arc::clone(&self.notes.lock().unwrap())
+    }
+
     fn create_information_getter(
         &self,
     ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>> {
@@ -605,7 +671,11 @@ impl Player for MidiPlayer {
 /// midi player object/structure
 impl MidiPlayer {
     /// create a new midi player structure, given the midi output and command/information send channel
-    pub fn new(con: MidiOutputConnection, output: Sender<Response>) -> Self {
+    pub fn new(
+        con: MidiOutputConnection,
+        output: Sender<Response>,
+        command: Receiver<Command>,
+    ) -> Self {
         let con = Arc::new(Mutex::new(con));
 
         let c = channel();
@@ -613,8 +683,10 @@ impl MidiPlayer {
         Self {
             output: Arc::new(Mutex::new(output)),
             cancel: c.0,
+            commands: Arc::new(Mutex::new(command)),
             midi_output_connection: con,
             isplaying: Arc::new(Mutex::new(false)),
+            ispaused: Arc::new(Mutex::new(false)),
             notes: Arc::new(Mutex::new(Arc::new(NotesInformations::default()))),
         }
     }
