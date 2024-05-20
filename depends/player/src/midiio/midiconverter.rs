@@ -239,8 +239,7 @@ pub fn convert<'a>(
             length: h.length,
             track: h.track,
         })
-        .map(|h| conversion.convert(&h))
-        .flatten();
+        .flat_map(|h| conversion.convert(&h));
 
     let mut sorted_result: Box<Vec<HoleEvent>> = Box::new(all_events.collect());
     sorted_result.sort_by_key(|e| e.timestamp);

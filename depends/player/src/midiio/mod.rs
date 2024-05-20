@@ -7,7 +7,7 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex, MutexGuard,
     },
-    thread::{self, sleep},
+    thread::{self},
     time::{Duration, Instant},
 };
 
@@ -489,7 +489,7 @@ impl Player for MidiPlayer {
                         }
 
                         // start waiting, before the play
-                        let start_wait_time = Instant::now();
+                        let _start_wait_time = Instant::now();
                         if let Some(wait) = start_wait {
                             let mut remain = wait;
                             const INCREMENT: f32 = 0.2;
@@ -547,7 +547,7 @@ impl Player for MidiPlayer {
                                             }
                                         }
 
-                                        e => {
+                                        _e => {
                                             debug!("command not yet supported");
                                         }
                                     }
