@@ -214,7 +214,8 @@ impl AppPlayer {
                                 // update
                                 for e in &computed {
                                     if e.added_at == p.added_at {
-                                        p.additional_informations.clone_from(&e.additional_informations);
+                                        p.additional_informations
+                                            .clone_from(&e.additional_informations);
                                     }
                                 }
                             }
