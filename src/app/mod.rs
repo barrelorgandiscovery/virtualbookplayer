@@ -349,7 +349,7 @@ impl eframe::App for VirtualBookApp {
                 *current_duration = delta;
                 self.offset_ms = delta.as_millis() as f64;
                 self.pid_controller.set_target(
-                    self.offset_ms + Duration::from_millis(*play_lattency_ms).as_millis() as f64,
+                    self.offset_ms - Duration::from_millis(*play_lattency_ms).as_millis() as f64,
                 );
             }
         }
