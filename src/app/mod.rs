@@ -263,7 +263,7 @@ impl VirtualBookApp {
                         }
                     }
                 }
-                old_storage.lang = lang.clone();
+                old_storage.lang.clone_from(&lang);
                 old_storage.i18n = create_i18n_message_with_lang(lang);
 
                 old_storage.screen_zoom_factor = old_storage.slider_selected_zoom_factor;
@@ -389,7 +389,7 @@ impl eframe::App for VirtualBookApp {
 
         // Open folder Dialog response
         if let Some(Ok(result)) = file_path_dialog.check() {
-            *file_store_path = result.clone();
+            file_store_path.clone_from(&result);
             if let Some(r) = result {
                 match FileStore::new(&r) {
                     Ok(fs) => {
