@@ -244,9 +244,10 @@ pub fn convert<'a>(
     let mut sorted_result: Box<Vec<HoleEvent>> = Box::new(all_events.collect());
     sorted_result.sort_by_key(|e| e.timestamp);
 
+    const TICKS_PER_BEAT: u16 = 10_000;
     let mut smf = Smf::new(Header {
         format: nodi::midly::Format::SingleTrack {},
-        timing: nodi::midly::Timing::Metrical(5000.into()),
+        timing: nodi::midly::Timing::Metrical(TICKS_PER_BEAT.into()),
     });
 
     let midi_events = sorted_result
@@ -255,8 +256,9 @@ pub fn convert<'a>(
             let mut v = t.1;
 
             let delta_in_microseconds: i64 = e.timestamp - t.0;
+            assert!(delta_in_microseconds >= 0);
             let delta_in_ticks: u32 =
-                ((delta_in_microseconds * 5000) / 1_000_000 * 120 / 60) as u32;
+                (  (delta_in_microseconds as f64 * TICKS_PER_BEAT as f64) / 1_000_000.0 * 120.0 / 60.0   ) as u32;
             v.push(TrackEvent {
                 delta: delta_in_ticks.into(),
                 kind: nodi::midly::TrackEventKind::Midi {
