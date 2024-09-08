@@ -258,7 +258,8 @@ pub fn convert<'a>(
             let delta_in_microseconds: i64 = e.timestamp - t.0;
             assert!(delta_in_microseconds >= 0);
             let delta_in_ticks: u32 =
-                (  (delta_in_microseconds as f64 * TICKS_PER_BEAT as f64) / 1_000_000.0 * 120.0 / 60.0   ) as u32;
+                ((delta_in_microseconds as f64 * TICKS_PER_BEAT as f64) / 1_000_000.0 * 120.0
+                    / 60.0) as u32;
             v.push(TrackEvent {
                 delta: delta_in_ticks.into(),
                 kind: nodi::midly::TrackEventKind::Midi {

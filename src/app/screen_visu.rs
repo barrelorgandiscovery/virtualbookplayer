@@ -50,7 +50,8 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mu
             VirtualBookComponent::from_some_indexedvirtualbook(Some(Arc::clone(&vbc)))
                 .offset_ms(foffset)
                 .xscale(*xscale)
-                .scrollbar_width(32.0),
+                .scrollbar_width(32.0)
+                .set_background_texture_id(app.background_textureid),
         );
     }
 }

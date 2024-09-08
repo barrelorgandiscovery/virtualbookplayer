@@ -86,6 +86,8 @@ pub struct VirtualBookComponent {
     scrollbars_visible: bool,
     scrollbats_width: f32,
 
+    background_texture_id: Option<egui::TextureId>,
+
     virtual_book: Option<Arc<IndexedVirtualBook>>,
 }
 
@@ -98,6 +100,7 @@ impl Default for VirtualBookComponent {
             fit_to_height: true,
             scrollbars_visible: true,
             scrollbats_width: 12.0,
+            background_texture_id: None,
             virtual_book: None,
         }
     }
@@ -175,6 +178,11 @@ impl VirtualBookComponent {
         self
     }
 
+    pub fn set_background_texture_id(mut self, texture_id: Option<egui::TextureId>) -> Self {
+        self.background_texture_id = texture_id;
+        self
+    }
+
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
         let Self {
             offset_ms: offset_in_millis,
@@ -219,11 +227,26 @@ impl VirtualBookComponent {
                         pos2(0.0, 0.0),
                         to_screen * pos2(width_container, response.rect.size().y),
                     ]);
-                    painter.add(RectShape::filled(
-                        book_background,
-                        Rounding::default(),
-                        Color32::from_rgb(255, 255, 255),
-                    ));
+
+                    if let Some(texture_id) = self.background_texture_id {
+                        let mut mesh = Mesh::with_texture(texture_id);
+                        let uv = Rect {
+                            min: Pos2::new(0.0, 0.0),
+                            max: Pos2::new(1.0, 1.0),
+                        };
+                        mesh.add_rect_with_uv(
+                            book_background,
+                            uv,
+                            Color32::from_rgb(255, 255, 255),
+                        );
+                        painter.add(Shape::mesh(mesh));
+                    } else {
+                        painter.add(RectShape::filled(
+                            book_background,
+                            Rounding::default(),
+                            Color32::from_rgb(255, 255, 255),
+                        ));
+                    }
 
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Filtering Holes");
@@ -359,7 +382,7 @@ impl VirtualBookComponent {
 
                     // draw the elements, for reactive elements
                     for (r, c) in rects.iter() {
-                        painter.add(RectShape::filled(*r, Rounding::default(), *c));
+                        painter.add(RectShape::filled(*r, Rounding::from(1.0), *c));
                     }
 
                     painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));

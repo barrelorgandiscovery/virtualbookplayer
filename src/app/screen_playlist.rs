@@ -239,6 +239,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                     .with_mouse_config( DragDropConfig::touch_scroll() )
                                                                         .show_custom(|ui, iter| {
                                                                             working_list.iter_mut().enumerate().for_each(|(index, item)| {
+                                                                                    #[allow(clippy::needless_borrows_for_generic_args)]
                                                                                      iter.next(ui, Id::new(&item), index, true, |ui, item_handle| {
                                                                                         item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
                                                                                             ui.vertical_centered_justified(|ui| {
@@ -496,14 +497,31 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                         let foffset: f64 = app.pid_regulated_offset_ms;
 
                         // display virtualbook
-                        let mut c = VirtualBookComponent::from_some_indexedvirtualbook(
+                        let c = VirtualBookComponent::from_some_indexedvirtualbook(
                             app.appplayer.virtual_book.read().clone(),
                         )
                         .offset_ms(foffset)
                         .xscale(app.xscale)
                         .hide_scrollbar();
 
-                        let response_ui_component = c.ui_content(ui);
+                        if app.background_texture_handle.is_none() {
+                            app.background_texture_handle = Some(ctx.load_texture(
+                                "bgbookimage",
+                                app.background_texture_image.clone(),
+                                TextureOptions {
+                                    magnification: TextureFilter::Nearest,
+                                    minification: TextureFilter::Linear,
+                                    wrap_mode: TextureWrapMode::Repeat,
+                                },
+                            ));
+                            app.background_textureid = Some(TextureId::from(
+                                app.background_texture_handle.as_ref().unwrap(),
+                            ));
+                        }
+
+                        let response_ui_component = c
+                            .set_background_texture_id(app.background_textureid)
+                            .ui_content(ui);
 
                         if response_ui_component.clicked() {
                             app.screen = Screen::Display;

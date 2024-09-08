@@ -10,6 +10,7 @@ use egui::*;
 use egui_extras::image::*;
 use egui_extras::{Size, StripBuilder};
 use im_native_dialog::ImNativeFileDialog;
+
 use player::midiio::{DeviceInformation, MidiPlayerFactory};
 use player::{PlayerFactory, Response};
 
@@ -86,6 +87,15 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     texture_handle: Option<TextureHandle>,
 
+    #[serde(skip)]
+    background_textureid: Option<TextureId>,
+
+    #[serde(skip)]
+    background_texture_handle: Option<TextureHandle>,
+
+    #[serde(skip)]
+    background_texture_image: ColorImage,
+
     selected_device: usize,
 
     #[serde(skip)]
@@ -106,7 +116,7 @@ pub struct VirtualBookApp {
 
     islight: bool,
 
-    play_lattency_ms: u64,
+    play_lattency_ms: i64,
 
     /// display the number pad
     hidden_number_pad: bool,
@@ -125,6 +135,7 @@ impl Default for VirtualBookApp {
         appplayer.player(None);
 
         let img: ColorImage = load_image_bytes(include_bytes!("bg2.png")).unwrap();
+        let imgbackground = load_image_bytes(include_bytes!("../../assets/craft.png")).unwrap();
 
         Self {
             lang: None,
@@ -147,6 +158,10 @@ impl Default for VirtualBookApp {
 
             bg_image: img,
             texture_handle: None,
+
+            background_texture_handle: None,
+            background_texture_image: imgbackground,
+            background_textureid: None,
 
             appplayer,
             current_duration: Duration::new(0, 0),
@@ -348,9 +363,8 @@ impl eframe::App for VirtualBookApp {
             if let Some(_vb) = appplayer.virtual_book.read().as_deref() {
                 *current_duration = delta;
                 self.offset_ms = delta.as_millis() as f64;
-                self.pid_controller.set_target(
-                    self.offset_ms - Duration::from_millis(*play_lattency_ms).as_millis() as f64,
-                );
+                self.pid_controller
+                    .set_target(self.offset_ms - *play_lattency_ms as f64);
             }
         }
 
@@ -375,8 +389,7 @@ impl eframe::App for VirtualBookApp {
                         // accordingly,
 
                         self.pid_controller.set_target(
-                            (*duration + Duration::from_millis(*play_lattency_ms)).as_micros()
-                                as f64
+                            ((*duration).as_micros() as f64 + *play_lattency_ms as f64 * 1000.0)
                                 / 1000.0,
                         );
                     }
@@ -540,7 +553,7 @@ impl eframe::App for VirtualBookApp {
 
                                     ui.label(&i18n.lattence_jeu);
                                     let play_lattency_slider =
-                                        egui::Slider::new(play_lattency_ms, 0..=4_000);
+                                        egui::Slider::new(play_lattency_ms, -1000..=4_000);
                                     ui.add(play_lattency_slider);
                                 },
                             );
@@ -621,9 +634,11 @@ impl eframe::App for VirtualBookApp {
                 indicator_play_response
                     .on_hover_text_at_pointer(&i18n.hover_activate_the_play_of_the_playlist);
 
+                /*
                 if ui.add(Button::new("pause")).clicked() {
                     appplayer.pause();
                 }
+                */
 
                 // playing title
 

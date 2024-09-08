@@ -339,7 +339,7 @@ fn read_book_file(
             let mut notes_informations = NotesInformations::default();
 
             notes_informations.notes = plain_notes;
-            
+
             notes_informations.display_informations = NotesDisplayInformations {
                 first_axis: vb.scale.definition.firsttrackdistance,
                 inter_axis: vb.scale.definition.intertrackdistance,
@@ -347,8 +347,6 @@ fn read_book_file(
                 width: vb.scale.definition.width,
                 preferred_view_inversed: vb.scale.definition.ispreferredviewinverted,
             };
-
-            
 
             Ok((Arc::new(notes_informations), timer, sheet))
         }
@@ -524,9 +522,8 @@ impl Player for MidiPlayer {
                             }
                         }
 
-                        let start_play_time = Instant::now();
                         let mut iter_moment = midi_sheet.iter();
-                       
+
                         loop {
                             // for moment in midi_sheet {
                             if receiver.try_recv().is_ok() {
@@ -581,8 +578,7 @@ impl Player for MidiPlayer {
                                     }
                                     let d = timer.sleep_duration(ticks_counter);
 
-                                    
-                                    timer.sleep(ticks_counter); 
+                                    timer.sleep(ticks_counter);
 
                                     total_duration += d;
                                     // total_duration = Instant::now() - start_play_time;
@@ -612,13 +608,13 @@ impl Player for MidiPlayer {
                                     if let Ok(output_locked) = output_reference.lock() {
                                         output_locked
                                             .send(Response::CurrentPlayTime(
-                                               total_duration + wait_time,
+                                                total_duration + wait_time,
                                             ))
                                             .unwrap();
                                     }
                                 }
 
-                               ticks_counter += 1;
+                                ticks_counter += 1;
                             } else {
                                 info!("end of moments");
                                 break;
