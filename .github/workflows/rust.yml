@@ -50,7 +50,7 @@ jobs:
   # SAVE INSTALLER
       - id: upload-installer
         name: Upload installer
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./target/release/virtualbookplayerapp
           name: ubuntu-virtualbookplayerapp-${{ github.ref_name }}
@@ -91,7 +91,7 @@ jobs:
       # SAVE INSTALLER
       - id: upload-installer-win
         name: Upload windows release
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: target/release/virtualbookplayerapp.exe
           name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
@@ -111,7 +111,7 @@ jobs:
       # SAVE INSTALLER
       - id: upload-installer-win-debug
         name: Upload windows binary debug
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: target/debug/virtualbookplayerapp-debug.exe
           name: windows-virtualbookplayerapp-${{ github.ref_name }}-debug.exe
@@ -134,13 +134,13 @@ jobs:
 
     - id: download-windows-image
       name: Download Windows appimage
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
       with:
         name: windows-virtualbookplayerapp-${{ github.ref_name }}.exe
 
     - id: download-windows-image-debug
       name: Download Windows appimage
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
       with:
         name: windows-virtualbookplayerapp-${{ github.ref_name }}-debug.exe
 
