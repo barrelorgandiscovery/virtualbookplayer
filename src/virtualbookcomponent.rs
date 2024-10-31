@@ -211,41 +211,37 @@ impl VirtualBookComponent {
                 let midx = width_container / 2.0f32;
                 let maxy = response.rect.height();
 
-                if let Some(current_vb) = &mut self.virtual_book {
-                    let to_screen = emath::RectTransform::from_to(
-                        Rect::from_min_size(Pos2::ZERO, response.rect.size()),
-                        response.rect,
-                    );
+                let to_screen = emath::RectTransform::from_to(
+                    Rect::from_min_size(Pos2::ZERO, response.rect.size()),
+                    response.rect,
+                );
 
+                // background draw
+                let book_background = Rect::from_points(&[
+                    pos2(0.0, 0.0),
+                    to_screen * pos2(width_container, response.rect.size().y),
+                ]);
+
+                if let Some(texture_id) = self.background_texture_id {
+                    let mut mesh = Mesh::with_texture(texture_id);
+                    let uv = Rect {
+                        min: Pos2::new(0.0, 0.0),
+                        max: Pos2::new(1.0, 1.0),
+                    };
+                    mesh.add_rect_with_uv(book_background, uv, Color32::from_rgb(255, 255, 255));
+                    painter.add(Shape::mesh(mesh));
+                } else {
+                    painter.add(RectShape::filled(
+                        book_background,
+                        Rounding::default(),
+                        Color32::from_rgb(255, 255, 255),
+                    ));
+                }
+
+                if let Some(current_vb) = &mut self.virtual_book {
                     if *fit_to_height {
                         *yfactor = (response.rect.size().y)
                             / (current_vb.virtualbook.scale.definition.width);
-                    }
-
-                    // background draw
-                    let book_background = Rect::from_points(&[
-                        pos2(0.0, 0.0),
-                        to_screen * pos2(width_container, response.rect.size().y),
-                    ]);
-
-                    if let Some(texture_id) = self.background_texture_id {
-                        let mut mesh = Mesh::with_texture(texture_id);
-                        let uv = Rect {
-                            min: Pos2::new(0.0, 0.0),
-                            max: Pos2::new(1.0, 1.0),
-                        };
-                        mesh.add_rect_with_uv(
-                            book_background,
-                            uv,
-                            Color32::from_rgb(255, 255, 255),
-                        );
-                        painter.add(Shape::mesh(mesh));
-                    } else {
-                        painter.add(RectShape::filled(
-                            book_background,
-                            Rounding::default(),
-                            Color32::from_rgb(255, 255, 255),
-                        ));
                     }
 
                     #[cfg(feature = "profiling")]
