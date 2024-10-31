@@ -244,7 +244,7 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
                                                                                         item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
                                                                                             ui.vertical_centered_justified(|ui| {
                                                                                                 handle.ui_sized(ui, item_size, |ui| {
-                                                                                                    ui.horizontal_wrapped(|ui| {
+                                                                                                    ui.horizontal(|ui| {
                                                                                                         ui.spacing();
                                                                                                         if ui.button( egui_phosphor::regular::TRASH)
                                                                                                             .on_hover_text_at_pointer(&app.i18n.remove_file_from_list)
