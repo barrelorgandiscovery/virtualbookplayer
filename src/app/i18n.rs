@@ -103,7 +103,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         play_count_tooltip: "Number of times this file has been played".into(),
         star_file_tooltip: "Star this file".into(),
         star_count_tooltip: "Number of times this file has been starred".into(),
-            })
+    })
 }
 
 pub fn create_i18n_fr_message() -> Box<I18NMessages> {
@@ -138,5 +138,5 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         play_count_tooltip: "Nombre de fois que ce fichier a été joué".into(),
         star_file_tooltip: "Mettre une étoile à ce fichier".into(),
         star_count_tooltip: "Nombre de fois que ce fichier a été étoilé".into(),
-            })
+    })
 }

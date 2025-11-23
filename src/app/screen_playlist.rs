@@ -47,8 +47,7 @@ fn handle_enter_key(
                         .expect("fail to lock the playlist");
                     was_empty = locked_playlist.file_list.is_empty();
 
-                    locked_playlist
-                        .add_from_path_and_expand_playlists(&file_node.borrow().path);
+                    locked_playlist.add_from_path_and_expand_playlists(&file_node.borrow().path);
                 }
                 if was_empty && appplayer.play_mod {
                     appplayer.play_file_on_top();
@@ -173,20 +172,26 @@ fn render_playlist_header(app: &mut VirtualBookApp, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.add_enabled_ui(!appplayer.is_playlist_empty(), |ui| {
             ui.label(
-                RichText::new(format!("{} {}", egui_phosphor::regular::FILES, "PlayList : "))
-                    .heading(),
+                RichText::new(format!(
+                    "{} {}",
+                    egui_phosphor::regular::FILES,
+                    "PlayList : "
+                ))
+                .heading(),
             );
 
             let play_mod = &appplayer.play_mod;
             if !*play_mod
-                && ui.button(egui_phosphor::regular::PLAY)
+                && ui
+                    .button(egui_phosphor::regular::PLAY)
                     .on_hover_text_at_pointer(&app.i18n.go_to_next_file)
                     .clicked()
             {
                 appplayer.play_file_on_top();
             }
 
-            if ui.button(egui_phosphor::regular::FAST_FORWARD)
+            if ui
+                .button(egui_phosphor::regular::FAST_FORWARD)
                 .on_hover_text_at_pointer(&app.i18n.go_to_next_file)
                 .clicked()
             {
@@ -196,7 +201,8 @@ fn render_playlist_header(app: &mut VirtualBookApp, ui: &mut Ui) {
 
         if let Some(path_buf) = &app.file_store_path {
             ui.separator();
-            if ui.button(egui_phosphor::regular::LIST_PLUS)
+            if ui
+                .button(egui_phosphor::regular::LIST_PLUS)
                 .on_hover_text_at_pointer(&app.i18n.save_playlist)
                 .clicked()
             {
@@ -237,7 +243,8 @@ fn render_playlist_item(
     let mut deleted = false;
     ui.horizontal(|ui| {
         ui.spacing();
-        if ui.button(egui_phosphor::regular::TRASH)
+        if ui
+            .button(egui_phosphor::regular::TRASH)
             .on_hover_text_at_pointer(&app.i18n.remove_file_from_list)
             .clicked()
         {
@@ -329,43 +336,47 @@ pub(crate) fn ui_playlist_right_panel(app: &mut VirtualBookApp, ctx: &egui::Cont
         .size(Size::remainder())
         .vertical(|mut strip| {
             strip.strip(|builder| {
-                builder.sizes(Size::remainder(), if app.hidden_number_pad { 1 } else { 2 }).vertical(|mut strip| {
-                    strip.cell(|ui| {
-                        StripBuilder::new(ui)
-                            .size(Size::remainder())
-                            .vertical(|mut strip| {
-                                strip.cell(|ui| {
-                                    ui.group(|ui| {
-                                        StripBuilder::new(ui)
-                                            .size(Size::remainder())
-                                            .vertical(|mut strip| {
-                                                strip.cell(|ui| {
-                                                    render_playlist_header(app, ui);
-                                                    ui.separator();
+                builder
+                    .sizes(Size::remainder(), if app.hidden_number_pad { 1 } else { 2 })
+                    .vertical(|mut strip| {
+                        strip.cell(|ui| {
+                            StripBuilder::new(ui)
+                                .size(Size::remainder())
+                                .vertical(|mut strip| {
+                                    strip.cell(|ui| {
+                                        ui.group(|ui| {
+                                            StripBuilder::new(ui).size(Size::remainder()).vertical(
+                                                |mut strip| {
+                                                    strip.cell(|ui| {
+                                                        render_playlist_header(app, ui);
+                                                        ui.separator();
 
-                                                    // playlist
-                                                    egui::ScrollArea::both().show(ui, |ui| {
-                                                        StripBuilder::new(ui)
-                                                            .size(Size::remainder())
-                                                            .horizontal(|mut strip| {
-                                                                strip.cell(|ui| {
-                                                                    render_playlist_items(app, ui);
+                                                        // playlist
+                                                        egui::ScrollArea::both().show(ui, |ui| {
+                                                            StripBuilder::new(ui)
+                                                                .size(Size::remainder())
+                                                                .horizontal(|mut strip| {
+                                                                    strip.cell(|ui| {
+                                                                        render_playlist_items(
+                                                                            app, ui,
+                                                                        );
+                                                                    });
                                                                 });
-                                                            });
+                                                        });
                                                     });
-                                                });
-                                            });
+                                                },
+                                            );
+                                        });
                                     });
                                 });
-                            });
-                    });
-
-                    if !app.hidden_number_pad {
-                        strip.cell(|ui| {
-                            ui_button_panel(app, ctx, ui);
                         });
-                    }
-                });
+
+                        if !app.hidden_number_pad {
+                            strip.cell(|ui| {
+                                ui_button_panel(app, ctx, ui);
+                            });
+                        }
+                    });
             });
         });
 }
@@ -386,28 +397,34 @@ fn display_folder(
 
     let id_source_folder = number_selected.clone() + element_name.as_str();
     let mut file_selected = false;
-    
+
     // Build folder header with icon
     use egui::text::{LayoutJob, TextFormat};
     let mut folder_job = LayoutJob::default();
-    let body_font = ui.style().text_styles.get(&egui::TextStyle::Body).unwrap().clone();
-    
+    let body_font = ui
+        .style()
+        .text_styles
+        .get(&egui::TextStyle::Body)
+        .unwrap()
+        .clone();
+
     // Icon format - use Proportional font (which has fill variant as fallback) for filled folder icon and blue color
     let icon_color = egui::Color32::from_rgb(0, 100, 200); // Blue color for folder icon
-    let icon_format = TextFormat::simple(
-        FontId::proportional(body_font.size),
-        icon_color,
-    );
-    
+    let icon_format = TextFormat::simple(FontId::proportional(body_font.size), icon_color);
+
     // Regular format for folder name (non-bold)
     let regular_format = TextFormat::simple(
         FontId::proportional(body_font.size),
         ui.style().visuals.text_color(),
     );
-    
-    folder_job.append(&format!("{} ", egui_phosphor::fill::FOLDER), 0.0, icon_format);
+
+    folder_job.append(
+        &format!("{} ", egui_phosphor::fill::FOLDER),
+        0.0,
+        icon_format,
+    );
     folder_job.append(&element_name, 0.0, regular_format);
-    
+
     let r = CollapsingHeader::new(egui::WidgetText::from(folder_job))
         .id_source(id_source_folder)
         .open(Some(expanded))
@@ -441,44 +458,40 @@ fn display_folder(
 /// tooltip: Tooltip text to show on hover
 fn render_badge(ui: &mut Ui, text: String, text_color: egui::Color32, tooltip: &str) {
     let visuals = &ui.style().visuals;
-    
+
     // Use subtle theme colors for the badge - less visible than the file title
     // Use a faint background that blends with the UI
     let bg_color = visuals.faint_bg_color;
     // Use a very subtle border or no border
     let stroke_color = visuals.faint_bg_color.linear_multiply(0.8); // Slightly darker for subtle border
-    
+
     // Calculate badge size based on text
     let font = FontId::proportional(9.0); // Slightly smaller font
-    let text_width = ui.fonts(|f| f.layout_no_wrap(
-        text.clone(),
-        font.clone(),
-        text_color,
-    ).size().x);
-    
+    let text_width = ui.fonts(|f| {
+        f.layout_no_wrap(text.clone(), font.clone(), text_color)
+            .size()
+            .x
+    });
+
     let padding = 4.0; // Slightly less padding
     let badge_width = text_width + padding * 2.0;
     let badge_height = 16.0; // Slightly smaller height
-    
+
     // Create badge frame with subtle appearance
     let badge_frame = Frame::none()
         .fill(bg_color) // Faint background
         .stroke(Stroke::new(0.5, stroke_color)) // Very thin, subtle border
         .rounding(Rounding::same(8.0)); // Rounded corners
-    
+
     // Create the badge with tooltip
     let badge_response = badge_frame.show(ui, |ui| {
         ui.set_width(badge_width);
         ui.set_height(badge_height);
         ui.centered_and_justified(|ui| {
-            ui.label(
-                RichText::new(text)
-                    .font(font)
-                    .color(text_color)
-            );
+            ui.label(RichText::new(text).font(font).color(text_color));
         });
     });
-    
+
     // Add tooltip on hover
     badge_response.response.on_hover_text_at_pointer(tooltip);
 }
@@ -520,85 +533,83 @@ fn display_file(
         let star = node.star_count;
         let is_folder = node.is_folder;
         if play.is_none() && star.is_none() {
-            debug!("Displaying file '{}' with no metadata yet (path: {:?})", element_name, node.path);
+            debug!(
+                "Displaying file '{}' with no metadata yet (path: {:?})",
+                element_name, node.path
+            );
         } else {
-            debug!("Displaying file '{}' with play count: {:?}, star count: {:?} (path: {:?})", element_name, play, star, node.path);
+            debug!(
+                "Displaying file '{}' with play count: {:?}, star count: {:?} (path: {:?})",
+                element_name, play, star, node.path
+            );
         }
         (play, star, is_folder)
     };
-    
+
     // Display file name with play count and stars in the checkbox text
     // Use LayoutJob to color stars differently and make filename bold
     let clicked = {
         let mut bele = element.borrow_mut();
-        
+
         // Build the checkbox label using LayoutJob for multi-colored text
         use egui::text::{LayoutJob, TextFormat};
         let mut job = LayoutJob::default();
-        let body_font = ui.style().text_styles.get(&egui::TextStyle::Body).unwrap().clone();
-        
+        let body_font = ui
+            .style()
+            .text_styles
+            .get(&egui::TextStyle::Body)
+            .unwrap()
+            .clone();
+
         // Bold format for filename - use the separate bold font family
-        let bold_font = FontId::new(
-            body_font.size,
-            FontFamily::Name("rubik_bold".into()),
-        );
-        let bold_format = TextFormat::simple(
-            bold_font,
-            ui.style().visuals.text_color(),
-        );
-        
-        let default_format = TextFormat::simple(
-            body_font.clone(),
-            ui.style().visuals.text_color(),
-        );
+        let bold_font = FontId::new(body_font.size, FontFamily::Name("rubik_bold".into()));
+        let bold_format = TextFormat::simple(bold_font, ui.style().visuals.text_color());
+
+        let default_format = TextFormat::simple(body_font.clone(), ui.style().visuals.text_color());
         // Smaller font for play count and stars
         let small_font = FontId::proportional(body_font.size * 0.65); // 65% of body size
-        let small_format = TextFormat::simple(
-            small_font.clone(),
-            ui.style().visuals.text_color(),
-        );
+        let small_format = TextFormat::simple(small_font.clone(), ui.style().visuals.text_color());
         let star_color = egui::Color32::from_rgb(255, 215, 0); // Yellow for stars
-        // Note: star_format is not used anymore, we use star_fill_format below
-        
+                                                               // Note: star_format is not used anymore, we use star_fill_format below
+
         // Add folder icon if it's a folder - use Proportional font (which has fill variant as fallback) for filled icon and blue color
         if is_folder {
             let icon_color = egui::Color32::from_rgb(0, 100, 200); // Blue color for folder icon
-            let icon_format = TextFormat::simple(
-                FontId::proportional(body_font.size),
-                icon_color,
+            let icon_format = TextFormat::simple(FontId::proportional(body_font.size), icon_color);
+            job.append(
+                &format!("{} ", egui_phosphor::fill::FOLDER),
+                0.0,
+                icon_format,
             );
-            job.append(&format!("{} ", egui_phosphor::fill::FOLDER), 0.0, icon_format);
         }
-        
+
         // Add filename (bold)
         job.append(&element_name, 0.0, bold_format);
-        
+
         // Add play count if available (with smaller font)
         if let Some(count) = play_count {
             if count > 0 {
                 job.append(&format!(" ({})", count), 0.0, small_format.clone());
             }
         }
-        
+
         // Add stars with yellow color if available (with smaller font, using fill variant)
         if let Some(count) = star_count {
             if count > 0 {
                 let stars = egui_phosphor::fill::STAR.repeat(count as usize);
                 // Use Proportional font (which has fill variant as fallback) for filled star icons
-                let star_fill_format = TextFormat::simple(
-                    FontId::proportional(small_font.size),
-                    star_color,
-                );
+                let star_fill_format =
+                    TextFormat::simple(FontId::proportional(small_font.size), star_color);
                 job.append(&format!(" {}", stars), 0.0, star_fill_format);
             }
         }
-        
+
         // Simple checkbox with all info in the label - no wrapping issues
         let checkbox_response = ui.checkbox(&mut bele.selected, egui::WidgetText::from(job));
-        
+
         // Check if clicked first (before consuming response for tooltip)
         let clicked = checkbox_response.clicked();
-        
+
         // Add tooltip with detailed info on hover
         let mut tooltip_text = String::new();
         if let Some(count) = play_count {
@@ -614,17 +625,17 @@ fn display_file(
         if !tooltip_text.is_empty() {
             checkbox_response.on_hover_text_at_pointer(tooltip_text.trim_end());
         }
-        
+
         clicked
     };
-    
+
     if clicked {
         // Set selected to false and drop the borrow before locking playlist
         {
             let mut bele = element.borrow_mut();
             bele.selected = false;
         } // Drop the borrow here
-        
+
         // Now lock the playlist (no conflict with element borrow)
         {
             let mut locked_playlist = appplayer
@@ -707,7 +718,7 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
                 // the content inside respects it. Use available_width() inside the ScrollArea.
                 let available_width = ui.available_width();
                 ui.set_width(available_width);
-                
+
                 StripBuilder::new(ui)
                     .size(Size::initial(6.0))
                     .size(Size::remainder())

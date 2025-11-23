@@ -654,7 +654,10 @@ impl Player for MidiPlayer {
     fn stop(&mut self) {
         // Try to send cancel signal - if channel is closed, thread already finished (this is normal)
         if let Err(e) = self.cancel.send(true) {
-            debug!("Could not send cancel order (thread may have already finished): {}", e);
+            debug!(
+                "Could not send cancel order (thread may have already finished): {}",
+                e
+            );
         }
     }
 

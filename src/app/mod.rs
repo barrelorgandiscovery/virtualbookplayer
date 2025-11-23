@@ -14,16 +14,14 @@ use player::midiio::{DeviceInformation, MidiPlayerFactory};
 use player::{PlayerFactory, Response};
 
 use crate::appplayer::AppPlayer;
-use crate::{duration_to_mm_ss, file_store::*};
 use crate::playmetadata_manager::PlayMetadataManager;
+use crate::{duration_to_mm_ss, file_store::*};
 
 use log::{debug, error, info, warn};
 
 use self::i18n::{create_i18n_message_with_lang, I18NMessages};
 
 use pid_lite::Controller;
-
-use egui_extras_xt::displays::IndicatorButton;
 
 mod i18n;
 mod screen_playlist;
@@ -130,11 +128,11 @@ pub struct VirtualBookApp {
     /// Play metadata manager for background play count queries
     #[serde(skip)]
     metadata_manager: PlayMetadataManager,
-    
+
     /// Frame counter for throttling metadata queries
     #[serde(skip)]
     metadata_query_frame_counter: u32,
-    
+
     /// Currently playing file path and its play metadata
     #[serde(skip)]
     current_playing_file: Option<(PathBuf, Option<u32>)>, // (path, play_count)
@@ -207,7 +205,9 @@ impl Default for VirtualBookApp {
 impl VirtualBookApp {
     /// Get the currently playing file's metadata (path and play count)
     pub fn current_playing_file_metadata(&self) -> Option<(&PathBuf, Option<u32>)> {
-        self.current_playing_file.as_ref().map(|(path, count)| (path, *count))
+        self.current_playing_file
+            .as_ref()
+            .map(|(path, count)| (path, *count))
     }
 
     /// Setup fonts for the application
@@ -264,10 +264,7 @@ impl VirtualBookApp {
         );
         // Insert fill variant BEFORE regular variant in Proportional font family
         // This ensures fill variant characters are found first when using fill:: constants
-        let proportional_family = fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap();
+        let proportional_family = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
         // Find where "phosphor" (regular variant) is and insert fill before it
         if let Some(pos) = proportional_family.iter().position(|f| f == "phosphor") {
             proportional_family.insert(pos, "phosphor-fill".to_owned());
@@ -284,19 +281,19 @@ impl VirtualBookApp {
 
     /// Restore MIDI device from saved state
     fn restore_midi_device(app: &mut Self) {
-                let factory = MidiPlayerFactory {
+        let factory = MidiPlayerFactory {
             device_no: app.selected_device,
-                };
+        };
 
-                let (_scmd, rcmd) = channel();
-                let (s, r) = channel();
+        let (_scmd, rcmd) = channel();
+        let (s, r) = channel();
 
-                match factory.create(s, rcmd) {
-                    Ok(player) => {
+        match factory.create(s, rcmd) {
+            Ok(player) => {
                 app.appplayer.player(Some((player, r, _scmd)));
-                    }
-                    Err(e) => {
-                        error!("fail to open device {}", e);
+            }
+            Err(e) => {
+                error!("fail to open device {}", e);
             }
         }
     }
@@ -308,30 +305,31 @@ impl VirtualBookApp {
             let db_path = PathBuf::from(path).join(".playmetadata.db");
             info!("Restoring metadata database for folder: {:?}", path);
             app.metadata_manager.set_database_path(db_path);
-            
-                    match FileStore::new(&PathBuf::from(path)) {
-                        Ok(mut storage_created) => {
-                            if storage_created.is_some() {
-                                if let Some(mut fs) = storage_created {
+
+            match FileStore::new(&PathBuf::from(path)) {
+                Ok(mut storage_created) => {
+                    if storage_created.is_some() {
+                        if let Some(mut fs) = storage_created {
                             if let Ok(v) = fs.view(&None, &app.extensions_filters) {
-                                        fs.default_view = Some(v);
-                                
+                                fs.default_view = Some(v);
+
                                 // Immediately query play counts for visible files (don't wait for periodic query)
                                 let visible_paths = Self::collect_visible_file_paths(&fs);
                                 if !visible_paths.is_empty() {
                                     debug!("Immediately querying play counts for {} visible files (on restore)", visible_paths.len());
-                                    app.metadata_manager.query_play_counts(visible_paths, Vec::new());
+                                    app.metadata_manager
+                                        .query_play_counts(visible_paths, Vec::new());
                                 } else {
                                     warn!("No visible files to query on restore - file tree may not be ready yet");
                                 }
-                                    }
-                                    storage_created = Some(fs);
-                                }
                             }
-                    app.file_store = storage_created;
+                            storage_created = Some(fs);
                         }
-                        Err(e) => {
-                            error!("error in opening the path {}", &e);
+                    }
+                    app.file_store = storage_created;
+                }
+                Err(e) => {
+                    error!("error in opening the path {}", &e);
                     app.file_store = None;
                 }
             }
@@ -339,25 +337,21 @@ impl VirtualBookApp {
     }
 
     /// Restore application state from storage
-    fn restore_state(
-        storage: &dyn eframe::Storage,
-        lang: Option<String>,
-    ) -> Option<Self> {
-        let mut old_storage: Self =
-            eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+    fn restore_state(storage: &dyn eframe::Storage, lang: Option<String>) -> Option<Self> {
+        let mut old_storage: Self = eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
         Self::restore_midi_device(&mut old_storage);
         Self::restore_file_store(&mut old_storage);
 
-                old_storage.lang.clone_from(&lang);
-                old_storage.i18n = create_i18n_message_with_lang(lang);
+        old_storage.lang.clone_from(&lang);
+        old_storage.i18n = create_i18n_message_with_lang(lang);
 
-                old_storage.screen_zoom_factor = old_storage.slider_selected_zoom_factor;
+        old_storage.screen_zoom_factor = old_storage.slider_selected_zoom_factor;
 
-                // define the wait time on restoration
-                old_storage
-                    .appplayer
-                    .set_waittime_between_file_play(old_storage.play_wait);
+        // define the wait time on restoration
+        old_storage
+            .appplayer
+            .set_waittime_between_file_play(old_storage.play_wait);
 
         Some(old_storage)
     }
@@ -441,23 +435,23 @@ impl VirtualBookApp {
 
         if let Some(last_response) = response {
             match &last_response {
-                    Response::EndOfFile => {
+                Response::EndOfFile => {
                     // Clear current playing file when file ends
                     self.current_playing_file = None;
                     self.appplayer.next();
-                    }
-                    Response::CurrentPlayTime(duration) => {
+                }
+                Response::CurrentPlayTime(duration) => {
                     self.latest_duration_time = *duration;
                     self.adjusted_start_time = Instant::now() - *duration;
 
-                        // depending on the midi control, some may have a
-                        // time shift
-                        // accordingly,
-                        self.pid_controller.set_target(
+                    // depending on the midi control, some may have a
+                    // time shift
+                    // accordingly,
+                    self.pid_controller.set_target(
                         ((*duration).as_micros() as f64 + self.play_lattency_ms as f64 * 1000.0)
-                                / 1000.0,
-                        );
-                    }
+                            / 1000.0,
+                    );
+                }
                 Response::FileCancelled => {
                     // Clear current playing file when cancelled
                     self.current_playing_file = None;
@@ -470,18 +464,19 @@ impl VirtualBookApp {
                         let full_path = if PathBuf::from(&filename).is_absolute() {
                             PathBuf::from(&filename)
                         } else {
-                            file_path.join(&filename)
+                            file_path.join(filename)
                         };
                         info!("Recording play event for file: {:?}", full_path);
-                        
+
                         // Store current playing file and query its play count
                         self.current_playing_file = Some((full_path.clone(), None)); // Count will be updated when result arrives
-                        
+
                         // Record the play event (this will also refresh the count)
                         self.metadata_manager.record_play_event(full_path.clone());
-                        
+
                         // Also immediately query the current file's play count
-                        self.metadata_manager.query_current_file_play_count(full_path);
+                        self.metadata_manager
+                            .query_current_file_play_count(full_path);
                     }
                 }
             }
@@ -498,7 +493,7 @@ impl VirtualBookApp {
                 let db_path = r.join(".playmetadata.db");
                 info!("Initializing metadata database for folder: {:?}", r);
                 self.metadata_manager.set_database_path(db_path);
-                
+
                 match FileStore::new(&r) {
                     Ok(fs) => {
                         self.file_store = fs;
@@ -507,18 +502,22 @@ impl VirtualBookApp {
                         if let Some(store) = &mut self.file_store {
                             if let Ok(result) = store.view(&None, &self.extensions_filters) {
                                 store.default_view = Some(result);
-                                
+
                                 // Wait a bit for database to initialize, then query play counts
                                 // Database initialization happens asynchronously in background thread
                                 // We'll query on next frame or use periodic query
                                 debug!("File store created, will query play counts after database initialization");
-                                
+
                                 // Immediately query play counts for visible files (don't wait for periodic query)
                                 // Note: Database might not be ready yet, but query will be queued
                                 let visible_paths = Self::collect_visible_file_paths(store);
                                 if !visible_paths.is_empty() {
-                                    debug!("Immediately querying play counts for {} visible files", visible_paths.len());
-                                    self.metadata_manager.query_play_counts(visible_paths, Vec::new());
+                                    debug!(
+                                        "Immediately querying play counts for {} visible files",
+                                        visible_paths.len()
+                                    );
+                                    self.metadata_manager
+                                        .query_play_counts(visible_paths, Vec::new());
                                 } else {
                                     warn!("No visible files collected after folder open!");
                                 }
@@ -543,61 +542,93 @@ impl VirtualBookApp {
     fn update_metadata(&mut self) {
         // Process any results from background thread
         if let Some(file_metadata) = self.metadata_manager.process_results() {
-            debug!("Received {} metadata results from background thread", file_metadata.len());
-            
+            debug!(
+                "Received {} metadata results from background thread",
+                file_metadata.len()
+            );
+
             // Update current playing file's metadata if it's in the results
             if let Some((current_path, _)) = &self.current_playing_file {
                 if let Some(metadata) = file_metadata.get(current_path) {
                     let path_clone = current_path.clone();
-                    self.current_playing_file = Some((path_clone.clone(), Some(metadata.play_count)));
-                    info!("Current playing file metadata: {} -> play={}, star={}", path_clone.display(), metadata.play_count, metadata.star_count);
+                    self.current_playing_file =
+                        Some((path_clone.clone(), Some(metadata.play_count)));
+                    info!(
+                        "Current playing file metadata: {} -> play={}, star={}",
+                        path_clone.display(),
+                        metadata.play_count,
+                        metadata.star_count
+                    );
                 }
             }
-            
+
             // Update FileNode metadata in the file store
             if let Some(file_store) = &mut self.file_store {
                 let mut updated_count = 0;
-                Self::update_file_node_metadata_with_debug(&mut file_store.root, &file_metadata, &mut updated_count);
+                Self::update_file_node_metadata_with_debug(
+                    &mut file_store.root,
+                    &file_metadata,
+                    &mut updated_count,
+                );
                 if updated_count > 0 {
                     debug!("Updated {} FileNode metadata in root", updated_count);
                 }
-                
+
                 // Also update filtered view if it exists
                 if let Some(ref mut filtered_view) = file_store.filtered_view {
                     let mut updated_count = 0;
-                    Self::update_file_view_node_metadata_with_debug(&mut filtered_view.root, &file_metadata, &mut updated_count);
+                    Self::update_file_view_node_metadata_with_debug(
+                        &mut filtered_view.root,
+                        &file_metadata,
+                        &mut updated_count,
+                    );
                     if updated_count > 0 {
-                        debug!("Updated {} FileViewNode metadata in filtered view", updated_count);
+                        debug!(
+                            "Updated {} FileViewNode metadata in filtered view",
+                            updated_count
+                        );
                     }
                 }
                 // Update default view
                 if let Some(ref mut default_view) = file_store.default_view {
                     let mut updated_count = 0;
-                    Self::update_file_view_node_metadata_with_debug(&mut default_view.root, &file_metadata, &mut updated_count);
+                    Self::update_file_view_node_metadata_with_debug(
+                        &mut default_view.root,
+                        &file_metadata,
+                        &mut updated_count,
+                    );
                     if updated_count > 0 {
-                        debug!("Updated {} FileViewNode metadata in default view", updated_count);
+                        debug!(
+                            "Updated {} FileViewNode metadata in default view",
+                            updated_count
+                        );
                     }
                 }
             }
         }
-        
+
         // Periodically query play counts for displayed files (every 2 seconds)
         // Use frame count to throttle queries
         // Only fetch metadata for files that are actually visible (expanded folders)
         self.metadata_query_frame_counter += 1;
-        if self.metadata_query_frame_counter % 120 == 0 { // Query every ~2 seconds at 60fps
+        if self.metadata_query_frame_counter % 120 == 0 {
+            // Query every ~2 seconds at 60fps
             if let Some(file_store) = &self.file_store {
                 // Only collect visible files (from expanded folders) - don't fetch for collapsed folders
                 let visible_paths = Self::collect_visible_file_paths(file_store);
-                
+
                 if !visible_paths.is_empty() {
-                    debug!("Periodically querying play counts for {} visible files", visible_paths.len());
+                    debug!(
+                        "Periodically querying play counts for {} visible files",
+                        visible_paths.len()
+                    );
                     // Only query visible files - empty list for non-visible files
-                    self.metadata_manager.query_play_counts(visible_paths, Vec::new());
+                    self.metadata_manager
+                        .query_play_counts(visible_paths, Vec::new());
                 }
             }
         }
-        
+
         // Also trigger an immediate query on first frame (when files are first displayed)
         // This ensures play counts appear immediately rather than waiting for the periodic query
         if self.metadata_query_frame_counter == 1 {
@@ -605,8 +636,12 @@ impl VirtualBookApp {
             if let Some(file_store) = &self.file_store {
                 let visible_paths = Self::collect_visible_file_paths(file_store);
                 if !visible_paths.is_empty() {
-                    debug!("Immediately querying play counts for {} visible files (first frame)", visible_paths.len());
-                    self.metadata_manager.query_play_counts(visible_paths, Vec::new());
+                    debug!(
+                        "Immediately querying play counts for {} visible files (first frame)",
+                        visible_paths.len()
+                    );
+                    self.metadata_manager
+                        .query_play_counts(visible_paths, Vec::new());
                 } else {
                     warn!("No visible files on first frame - file tree may not be ready yet");
                 }
@@ -615,7 +650,7 @@ impl VirtualBookApp {
             }
         }
     }
-    
+
     /// Recursively collect all displayed file paths from the file store
     fn collect_displayed_file_paths(file_store: &FileStore) -> Vec<PathBuf> {
         let mut paths = Vec::new();
@@ -625,7 +660,7 @@ impl VirtualBookApp {
         }
         paths
     }
-    
+
     /// Recursively collect only visible (expanded) file paths from a FileViewNode
     /// Only collects files from expanded folders (high priority for immediate display)
     /// The base folder is always displayed and expanded, so we start with parent_expanded=true
@@ -637,16 +672,26 @@ impl VirtualBookApp {
             // Root folder is always displayed in GUI, so we always collect its direct children (files)
             // Pass true for both parent_expanded and is_root to ensure root-level files are always collected
             Self::collect_visible_paths_from_view_node(&mut paths, &view.root, true, true);
-            debug!("Collected {} visible file paths from file store", paths.len());
+            debug!(
+                "Collected {} visible file paths from file store",
+                paths.len()
+            );
             if paths.is_empty() {
                 warn!("No visible files collected - checking view structure");
                 // Debug: check if view has any children
                 let view_node = view.root.borrow();
                 let file_node = view_node.node.borrow();
-                debug!("View root: is_folder={}, path={:?}, has {} children", 
-                      file_node.is_folder, file_node.path, view_node.childs.len());
+                debug!(
+                    "View root: is_folder={}, path={:?}, has {} children",
+                    file_node.is_folder,
+                    file_node.path,
+                    view_node.childs.len()
+                );
                 if !view_node.childs.is_empty() {
-                    warn!("View has {} children but no files collected - may be folders only", view_node.childs.len());
+                    warn!(
+                        "View has {} children but no files collected - may be folders only",
+                        view_node.childs.len()
+                    );
                 }
             } else if paths.len() <= 10 {
                 for path in &paths {
@@ -658,50 +703,62 @@ impl VirtualBookApp {
         }
         paths
     }
-    
+
     /// Recursively collect paths from a FileViewNode (all files, regardless of expansion)
-    fn collect_paths_from_view_node(paths: &mut Vec<PathBuf>, node: &std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>) {
+    fn collect_paths_from_view_node(
+        paths: &mut Vec<PathBuf>,
+        node: &std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
+    ) {
         let view_node = node.borrow();
         let file_node = view_node.node.borrow();
-        
+
         if !file_node.is_folder {
             paths.push(file_node.path.clone());
         }
-        
+
         for child in &view_node.childs {
             Self::collect_paths_from_view_node(paths, child);
         }
     }
-    
+
     /// Recursively collect only visible paths (from expanded folders)
     /// parent_expanded: whether the parent folder is expanded
     /// is_root: whether this is the root folder (always displayed in GUI)
     /// Note: The root folder is always displayed in GUI, so its direct children (files) are always collected
     fn collect_visible_paths_from_view_node(
-        paths: &mut Vec<PathBuf>, 
+        paths: &mut Vec<PathBuf>,
         node: &std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
         parent_expanded: bool,
-        is_root: bool
+        is_root: bool,
     ) {
         let view_node = node.borrow();
         let file_node = view_node.node.borrow();
         let is_expanded = view_node.expanded;
-        
+
         // Collect files if:
         // 1. Parent is expanded (so they're visible), OR
         // 2. This is the root folder (always displayed in GUI)
         // Root folder's direct children (files) are always visible regardless of root's expansion state
         if !file_node.is_folder {
             if parent_expanded || is_root {
-                debug!("Collecting file: {:?} (parent_expanded={}, is_root={})", file_node.path, parent_expanded, is_root);
+                debug!(
+                    "Collecting file: {:?} (parent_expanded={}, is_root={})",
+                    file_node.path, parent_expanded, is_root
+                );
                 paths.push(file_node.path.clone());
             } else {
-                debug!("Skipping file: {:?} (parent not expanded, not root)", file_node.path);
+                debug!(
+                    "Skipping file: {:?} (parent not expanded, not root)",
+                    file_node.path
+                );
             }
         } else if file_node.is_folder {
-            debug!("Processing folder: {:?} (parent_expanded={}, is_expanded={}, is_root={})", file_node.path, parent_expanded, is_expanded, is_root);
+            debug!(
+                "Processing folder: {:?} (parent_expanded={}, is_expanded={}, is_root={})",
+                file_node.path, parent_expanded, is_expanded, is_root
+            );
         }
-        
+
         // Recurse into children if:
         // 1. Parent is expanded (base folder case), OR
         // 2. This folder is expanded, OR
@@ -715,17 +772,28 @@ impl VirtualBookApp {
                 // For root folder children: is_root=false (they're not root), but parent_expanded should be true if root is always displayed
                 // Actually, for root's direct children, we want them to always be collected, so we pass is_root=false but parent_expanded=true
                 // For nested folders, we pass is_root=false and use the folder's expanded state
-                Self::collect_visible_paths_from_view_node(paths, child, is_expanded || is_root, false);
+                Self::collect_visible_paths_from_view_node(
+                    paths,
+                    child,
+                    is_expanded || is_root,
+                    false,
+                );
             }
         } else {
-            debug!("Not recursing into {:?} - parent not expanded, folder not expanded, and not root", file_node.path);
+            debug!(
+                "Not recursing into {:?} - parent not expanded, folder not expanded, and not root",
+                file_node.path
+            );
         }
     }
-    
+
     /// Recursively update FileNode metadata (play counts and star counts) with debug tracking
     fn update_file_node_metadata_with_debug(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileNode>>,
-        file_metadata: &std::collections::HashMap<PathBuf, crate::playmetadata_manager::FileMetadata>,
+        file_metadata: &std::collections::HashMap<
+            PathBuf,
+            crate::playmetadata_manager::FileMetadata,
+        >,
         updated_count: &mut usize,
     ) {
         let mut file_node = node.borrow_mut();
@@ -735,46 +803,62 @@ impl VirtualBookApp {
                 let old_star_count = file_node.star_count;
                 file_node.play_count = Some(metadata.play_count);
                 file_node.star_count = Some(metadata.star_count);
-                if old_play_count != Some(metadata.play_count) || old_star_count != Some(metadata.star_count) {
-                    debug!("Updated FileNode metadata: {:?} -> play={} (was {:?}), star={} (was {:?})", 
-                        file_node.path, metadata.play_count, old_play_count, metadata.star_count, old_star_count);
+                if old_play_count != Some(metadata.play_count)
+                    || old_star_count != Some(metadata.star_count)
+                {
+                    debug!(
+                        "Updated FileNode metadata: {:?} -> play={} (was {:?}), star={} (was {:?})",
+                        file_node.path,
+                        metadata.play_count,
+                        old_play_count,
+                        metadata.star_count,
+                        old_star_count
+                    );
                     *updated_count += 1;
                 }
             } else {
                 debug!("No metadata found for FileNode: {:?}", file_node.path);
             }
         }
-        
+
         for child in &mut file_node.folder_files {
             Self::update_file_node_metadata_with_debug(child, file_metadata, updated_count);
         }
     }
-    
+
     /// Recursively update FileViewNode metadata (updates underlying FileNode)
     fn update_file_view_node_metadata(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
-        file_metadata: &std::collections::HashMap<PathBuf, crate::playmetadata_manager::FileMetadata>,
+        file_metadata: &std::collections::HashMap<
+            PathBuf,
+            crate::playmetadata_manager::FileMetadata,
+        >,
     ) {
         let mut updated_count = 0;
         Self::update_file_view_node_metadata_with_debug(node, file_metadata, &mut updated_count);
     }
-    
+
     /// Recursively update FileViewNode metadata (play counts and star counts) with debug tracking
     fn update_file_view_node_metadata_with_debug(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
-        file_metadata: &std::collections::HashMap<PathBuf, crate::playmetadata_manager::FileMetadata>,
+        file_metadata: &std::collections::HashMap<
+            PathBuf,
+            crate::playmetadata_manager::FileMetadata,
+        >,
         updated_count: &mut usize,
     ) {
         let mut view_node = node.borrow_mut();
         let mut file_node = view_node.node.borrow_mut();
-        
+
         if !file_node.is_folder {
             if let Some(metadata) = file_metadata.get(&file_node.path) {
                 let old_play_count = file_node.play_count;
                 let old_star_count = file_node.star_count;
                 file_node.play_count = Some(metadata.play_count);
                 file_node.star_count = Some(metadata.star_count);
-                if old_play_count != Some(metadata.play_count) || old_star_count != Some(metadata.star_count) {
+                if old_play_count != Some(metadata.play_count)
+                    || old_star_count != Some(metadata.star_count)
+                {
                     debug!("Updated FileViewNode metadata: {:?} -> play={} (was {:?}), star={} (was {:?})", 
                         file_node.path, metadata.play_count, old_play_count, metadata.star_count, old_star_count);
                     *updated_count += 1;
@@ -783,9 +867,9 @@ impl VirtualBookApp {
                 debug!("No metadata found for FileViewNode: {:?}", file_node.path);
             }
         }
-        
+
         drop(file_node);
-        
+
         for child in &mut view_node.childs {
             Self::update_file_view_node_metadata_with_debug(child, file_metadata, updated_count);
         }
@@ -793,55 +877,53 @@ impl VirtualBookApp {
 
     /// Render file menu items
     fn render_file_menu(&mut self, ui: &mut egui::Ui) {
-                            if ui
-                                .button(format!(
-                                    "{} {}",
-                                    egui_phosphor::regular::FOLDER_OPEN,
+        if ui
+            .button(format!(
+                "{} {}",
+                egui_phosphor::regular::FOLDER_OPEN,
                 &self.i18n.open_folder
-                                ))
-                                .clicked()
-                            {
-                                let mut location: Option<PathBuf> = self.file_store_path.clone();
-                                if let Some(loc) = &location {
+            ))
+            .clicked()
+        {
+            let mut location: Option<PathBuf> = self.file_store_path.clone();
+            if let Some(loc) = &location {
                 // check location exists
-                                    match loc.metadata() {
-                                        Ok(_r) => {
-                                            if !_r.is_dir() {
-                                                location = None;
-                                            }
-                                        }
-                                        Err(_e) => {
-                                            location = None;
-                                        }
-                                    }
-                                }
+                match loc.metadata() {
+                    Ok(_r) => {
+                        if !_r.is_dir() {
+                            location = None;
+                        }
+                    }
+                    Err(_e) => {
+                        location = None;
+                    }
+                }
+            }
 
-                                if let Err(_result_open_single_dir) =
-                self.file_path_dialog.open_single_dir(location)
-                                {
-                                    error!("fail to open dir dialog");
-                                } else {
-                                    debug!("dialog opened");
-                                }
+            if let Err(_result_open_single_dir) = self.file_path_dialog.open_single_dir(location) {
+                error!("fail to open dir dialog");
+            } else {
+                debug!("dialog opened");
+            }
 
-                                ui.close_menu();
-                            }
-                            ui.separator();
-                            if ui
-                                .button(format!(
-                                    "{} {}",
-                                    egui_phosphor::regular::RECYCLE,
+            ui.close_menu();
+        }
+        ui.separator();
+        if ui
+            .button(format!(
+                "{} {}",
+                egui_phosphor::regular::RECYCLE,
                 &self.i18n.reload_folder
-                                ))
-                                .clicked()
-                            {
-                                if let Some(current_path) = &self.file_store_path {
-                                    let new_filestore = FileStore::new(current_path);
-                                    if let Ok(new_store) = new_filestore {
-                                        self.file_store = new_store.map(|mut fs| {
+            ))
+            .clicked()
+        {
+            if let Some(current_path) = &self.file_store_path {
+                let new_filestore = FileStore::new(current_path);
+                if let Ok(new_store) = new_filestore {
+                    self.file_store = new_store.map(|mut fs| {
                         if let Ok(v) = fs.view(&None, &self.extensions_filters) {
                                                 fs.default_view = Some(v);
-                            
+
                             // Immediately query play counts for visible files (don't wait for periodic query)
                             let visible_paths = Self::collect_visible_file_paths(&fs);
                             if !visible_paths.is_empty() {
@@ -851,20 +933,20 @@ impl VirtualBookApp {
                                             }
                                             fs
                                         });
-                                    }
-                                }
-                                ui.close_menu();
-                            };
+                }
+            }
+            ui.close_menu();
+        };
     }
 
     /// Render preferences menu
     fn render_preferences_menu(&mut self, ui: &mut egui::Ui) {
         ui.label(&self.i18n.zoom);
-                                    let result = ui.add(egui::Slider::new(
+        let result = ui.add(egui::Slider::new(
             &mut self.slider_selected_zoom_factor,
-                                        1.5..=6.0,
-                                    ));
-                                    if !result.is_pointer_button_down_on() {
+            1.5..=6.0,
+        ));
+        if !result.is_pointer_button_down_on() {
             self.screen_zoom_factor = self.slider_selected_zoom_factor;
         };
 
@@ -872,65 +954,63 @@ impl VirtualBookApp {
         ui.checkbox(&mut self.islight, &self.i18n.dark_light);
         ui.label(&self.i18n.time_between_file);
         let time_slider = egui::Slider::new(&mut self.play_wait, 0.0..=30.0);
-                                    if time_slider.ui(ui).changed() {
-            self.appplayer.set_waittime_between_file_play(self.play_wait);
-                                    }
-                                    ui.separator();
+        if time_slider.ui(ui).changed() {
+            self.appplayer
+                .set_waittime_between_file_play(self.play_wait);
+        }
+        ui.separator();
         let mut hasvalue = self.automatic_switch_to_display_after.is_some();
         if ui.checkbox(&mut hasvalue, &self.i18n.switch_auto).changed() {
-                                        if !hasvalue {
+            if !hasvalue {
                 self.automatic_switch_to_display_after = None;
-                                        } else {
+            } else {
                 self.automatic_switch_to_display_after = Some(10);
-                                        }
-                                    }
+            }
+        }
 
         if let Some(value) = &mut self.automatic_switch_to_display_after {
             let automatic_switch_value = egui::Slider::new(value, 5..=300);
-                                        ui.add(automatic_switch_value);
-                                    }
+            ui.add(automatic_switch_value);
+        }
 
-                                    ui.separator();
+        ui.separator();
 
         ui.label(&self.i18n.lattence_jeu);
         let play_lattency_slider = egui::Slider::new(&mut self.play_lattency_ms, -1000..=4_000);
-                                    ui.add(play_lattency_slider);
+        ui.add(play_lattency_slider);
     }
 
     /// Render MIDI device selection
     fn render_midi_devices(&mut self, ui: &mut egui::Ui) {
-                            ui.label("midi out interfaces");
-                            for device in &self.current_devices {
+        ui.label("midi out interfaces");
+        for device in &self.current_devices {
             let selected = self.selected_device == device.no;
-                                if ui.radio(selected, &device.label).clicked() {
+            if ui.radio(selected, &device.label).clicked() {
                 if let Some(_old_player) = &self.appplayer.player {}
 
-                                    println!("Open the device");
+                println!("Open the device");
                 self.selected_device = device.no;
 
-                                    let factory = MidiPlayerFactory {
+                let factory = MidiPlayerFactory {
                     device_no: self.selected_device,
-                                    };
+                };
 
-                                    let (_scmd, rcmd) = channel();
-                                    let (s, player_event_receiver) = channel();
+                let (_scmd, rcmd) = channel();
+                let (s, player_event_receiver) = channel();
 
-                                    match factory.create(s, rcmd) {
-                                        Ok(player) => {
-                                            // change the player
-                        self.appplayer.player(Some((
-                                                player,
-                                                player_event_receiver,
-                                                _scmd,
-                                            )));
-                                        }
-                                        Err(e) => {
-                                            error!("fail to open device {}", e);
-                                        }
-                                    }
+                match factory.create(s, rcmd) {
+                    Ok(player) => {
+                        // change the player
+                        self.appplayer
+                            .player(Some((player, player_event_receiver, _scmd)));
+                    }
+                    Err(e) => {
+                        error!("fail to open device {}", e);
+                    }
+                }
 
-                                    ui.close_menu();
-                                }
+                ui.close_menu();
+            }
         }
     }
 
@@ -958,10 +1038,10 @@ impl VirtualBookApp {
         let visuals = &ctx.style().visuals;
         let button_fill = if play_mod {
             visuals.selection.bg_fill
-                    } else {
+        } else {
             visuals.extreme_bg_color
         };
-        
+
         let button_stroke = if play_mod {
             Stroke::new(2.0, visuals.selection.stroke.color)
         } else {
@@ -970,7 +1050,7 @@ impl VirtualBookApp {
 
         let icon_color = if play_mod {
             visuals.selection.stroke.color
-                    } else {
+        } else {
             visuals.text_color()
         };
 
@@ -984,32 +1064,23 @@ impl VirtualBookApp {
 
         area.show(ctx, |ui| {
             // Allocate exact size for the button area
-            let (rect, response) = ui.allocate_exact_size(
-                Vec2::new(button_size, button_size),
-                Sense::click()
-            );
-            
+            let (rect, response) =
+                ui.allocate_exact_size(Vec2::new(button_size, button_size), Sense::click());
+
             // Draw the button background
-            ui.painter().rect_filled(
-                rect,
-                Rounding::same(8.0),
-                button_fill,
-            );
-            ui.painter().rect_stroke(
-                rect,
-                Rounding::same(8.0),
-                button_stroke,
-            );
-            
+            ui.painter()
+                .rect_filled(rect, Rounding::same(8.0), button_fill);
+            ui.painter()
+                .rect_stroke(rect, Rounding::same(8.0), button_stroke);
+
             // Draw the icon centered
-            let galley = ui.fonts(|f| f.layout_no_wrap(
-                icon.to_string(),
-                FontId::proportional(20.0),
-                icon_color,
-            ));
+            let galley = ui.fonts(|f| {
+                f.layout_no_wrap(icon.to_string(), FontId::proportional(20.0), icon_color)
+            });
             let icon_pos = rect.center() - galley.size() / 2.0;
-            ui.painter().galley_with_override_text_color(icon_pos, galley, icon_color);
-            
+            ui.painter()
+                .galley_with_override_text_color(icon_pos, galley, icon_color);
+
             // Handle clicks
             if response.clicked() {
                 if play_mod {
@@ -1025,46 +1096,51 @@ impl VirtualBookApp {
                 ctx.request_repaint();
             }
 
-            response
-                .on_hover_text_at_pointer(&self.i18n.hover_activate_the_play_of_the_playlist);
+            response.on_hover_text_at_pointer(&self.i18n.hover_activate_the_play_of_the_playlist);
         });
     }
 
     /// Render play time and title (centered)
     fn render_play_time_and_title(&mut self, ui: &mut egui::Ui) {
         if self.appplayer.is_playing() {
-                    let current_playlist =
-                &self.appplayer.playlist.lock().expect("fail to lock playlist");
-                    let cell = current_playlist.current();
-                    if let Some(t) = cell {
-                        let name = t.name.clone();
+            let current_playlist = &self
+                .appplayer
+                .playlist
+                .lock()
+                .expect("fail to lock playlist");
+            let cell = current_playlist.current();
+            if let Some(t) = cell {
+                let name = t.name.clone();
 
                 // Calculate durations
-                            let mut total_duration = String::from("-");
-                            if let Some(duration) = current_playlist.computed_length {
-                                total_duration = duration_to_mm_ss(&duration);
-                            }
+                let mut total_duration = String::from("-");
+                if let Some(duration) = current_playlist.computed_length {
+                    total_duration = duration_to_mm_ss(&duration);
+                }
 
-                            let mut current_file_remaining_duration = String::from("");
-                            if let Some(current_play) = current_playlist.current() {
+                let mut current_file_remaining_duration = String::from("");
+                if let Some(current_play) = current_playlist.current() {
                     if let Some(additional_info) = current_play.additional_informations {
-                                    if let Some(dur) = additional_info.duration {
+                        if let Some(dur) = additional_info.duration {
                             if dur > self.current_duration {
                                 let remaining_current = dur - self.current_duration;
-                                            current_file_remaining_duration =
-                                                duration_to_mm_ss(&remaining_current);
-                                        }
-                                    }
-                                }
+                                current_file_remaining_duration =
+                                    duration_to_mm_ss(&remaining_current);
                             }
+                        }
+                    }
+                }
 
                 // Center the content horizontally
                 ui.horizontal_centered(|ui| {
                     // Play time
                     ui.label(
-                        RichText::new(format!("{} / {}", current_file_remaining_duration, total_duration))
-                            .font(FontId::proportional(14.0))
-                            .color(ui.style().visuals.text_color())
+                        RichText::new(format!(
+                            "{} / {}",
+                            current_file_remaining_duration, total_duration
+                        ))
+                        .font(FontId::proportional(14.0))
+                        .color(ui.style().visuals.text_color()),
                     );
 
                     ui.add_space(12.0);
@@ -1079,7 +1155,8 @@ impl VirtualBookApp {
                     ui.add_space(8.0);
 
                     // Star button - only show when file is playing (using fill variant for filled star)
-                    if ui.button(egui_phosphor::fill::STAR)
+                    if ui
+                        .button(egui_phosphor::fill::STAR)
                         .on_hover_text_at_pointer(&self.i18n.star_file_tooltip)
                         .clicked()
                     {
@@ -1088,9 +1165,9 @@ impl VirtualBookApp {
                             let full_path = &current_play.path;
                             info!("Star button clicked for file: {:?}", full_path);
                             self.metadata_manager.record_star_event(full_path.clone());
+                        }
                     }
-                }
-            });
+                });
             }
         } else {
             // Show empty state when not playing - no text displayed
@@ -1104,142 +1181,141 @@ impl VirtualBookApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn render_top_panel(&mut self, ctx: &egui::Context) -> egui::Response {
         let top_panel_response = egui::TopBottomPanel::top("top_panel")
-            .frame(Frame::default().inner_margin(Margin::same(4.0)).outer_margin(Margin::same(0.0)))
+            .frame(
+                Frame::default()
+                    .inner_margin(Margin::same(4.0))
+                    .outer_margin(Margin::same(0.0)),
+            )
             .default_height(32.0)
             .min_height(32.0)
             .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                // Left: File menu
-                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                    #[allow(clippy::blocks_in_conditions)]
-                    if ui
-                        .menu_button(
-                            format!(
-                                "{} {}",
-                                egui_phosphor::variants::regular::HOUSE_LINE,
-                                &self.i18n.file
-                            ),
-                            |ui| {
-                                self.render_file_menu(ui);
-                                ui.separator();
-                                // preferences menu
-                                ui.menu_button(
-                                    format!(
-                                        "{} {}",
-                                        egui_phosphor::variants::regular::GEAR_SIX,
-                                        &self.i18n.preferences
-                                    ),
-                                    |ui| {
-                                        self.render_preferences_menu(ui);
-                                    },
-                                );
+                ui.horizontal(|ui| {
+                    // Left: File menu
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        #[allow(clippy::blocks_in_conditions)]
+                        if ui
+                            .menu_button(
+                                format!(
+                                    "{} {}",
+                                    egui_phosphor::variants::regular::HOUSE_LINE,
+                                    &self.i18n.file
+                                ),
+                                |ui| {
+                                    self.render_file_menu(ui);
+                                    ui.separator();
+                                    // preferences menu
+                                    ui.menu_button(
+                                        format!(
+                                            "{} {}",
+                                            egui_phosphor::variants::regular::GEAR_SIX,
+                                            &self.i18n.preferences
+                                        ),
+                                        |ui| {
+                                            self.render_preferences_menu(ui);
+                                        },
+                                    );
 
-                                ui.separator();
+                                    ui.separator();
 
-                                self.render_midi_devices(ui);
+                                    self.render_midi_devices(ui);
 
-                                ui.separator();
+                                    ui.separator();
 
-                                if ui.button(&self.i18n.quit).clicked() {
-                                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                                }
-                            },
-                        )
-                        .response
-                        .clicked()
-                    {
-                        if let Ok(devices) = MidiPlayerFactory::list_all_devices() {
-                            self.current_devices = devices;
+                                    if ui.button(&self.i18n.quit).clicked() {
+                                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                                    }
+                                },
+                            )
+                            .response
+                            .clicked()
+                        {
+                            if let Ok(devices) = MidiPlayerFactory::list_all_devices() {
+                                self.current_devices = devices;
+                            }
                         }
-                    }
-                });
+                    });
 
-                // Center: Play time and title (centered)
-                ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                    ui.set_width(ui.available_width());
-                    self.render_play_time_and_title(ui);
+                    // Center: Play time and title (centered)
+                    ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                        ui.set_width(ui.available_width());
+                        self.render_play_time_and_title(ui);
+                    });
                 });
             });
-        });
-        
+
         top_panel_response.response
     }
 
     /// Handle input events (keyboard, mouse movement, etc.)
     fn handle_input_events(&mut self, ui: &mut egui::Ui) {
-                    let v = vec![
-                        (Key::Backspace, String::from(screen_playlist::BACKSPACE)),
-                        (Key::Enter, String::from(screen_playlist::ENTER)),
-                    ];
+        let v = vec![
+            (Key::Backspace, String::from(screen_playlist::BACKSPACE)),
+            (Key::Enter, String::from(screen_playlist::ENTER)),
+        ];
 
-                    let skipped_keys = vec![
-                        Key::Tab,
-                        Key::PageDown,
-                        Key::ArrowDown,
-                        Key::ArrowLeft,
-                        Key::ArrowRight,
-                        Key::ArrowUp,
-                    ];
+        let skipped_keys = vec![
+            Key::Tab,
+            Key::PageDown,
+            Key::ArrowDown,
+            Key::ArrowLeft,
+            Key::ArrowRight,
+            Key::ArrowUp,
+        ];
 
-                    ui.input(|i| {
-                        if i.pointer.is_moving() {
+        ui.input(|i| {
+            if i.pointer.is_moving() {
                 self.last_user_application_date = chrono::Local::now();
             }
 
-            let difference_non_interaction =
-                Local::now() - self.last_user_application_date;
+            let difference_non_interaction = Local::now() - self.last_user_application_date;
 
             if self.screen != Screen::Display && self.appplayer.is_playing() {
                 if let Some(timeout) = self.automatic_switch_to_display_after {
                     if difference_non_interaction.num_seconds() > timeout as i64 {
                         self.screen = Screen::Display;
-                                }
-                            }
-                        }
+                    }
+                }
+            }
 
-                        // top level key handling
-                        let mut consumed = false;
-                        // translate some special keys and call the screen accordingly
+            // top level key handling
+            let mut consumed = false;
+            // translate some special keys and call the screen accordingly
 
-                        if i.modifiers.alt
-                            || i.modifiers.command
-                            || i.modifiers.ctrl
-                            || i.modifiers.shift
-                        {
-                            return;
-                        }
+            if i.modifiers.alt || i.modifiers.command || i.modifiers.ctrl || i.modifiers.shift {
+                return;
+            }
 
-                        for k in skipped_keys {
-                            if i.key_pressed(k) {
-                                return;
-                            }
-                        }
+            for k in skipped_keys {
+                if i.key_pressed(k) {
+                    return;
+                }
+            }
 
-                        // using space to select using the keyboard
+            // using space to select using the keyboard
             if i.key_pressed(Key::Space) && self.current_typed_no.is_empty() {
-                            return;
-                        }
+                return;
+            }
 
-                        for k in v {
-                            if i.key_pressed(k.0) {
-                                let no = k.1;
-                                screen_playlist::handling_key(
-                                    &no,
+            for k in v {
+                if i.key_pressed(k.0) {
+                    let no = k.1;
+                    screen_playlist::handling_key(
+                        &no,
                         &mut self.current_typed_no,
                         &mut self.file_store,
                         &mut self.appplayer,
                         &self.extensions_filters,
-                                );
-                                consumed = true;
-                            }
-                        }
+                    );
+                    consumed = true;
+                }
+            }
 
-                        if !consumed {
-                            for e in i.events.iter() {
-                                if let Event::Key { key, pressed, .. } = e {
-                                    if *pressed {
-                                        screen_playlist::handling_key(
-                                            key.name(),
+            if !consumed {
+                for e in i.events.iter() {
+                    if let Event::Key { key, pressed, .. } = e {
+                        if *pressed {
+                            screen_playlist::handling_key(
+                                key.name(),
                                 &mut self.current_typed_no,
                                 &mut self.file_store,
                                 &mut self.appplayer,
@@ -1248,94 +1324,94 @@ impl VirtualBookApp {
 
                             self.last_user_application_date = chrono::Local::now();
                             self.screen = Screen::PlayListConstruction;
-                                    }
-                                }
-                            }
                         }
-                    });
+                    }
                 }
+            }
+        });
+    }
 
     /// Render background image
     fn render_background(&mut self, ctx: &egui::Context, top_panel_bottom: f32) {
-                let p = ctx.layer_painter(LayerId {
-                    order: Order::Background,
-                    id: Id::new("source"),
-                });
+        let p = ctx.layer_painter(LayerId {
+            order: Order::Background,
+            id: Id::new("source"),
+        });
 
         if self.texture_handle.is_none() {
-                    let textureid = ctx.load_texture(
-                        "bgimage",
+            let textureid = ctx.load_texture(
+                "bgimage",
                 self.bg_image.clone(),
-                        TextureOptions {
-                            magnification: TextureFilter::Nearest,
-                            minification: TextureFilter::Linear,
-                            wrap_mode: TextureWrapMode::Repeat,
-                        },
-                    );
+                TextureOptions {
+                    magnification: TextureFilter::Nearest,
+                    minification: TextureFilter::Linear,
+                    wrap_mode: TextureWrapMode::Repeat,
+                },
+            );
             self.texture_handle = Some(textureid);
-                }
+        }
 
-                let uv = Rect {
-                    min: pos2(0.0, 0.0),
-                    max: pos2(1.0, 1.0),
-                };
+        let uv = Rect {
+            min: pos2(0.0, 0.0),
+            max: pos2(1.0, 1.0),
+        };
 
-                // Background should fill the entire area below the top panel
-                // Since it's rendered at Background layer, use screen_rect and adjust for top panel
-                let mut displayed_image = ctx.screen_rect();
+        // Background should fill the entire area below the top panel
+        // Since it's rendered at Background layer, use screen_rect and adjust for top panel
+        let mut displayed_image = ctx.screen_rect();
         *displayed_image.top_mut() = top_panel_bottom;
 
         if let Some(t) = &self.texture_handle {
-                    // background image
-                    p.image(t.id(), displayed_image, uv, Color32::WHITE);
-                }
+            // background image
+            p.image(t.id(), displayed_image, uv, Color32::WHITE);
+        }
     }
 
     /// Render central panel content
     fn render_central_panel(&mut self, ctx: &egui::Context, top_panel_bottom: f32) {
-                // Central panel should use available_rect which already accounts for top panel
-                let mut rect = ctx.available_rect();
+        // Central panel should use available_rect which already accounts for top panel
+        let mut rect = ctx.available_rect();
         *rect.bottom_mut() -= 0.0; // Remove bottom spacing
 
-                // windows is the only way to have a transparent overlap in egui
-                Window::new("title")
-                    .title_bar(false)
-                    .fixed_rect(rect)
-                    .show(ctx, |ui| {
+        // windows is the only way to have a transparent overlap in egui
+        Window::new("title")
+            .title_bar(false)
+            .fixed_rect(rect)
+            .show(ctx, |ui| {
                 self.handle_input_events(ui);
 
                 if self.screen == Screen::Display {
-                            StripBuilder::new(ui)
-                                .size(Size::relative(0.05))
-                                .size(Size::remainder())
-                                .horizontal(|mut strip| {
-                                    strip.cell(|ui| {
-                                        ui.centered_and_justified(|ui| {
-                                            if ui
-                                                .button(egui_phosphor::regular::PLAYLIST)
-                                                .on_hover_text_at_pointer(
+                    StripBuilder::new(ui)
+                        .size(Size::relative(0.05))
+                        .size(Size::remainder())
+                        .horizontal(|mut strip| {
+                            strip.cell(|ui| {
+                                ui.centered_and_justified(|ui| {
+                                    if ui
+                                        .button(egui_phosphor::regular::PLAYLIST)
+                                        .on_hover_text_at_pointer(
                                             &self.i18n.hover_retour_a_la_playlist,
-                                                )
-                                                .clicked()
-                                            {
+                                        )
+                                        .clicked()
+                                    {
                                         self.screen = Screen::PlayListConstruction
-                                            }
-                                        });
-                                    });
-                                    strip.cell(|ui| {
+                                    }
+                                });
+                            });
+                            strip.cell(|ui| {
                                 screen_visu::ui_content(self, ctx, ui);
-                                    });
-                                });
-                        } else {
-                            StripBuilder::new(ui)
-                                .size(Size::remainder())
-                                .horizontal(|mut strip| {
-                                    strip.cell(|ui| {
+                            });
+                        });
+                } else {
+                    StripBuilder::new(ui)
+                        .size(Size::remainder())
+                        .horizontal(|mut strip| {
+                            strip.cell(|ui| {
                                 screen_playlist::ui_content(self, ctx, ui);
-                                    });
-                                });
-                        }
-                    });
+                            });
+                        });
+                }
+            });
     }
 }
 
@@ -1382,7 +1458,7 @@ impl eframe::App for VirtualBookApp {
             self.render_floating_play_button(ctx, top_panel_rect);
         }
 
-        if !self.appplayer.player.is_some() {
+        if self.appplayer.player.is_none() {
             // there is no player instanciated (because we need to define the output port)
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.label("Choisissez un périphérique de sortie dans le menu Fichier");

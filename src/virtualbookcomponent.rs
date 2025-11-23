@@ -46,7 +46,7 @@ impl Eq for OrdHole {}
 
 impl PartialOrd for OrdHole {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.hole_ref.timestamp.cmp(&other.hole_ref.timestamp))
+        Some(self.cmp(other))
     }
 }
 
