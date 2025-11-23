@@ -70,7 +70,7 @@ fn main() -> eframe::Result<()> {
     // // Log to stdout (if you run with `RUST_LOG=debug`).
     // tracing_subscriber::fmt::init();
 
-    env_logger::try_init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info")).ok();
+    env_logger::try_init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "error")).ok();
 
     println!("==========================================================================");
     let version = env!("CARGO_PKG_VERSION");

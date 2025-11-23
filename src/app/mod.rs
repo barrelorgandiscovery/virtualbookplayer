@@ -220,6 +220,12 @@ impl VirtualBookApp {
             FontData::from_static(include_bytes!("../../fonts/Rubik-VariableFont_wght.ttf")),
         ); // .ttf and .otf supported
 
+        // Install bold font - using Rubik-Bold.ttf
+        fonts.font_data.insert(
+            "rubik_bold".to_owned(),
+            FontData::from_static(include_bytes!("../../fonts/Rubik-Bold.ttf")),
+        );
+
         fonts.font_data.insert(
             "icon_font".to_owned(),
             FontData::from_static(include_bytes!("../../fonts/fa-solid-900.ttf")),
@@ -239,12 +245,38 @@ impl VirtualBookApp {
             .unwrap()
             .push("my_font".to_owned());
 
+        // Register bold font as a separate font family
+        let bold_family = vec!["rubik_bold".to_owned()];
+        fonts
+            .families
+            .insert(FontFamily::Name("rubik_bold".into()), bold_family);
+
         let v = vec!["icon_font".to_owned()];
 
         fonts
             .families
             .insert(FontFamily::Name("icon_font".into()), v);
 
+        // Add fill variant FIRST (higher priority) for filled icons (stars, folders)
+        fonts.font_data.insert(
+            "phosphor-fill".to_owned(),
+            egui_phosphor::Variant::Fill.font_data(),
+        );
+        // Insert fill variant BEFORE regular variant in Proportional font family
+        // This ensures fill variant characters are found first when using fill:: constants
+        let proportional_family = fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap();
+        // Find where "phosphor" (regular variant) is and insert fill before it
+        if let Some(pos) = proportional_family.iter().position(|f| f == "phosphor") {
+            proportional_family.insert(pos, "phosphor-fill".to_owned());
+        } else {
+            // If regular variant not found yet, just add fill variant
+            proportional_family.push("phosphor-fill".to_owned());
+        }
+
+        // Add regular variant as fallback to Proportional (after fill variant)
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
         ctx.set_fonts(fonts);
@@ -901,46 +933,109 @@ impl VirtualBookApp {
         }
     }
 
-    /// Render play button and status
-    fn render_play_button_and_status(&mut self, ui: &mut egui::Ui) {
-        let play_mod = &mut self.appplayer.play_mod;
-                let play_mod_value = *play_mod;
+    /// Render floating play button (not part of top panel layout)
+    fn render_floating_play_button(&mut self, ctx: &egui::Context, top_panel_rect: Rect) {
+        let play_mod = self.appplayer.play_mod;
 
-                let indicator_play_button = IndicatorButton::new(play_mod)
-                    .label(if !play_mod_value {
-                        egui_phosphor::regular::PLAY
+        // Use filled icons for better visibility - show PAUSE when in play mode, PLAY when stopped
+        let icon = if play_mod {
+            egui_phosphor::fill::PAUSE
+        } else {
+            egui_phosphor::fill::PLAY
+        };
+
+        // Position the button at top-right of window with equal margins
+        let button_size = 32.0;
+        let margin = 8.0;
+        let screen_rect = ctx.screen_rect();
+        let button_pos = Pos2::new(
+            screen_rect.right() - button_size - margin,
+            screen_rect.top() + margin,
+        );
+
+        let visuals = &ctx.style().visuals;
+        let button_fill = if play_mod {
+            visuals.selection.bg_fill
                     } else {
-                        egui_phosphor::regular::STOP
-                    })
-                    .width(32.0)
-                    .height(24.0);
+            visuals.extreme_bg_color
+        };
+        
+        let button_stroke = if play_mod {
+            Stroke::new(2.0, visuals.selection.stroke.color)
+        } else {
+            visuals.window_stroke
+        };
 
-                let indicator_play_response = ui.add(indicator_play_button);
-
-                if indicator_play_response.changed() {
-                    if *play_mod {
-                self.appplayer.play_file_on_top();
+        let icon_color = if play_mod {
+            visuals.selection.stroke.color
                     } else {
-                self.appplayer.stop();
-                    }
+            visuals.text_color()
+        };
+
+        // Create floating area for the button
+        let area = Area::new(Id::new("floating_play_button"))
+            .fixed_pos(button_pos)
+            .order(Order::Foreground)
+            .interactable(true);
+
+        area.show(ctx, |ui| {
+            // Allocate exact size for the button area
+            let (rect, response) = ui.allocate_exact_size(
+                Vec2::new(button_size, button_size),
+                Sense::click()
+            );
+            
+            // Draw the button background
+            ui.painter().rect_filled(
+                rect,
+                Rounding::same(8.0),
+                button_fill,
+            );
+            ui.painter().rect_stroke(
+                rect,
+                Rounding::same(8.0),
+                button_stroke,
+            );
+            
+            // Draw the icon centered
+            let galley = ui.fonts(|f| f.layout_no_wrap(
+                icon.to_string(),
+                FontId::proportional(20.0),
+                icon_color,
+            ));
+            let icon_pos = rect.center() - galley.size() / 2.0;
+            ui.painter().galley_with_override_text_color(icon_pos, galley, icon_color);
+            
+            // Handle clicks
+            if response.clicked() {
+                if play_mod {
+                    // Currently in play mode - pause/stop
+                    self.appplayer.stop();
+                    self.appplayer.play_mod = false;
+                } else {
+                    // Not in play mode - start
+                    self.appplayer.play_mod = true;
+                    self.appplayer.play_file_on_top();
                 }
+                // Request immediate repaint to update button state
+                ctx.request_repaint();
+            }
 
-                indicator_play_response
-            .on_hover_text_at_pointer(&self.i18n.hover_activate_the_play_of_the_playlist);
+            response
+                .on_hover_text_at_pointer(&self.i18n.hover_activate_the_play_of_the_playlist);
+        });
+    }
 
-                // playing title
+    /// Render play time and title (centered)
+    fn render_play_time_and_title(&mut self, ui: &mut egui::Ui) {
         if self.appplayer.is_playing() {
                     let current_playlist =
                 &self.appplayer.playlist.lock().expect("fail to lock playlist");
                     let cell = current_playlist.current();
                     if let Some(t) = cell {
                         let name = t.name.clone();
-                        let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
-                        rt = rt.font(FontId::proportional(12.0));
-                        rt = rt.background_color(ui.style().visuals.selection.bg_fill);
-                        rt = rt.color(ui.style().visuals.selection.stroke.color);
 
-                        ui.horizontal(|ui| {
+                // Calculate durations
                             let mut total_duration = String::from("-");
                             if let Some(duration) = current_playlist.computed_length {
                                 total_duration = duration_to_mm_ss(&duration);
@@ -948,11 +1043,10 @@ impl VirtualBookApp {
 
                             let mut current_file_remaining_duration = String::from("");
                             if let Some(current_play) = current_playlist.current() {
-                        if let Some(additional_info) = current_play.additional_informations {
+                    if let Some(additional_info) = current_play.additional_informations {
                                     if let Some(dur) = additional_info.duration {
-                                if dur > self.current_duration {
-                                    let remaining_current = dur - self.current_duration;
-
+                            if dur > self.current_duration {
+                                let remaining_current = dur - self.current_duration;
                                             current_file_remaining_duration =
                                                 duration_to_mm_ss(&remaining_current);
                                         }
@@ -960,93 +1054,111 @@ impl VirtualBookApp {
                                 }
                             }
 
-                            ui.label(format!(
-                                "{} / {}",
-                                current_file_remaining_duration,
-                                total_duration
-                            ));
+                // Center the content horizontally
+                ui.horizontal_centered(|ui| {
+                    // Play time
+                    ui.label(
+                        RichText::new(format!("{} / {}", current_file_remaining_duration, total_duration))
+                            .font(FontId::proportional(14.0))
+                            .color(ui.style().visuals.text_color())
+                    );
 
-                            ui.label(rt.monospace());
-                            
-                            // Star button - only show when file is playing
-                            if ui.button(egui_phosphor::regular::STAR)
-                                .on_hover_text_at_pointer(&self.i18n.star_file_tooltip)
-                                .clicked()
-                            {
-                                // Get the current playing file path
-                                if let Some(current_play) = current_playlist.current() {
-                                    let full_path = &current_play.path;
-                                    info!("Star button clicked for file: {:?}", full_path);
-                                    self.metadata_manager.record_star_event(full_path.clone());
+                    ui.add_space(12.0);
+
+                    // Title with arrows
+                    let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
+                    rt = rt.font(FontId::proportional(14.0));
+                    rt = rt.background_color(ui.style().visuals.selection.bg_fill);
+                    rt = rt.color(ui.style().visuals.selection.stroke.color);
+                    ui.label(rt);
+
+                    ui.add_space(8.0);
+
+                    // Star button - only show when file is playing (using fill variant for filled star)
+                    if ui.button(egui_phosphor::fill::STAR)
+                        .on_hover_text_at_pointer(&self.i18n.star_file_tooltip)
+                        .clicked()
+                    {
+                        // Get the current playing file path
+                        if let Some(current_play) = current_playlist.current() {
+                            let full_path = &current_play.path;
+                            info!("Star button clicked for file: {:?}", full_path);
+                            self.metadata_manager.record_star_event(full_path.clone());
                     }
                 }
             });
-                    }
-                }
+            }
+        } else {
+            // Show empty state when not playing - no text displayed
+            ui.horizontal_centered(|ui| {
+                // Empty - no text shown when not playing
+            });
+        }
     }
 
     /// Render top panel menu bar
     #[cfg(not(target_arch = "wasm32"))]
     fn render_top_panel(&mut self, ctx: &egui::Context) -> egui::Response {
-        let old = ctx.style().visuals.clone();
-        let mut visual_mut = old.clone();
+        let top_panel_response = egui::TopBottomPanel::top("top_panel")
+            .frame(Frame::default().inner_margin(Margin::same(4.0)).outer_margin(Margin::same(0.0)))
+            .default_height(32.0)
+            .min_height(32.0)
+            .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                // Left: File menu
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    #[allow(clippy::blocks_in_conditions)]
+                    if ui
+                        .menu_button(
+                            format!(
+                                "{} {}",
+                                egui_phosphor::variants::regular::HOUSE_LINE,
+                                &self.i18n.file
+                            ),
+                            |ui| {
+                                self.render_file_menu(ui);
+                                ui.separator();
+                                // preferences menu
+                                ui.menu_button(
+                                    format!(
+                                        "{} {}",
+                                        egui_phosphor::variants::regular::GEAR_SIX,
+                                        &self.i18n.preferences
+                                    ),
+                                    |ui| {
+                                        self.render_preferences_menu(ui);
+                                    },
+                                );
 
-        let mut c = visual_mut.window_fill;
-        c = Color32::from_rgb(c.r(), c.g(), c.b());
-        visual_mut.window_fill = c;
+                                ui.separator();
 
-        ctx.set_visuals(visual_mut);
+                                self.render_midi_devices(ui);
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // file menu
-            egui::menu::bar(ui, |ui| {
-                #[allow(clippy::blocks_in_conditions)]
-                if ui
-                    .menu_button(
-                        format!(
-                            "{} {}",
-                            egui_phosphor::variants::regular::HOUSE_LINE,
-                            &self.i18n.file
-                        ),
-                        |ui| {
-                            self.render_file_menu(ui);
-                            ui.separator();
-                            // preferences menu
-                            ui.menu_button(
-                                format!(
-                                    "{} {}",
-                                    egui_phosphor::variants::regular::GEAR_SIX,
-                                    &self.i18n.preferences
-                                ),
-                                |ui| {
-                                    self.render_preferences_menu(ui);
-                                },
-                            );
+                                ui.separator();
 
-                            ui.separator();
-
-                            self.render_midi_devices(ui);
-
-                            ui.separator();
-
-                            if ui.button(&self.i18n.quit).clicked() {
-                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                            }
-                        },
-                    )
-                    .response
-                    .clicked()
-                {
-                    if let Ok(devices) = MidiPlayerFactory::list_all_devices() {
-                        self.current_devices = devices;
+                                if ui.button(&self.i18n.quit).clicked() {
+                                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                                }
+                            },
+                        )
+                        .response
+                        .clicked()
+                    {
+                        if let Ok(devices) = MidiPlayerFactory::list_all_devices() {
+                            self.current_devices = devices;
+                        }
                     }
-                }
+                });
 
-                self.render_play_button_and_status(ui);
+                // Center: Play time and title (centered)
+                ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                    ui.set_width(ui.available_width());
+                    self.render_play_time_and_title(ui);
+                });
             });
-            ctx.set_visuals(old);
-        })
-        .response
+        });
+        
+        top_panel_response.response
     }
 
     /// Handle input events (keyboard, mouse movement, etc.)
@@ -1177,9 +1289,7 @@ impl VirtualBookApp {
     fn render_central_panel(&mut self, ctx: &egui::Context, top_panel_bottom: f32) {
                 let mut rect = ctx.screen_rect();
         *rect.top_mut() += top_panel_bottom;
-        *rect.bottom_mut() -= top_panel_bottom
-            - (ctx.style().spacing.window_margin.bottom
-                + ctx.style().spacing.window_margin.top);
+        *rect.bottom_mut() -= 0.0; // Remove bottom spacing
 
                 // windows is the only way to have a transparent overlap in egui
                 Window::new("title")
@@ -1253,6 +1363,18 @@ impl eframe::App for VirtualBookApp {
         } else {
             0.0
         };
+
+        let top_panel_rect = if cfg!(not(target_arch = "wasm32")) {
+            top_response.rect
+        } else {
+            Rect::NOTHING
+        };
+
+        // Render floating play button (not part of top panel layout)
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.appplayer.player.is_some() {
+            self.render_floating_play_button(ctx, top_panel_rect);
+        }
 
         if !self.appplayer.player.is_some() {
             // there is no player instanciated (because we need to define the output port)
