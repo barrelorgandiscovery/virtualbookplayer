@@ -425,8 +425,10 @@ impl Player for MidiPlayer {
         // thread spawned interpret the Midi event and send them on the line
         thread::spawn(move || {
             profiling::register_thread!("player thread");
+            // Try to set max priority - this may fail on Linux without root/CAP_SYS_NICE (OS error 13)
+            // This is expected and not critical - playback will work fine with normal priority
             if let Err(e) = set_current_thread_priority(ThreadPriority::Max) {
-                warn!("fail to set max priority to player thread : {:?}", e);
+                debug!("Could not set max priority to player thread (this is normal without root privileges): {:?}", e);
             }
 
             let mut buf = Vec::new();
@@ -650,8 +652,9 @@ impl Player for MidiPlayer {
     }
 
     fn stop(&mut self) {
+        // Try to send cancel signal - if channel is closed, thread already finished (this is normal)
         if let Err(e) = self.cancel.send(true) {
-            error!("fail to send cancel order : {}", e);
+            debug!("Could not send cancel order (thread may have already finished): {}", e);
         }
     }
 

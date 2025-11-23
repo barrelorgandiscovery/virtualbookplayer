@@ -49,6 +49,8 @@ pub struct FileNode {
     pub is_folder: bool,
     pub parent_folder: Option<Weak<RefCell<FileNode>>>,
     pub folder_files: Vec<Rc<RefCell<FileNode>>>,
+    /// Number of times this file has been played (memoized from database)
+    pub play_count: Option<u32>,
 }
 
 impl Display for FileNode {
@@ -95,6 +97,7 @@ impl FileNode {
                         is_folder: is_dir,
                         folder_files: vec![],
                         parent_folder: None,
+                        play_count: None, // Will be populated by background thread
                     };
                     Ok(n)
                 }

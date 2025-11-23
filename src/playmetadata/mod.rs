@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 //    the total play time
 //    some "stars"/rank (1..5) hits from the user
 use rusqlite::Connection;
+use log::{debug, error, info};
 
 /// Helper function to convert DateTime<Utc> to SQLite DATE format (YYYY-MM-DD HH:MM:SS)
 /// SQLite DATE columns work best with this format for date functions
@@ -60,17 +61,61 @@ const CURRENT_MODEL_VERSION: &str = "1.0.0";
 // implement the database operations
 impl PlayMetadataDatabase {
     pub fn new(db_file_path: String) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut connection = Connection::open(&db_file_path).map_err(|e| Box::new(e))?;
+        use std::path::Path;
+        
+        // Check if database file already exists
+        let db_exists = Path::new(&db_file_path).exists();
+        if db_exists {
+            info!("Opening existing metadata database at: {:?}", db_file_path);
+        } else {
+            info!("Creating new metadata database at: {:?}", db_file_path);
+        }
+        
+        let mut connection = Connection::open(&db_file_path).map_err(|e| {
+            error!("Failed to open database at {:?}: {}", db_file_path, e);
+            Box::new(e)
+        })?;
         
         // Optimize SQLite for better performance
         Self::optimize_connection(&mut connection)?;
         
         let play_metadata_database = Self {
-            db_file_path,
+            db_file_path: db_file_path.clone(),
             connection,
         };
         play_metadata_database.create_tables()?;
+        
+        // Log database stats after opening
+        if db_exists {
+            if let Ok(count) = play_metadata_database.count_played_files() {
+                info!("Database contains {} file entries", count);
+            }
+            if let Ok(count) = play_metadata_database.count_play_events() {
+                info!("Database contains {} play events", count);
+            }
+        }
+        
         Ok(play_metadata_database)
+    }
+    
+    /// Count total number of files in database (for debugging)
+    fn count_played_files(&self) -> Result<usize, Box<dyn std::error::Error>> {
+        let count: i64 = self.connection.query_row(
+            "SELECT COUNT(*) FROM played_file_stats",
+            [],
+            |row| row.get(0)
+        )?;
+        Ok(count as usize)
+    }
+    
+    /// Count total number of play events in database (for debugging)
+    fn count_play_events(&self) -> Result<usize, Box<dyn std::error::Error>> {
+        let count: i64 = self.connection.query_row(
+            "SELECT COUNT(*) FROM played_file_stats_history",
+            [],
+            |row| row.get(0)
+        )?;
+        Ok(count as usize)
     }
 
     /// Configure SQLite connection for optimal performance with small memory footprint
@@ -211,19 +256,28 @@ impl PlayMetadataDatabase {
         &self,
         played_file_stats: PlayedFileStats,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Insert or update the main stats record (without latest_play_time and total_play_number)
+        // Use INSERT ... ON CONFLICT DO UPDATE to preserve the id when updating
+        // This is important because foreign keys in played_file_stats_history reference the id
+        // INSERT OR REPLACE would delete and reinsert, changing the id and breaking foreign keys
+        let file_path_for_log = played_file_stats.relative_file_path.clone();
         self.connection
             .execute(
-                "INSERT OR REPLACE INTO played_file_stats \
+                "INSERT INTO played_file_stats \
                 (relative_file_path, file_md5_checksum, user_comments_or_notes) \
-                VALUES (?, ?, ?)",
+                VALUES (?, ?, ?) \
+                ON CONFLICT(relative_file_path) DO UPDATE SET \
+                file_md5_checksum = excluded.file_md5_checksum, \
+                user_comments_or_notes = excluded.user_comments_or_notes",
                 (
                     played_file_stats.relative_file_path,
                     played_file_stats.file_md5_checksum,
                     played_file_stats.user_comments_or_notes,
                 ),
             )
-            .map_err(|e| Box::new(e))?;
+            .map_err(|e| {
+                error!("Error inserting/updating file stats for '{}': {}", file_path_for_log, e);
+                Box::new(e)
+            })?;
         Ok(())
     }
 
@@ -236,20 +290,29 @@ impl PlayMetadataDatabase {
         // Use a single query with subquery to avoid two round trips
         // But check if any rows were affected to ensure the file exists
         let play_time_str = datetime_to_sqlite_date(&play_time);
+        let file_path_for_log = relative_file_path.clone();
+        debug!("Adding play event to history: file='{}', time='{}'", file_path_for_log, play_time_str);
+        
         let rows_affected = self.connection
             .execute(
                 "INSERT INTO played_file_stats_history (ref_played_file_stats_id, played_time) \
                 SELECT id, ? FROM played_file_stats WHERE relative_file_path = ?",
-                (play_time_str, relative_file_path),
+                (play_time_str, relative_file_path.clone()),
             )
-            .map_err(|e| Box::new(e))?;
+            .map_err(|e| {
+                error!("Database error inserting play event for '{}': {}", file_path_for_log, e);
+                Box::new(e)
+            })?;
         
         if rows_affected == 0 {
+            error!("No rows affected when inserting play event for '{}' - file may not exist in played_file_stats", file_path_for_log);
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                "File not found in played_file_stats"
+                format!("File '{}' not found in played_file_stats", file_path_for_log)
             )));
         }
+        
+        debug!("Successfully inserted play event: {} rows affected for '{}'", rows_affected, file_path_for_log);
         Ok(())
     }
 
@@ -310,10 +373,14 @@ impl PlayMetadataDatabase {
             .map_err(|e| Box::new(e))?;
 
         // Prepare statement once and reuse
+        // Use INSERT ... ON CONFLICT DO UPDATE to preserve the id when updating
         let mut stmt = self.connection.prepare(
-            "INSERT OR REPLACE INTO played_file_stats \
+            "INSERT INTO played_file_stats \
             (relative_file_path, file_md5_checksum, user_comments_or_notes) \
-            VALUES (?, ?, ?)"
+            VALUES (?, ?, ?) \
+            ON CONFLICT(relative_file_path) DO UPDATE SET \
+            file_md5_checksum = excluded.file_md5_checksum, \
+            user_comments_or_notes = excluded.user_comments_or_notes"
         )?;
 
         // Process items in chunks
@@ -337,6 +404,8 @@ impl PlayMetadataDatabase {
         &self,
         relative_file_path: String,
     ) -> Result<Option<PlayedFileStats>, Box<dyn std::error::Error>> {
+        debug!("Querying play stats for relative path: '{}'", relative_file_path);
+        
         // Optimized SQL query using subqueries for better performance with indexes
         // This query leverages the composite index (ref_played_file_stats_id, played_time)
         let sql = "\
@@ -352,7 +421,12 @@ impl PlayMetadataDatabase {
             FROM played_file_stats \
             WHERE played_file_stats.relative_file_path = ?";
         
-        let mut stmt = self.connection.prepare(sql).map_err(|e| Box::new(e))?;
+        let mut stmt = self.connection.prepare(sql).map_err(|e| {
+            error!("Failed to prepare query for '{}': {}", relative_file_path, e);
+            Box::new(e)
+        })?;
+        
+        // Try to find the file - use query_row which returns an error if not found
         let result = stmt.query_row([&relative_file_path], |row| {
             let relative_file_path: String = row.get(1)?;
             let file_md5_checksum: String = row.get(2)?;
@@ -361,6 +435,8 @@ impl PlayMetadataDatabase {
             // Get computed values from history
             let latest_play_time_str: Option<String> = row.get(4)?;
             let total_play_number: i64 = row.get(5)?;
+            
+            debug!("Found file in database: '{}', play_count={}", relative_file_path, total_play_number);
             
             // Convert latest_play_time from SQLite DATE format to DateTime<Utc>
             // If no history exists, use a default (epoch or current time)
@@ -382,9 +458,18 @@ impl PlayMetadataDatabase {
         });
         
         match result {
-            Ok(stats) => Ok(Some(stats)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(Box::new(e)),
+            Ok(stats) => {
+                debug!("Successfully retrieved stats for '{}': play_count={}", relative_file_path, stats.total_play_number);
+                Ok(Some(stats))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                debug!("File '{}' not found in database (no play history yet)", relative_file_path);
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Database error querying '{}': {}", relative_file_path, e);
+                Err(Box::new(e))
+            }
         }
     }
 }

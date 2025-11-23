@@ -26,6 +26,7 @@ pub struct I18NMessages {
     pub hover_click_to_enlarge_view: String,
     pub hover_activate_the_play_of_the_playlist: String,
     pub hover_retour_a_la_playlist: String,
+    pub play_count_tooltip: String,
 }
 
 fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
@@ -97,6 +98,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         hover_click_to_enlarge_view: "Click to enlarge the view".into(),
         hover_activate_the_play_of_the_playlist: "Activate the play of the playlist".into(),
         hover_retour_a_la_playlist: "Back to playlist".into(),
+        play_count_tooltip: "Number of times this file has been played".into(),
     })
 }
 
@@ -129,5 +131,6 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         hover_click_to_enlarge_view: "Clickez pour agrandir".into(),
         hover_activate_the_play_of_the_playlist: "Jouer ou Arreter le jeu de la playlist".into(),
         hover_retour_a_la_playlist: "Retour à la playlist".into(),
+        play_count_tooltip: "Nombre de fois que ce fichier a été joué".into(),
     })
 }

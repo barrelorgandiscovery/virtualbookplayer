@@ -8,6 +8,7 @@ pub mod file_store;
 pub mod playlist;
 pub mod virtualbookcomponent;
 pub mod playmetadata;
+pub mod playmetadata_manager;
 
 use std::time::Duration;
 

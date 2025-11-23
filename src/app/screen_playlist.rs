@@ -377,6 +377,7 @@ fn display_folder(
     element: &mut Rc<RefCell<FileViewNode>>,
     element_name: String,
     ui: &mut Ui,
+    i18n: &crate::app::i18n::I18NMessages,
 ) -> Result<bool, FileStoreError> {
     let expanded = {
         let e = element.borrow();
@@ -391,7 +392,7 @@ fn display_folder(
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
 
-            match display_tree(appplayer, number_selected, element, ui) {
+            match display_tree(appplayer, number_selected, element, ui, i18n) {
                 Err(e) => {
                     error!("error in displaying sub tree {}", e);
                 }
@@ -412,24 +413,107 @@ fn display_folder(
 }
 
 /// Handle file display in tree view
+/// Render a badge with the play count using theme colors (subtle, less visible than file title)
+/// i18n: i18n messages for tooltip text
+fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
+    let badge_text = count.to_string();
+    let visuals = &ui.style().visuals;
+    
+    // Use subtle theme colors for the badge - less visible than the file title
+    // Use a faint background that blends with the UI
+    let bg_color = visuals.faint_bg_color;
+    // Use a very subtle border or no border
+    let stroke_color = visuals.faint_bg_color.linear_multiply(0.8); // Slightly darker for subtle border
+    // Use a muted text color - less prominent than the file title
+    let text_color = visuals.text_color().linear_multiply(0.6); // 60% opacity for subtlety
+    
+    // Calculate badge size based on text
+    let font = FontId::proportional(9.0); // Slightly smaller font
+    let text_width = ui.fonts(|f| f.layout_no_wrap(
+        badge_text.clone(),
+        font.clone(),
+        text_color,
+    ).size().x);
+    
+    let padding = 4.0; // Slightly less padding
+    let badge_width = text_width + padding * 2.0;
+    let badge_height = 16.0; // Slightly smaller height
+    
+    // Create badge frame with subtle appearance
+    let badge_frame = Frame::none()
+        .fill(bg_color) // Faint background
+        .stroke(Stroke::new(0.5, stroke_color)) // Very thin, subtle border
+        .rounding(Rounding::same(8.0)); // Rounded corners
+    
+    // Create the badge with tooltip
+    let badge_response = badge_frame.show(ui, |ui| {
+        ui.set_width(badge_width);
+        ui.set_height(badge_height);
+        ui.centered_and_justified(|ui| {
+            ui.label(
+                RichText::new(badge_text)
+                    .font(font)
+                    .color(text_color) // Muted text color
+            );
+        });
+    });
+    
+    // Add tooltip on hover
+    badge_response.response.on_hover_text_at_pointer(&i18n.play_count_tooltip);
+}
+
 fn display_file(
     appplayer: &mut AppPlayer,
     number_selected: &mut String,
     element: &mut Rc<RefCell<FileViewNode>>,
     element_name: String,
     ui: &mut Ui,
+    i18n: &crate::app::i18n::I18NMessages,
 ) -> bool {
+    // Get play count from FileNode if available
+    let play_count = {
+        let file_node = element.borrow();
+        let node = file_node.node.borrow();
+        let count = node.play_count;
+        if count.is_none() {
+            debug!("Displaying file '{}' with no play count yet (path: {:?})", element_name, node.path);
+        } else {
+            debug!("Displaying file '{}' with play count: {:?} (path: {:?})", element_name, count, node.path);
+        }
+        count
+    };
+    
+    // Display file name with play count badge if available
     let clicked = {
         let mut bele = element.borrow_mut();
-        if ui.checkbox(&mut bele.selected, &element_name).clicked() {
-            bele.selected = false;
-            true
-        } else {
-            false
-        }
+        
+        // Use horizontal layout to place checkbox, filename, and badge side by side
+        let checkbox_clicked = ui.horizontal(|ui| {
+            // Checkbox with filename
+            let clicked = ui.checkbox(&mut bele.selected, &element_name).clicked();
+            
+            // Play count badge (only show if count > 0)
+            if let Some(count) = play_count {
+                if count > 0 {
+                    ui.add_space(4.0); // Small spacing between filename and badge
+                    render_play_count_badge(ui, count, i18n);
+                }
+            }
+            
+            clicked
+        }).inner;
+        
+        checkbox_clicked
     };
-
+    
     if clicked {
+        // Set selected to false and drop the borrow before locking playlist
+        {
+            let mut bele = element.borrow_mut();
+            bele.selected = false;
+        } // Drop the borrow here
+        
+        // Now lock the playlist (no conflict with element borrow)
         {
             let mut locked_playlist = appplayer
                 .playlist
@@ -457,6 +541,7 @@ fn display_tree(
     number_selected: &mut String,
     files_folder: &mut Rc<RefCell<FileViewNode>>,
     ui: &mut Ui,
+    i18n: &crate::app::i18n::I18NMessages,
 ) -> Result<bool, FileStoreError> {
     let mut file_selected = false;
     let mut bfile_folder = files_folder.borrow_mut();
@@ -470,7 +555,7 @@ fn display_tree(
         };
 
         if node_is_folder {
-            match display_folder(appplayer, number_selected, element, element_name, ui) {
+            match display_folder(appplayer, number_selected, element, element_name, ui, i18n) {
                 Err(e) => {
                     error!("error in displaying folder {}", e);
                 }
@@ -482,7 +567,7 @@ fn display_tree(
             }
         } else {
             // file and not a folder
-            if display_file(appplayer, number_selected, element, element_name, ui) {
+            if display_file(appplayer, number_selected, element, element_name, ui, i18n) {
                 file_selected = true;
             }
         }
@@ -532,6 +617,7 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
                                         &mut app.current_typed_no,
                                         &mut view.root,
                                         ui,
+                                        &app.i18n,
                                     ) {
                                         Err(e) => {
                                             error!("error in display tree: {}", e);
