@@ -7,6 +7,7 @@ pub mod appplayer;
 pub mod file_store;
 pub mod playlist;
 pub mod virtualbookcomponent;
+pub mod playmetadata;
 
 use std::time::Duration;
 

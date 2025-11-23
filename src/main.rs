@@ -7,7 +7,7 @@
 //! use@alexa:~/projets/2023-05-01_test_egui_draw/virtualbookplayer$ target/debug/virtualbookplayerapp --help
 //! ```
 //! ==========================================================================
-//! Virtual Book Player 0.0.35 (Patrice Freydiere - BarrelOrganDiscovery)
+//! Virtual Book Player 0.0.56 (Patrice Freydiere - BarrelOrganDiscovery)
 //! https://www.barrel-organ-discovery.org
 //!   date: dim. 15 oct. 2023 08:57:03 CEST
 //!   build: 10adc0cf4a8f004c0f7b969ca69a5b6be5a96de5
