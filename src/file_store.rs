@@ -51,6 +51,8 @@ pub struct FileNode {
     pub folder_files: Vec<Rc<RefCell<FileNode>>>,
     /// Number of times this file has been played (memoized from database)
     pub play_count: Option<u32>,
+    /// Number of times this file has been starred (memoized from database)
+    pub star_count: Option<u32>,
 }
 
 impl Display for FileNode {
@@ -98,6 +100,7 @@ impl FileNode {
                         folder_files: vec![],
                         parent_folder: None,
                         play_count: None, // Will be populated by background thread
+                        star_count: None, // Will be populated by background thread
                     };
                     Ok(n)
                 }

@@ -386,7 +386,20 @@ fn display_folder(
 
     let id_source_folder = number_selected.clone() + element_name.as_str();
     let mut file_selected = false;
-    let r = CollapsingHeader::new(&element_name)
+    
+    // Build folder header with icon
+    use egui::text::{LayoutJob, TextFormat};
+    let mut folder_job = LayoutJob::default();
+    let body_font = ui.style().text_styles.get(&egui::TextStyle::Body).unwrap().clone();
+    let bold_font = FontId::proportional(body_font.size * 1.05); // Slightly larger for bold effect
+    let bold_format = TextFormat::simple(
+        bold_font,
+        ui.style().visuals.text_color(),
+    );
+    folder_job.append(&format!("{} ", egui_phosphor::regular::FOLDER), 0.0, bold_format.clone());
+    folder_job.append(&element_name, 0.0, bold_format);
+    
+    let r = CollapsingHeader::new(egui::WidgetText::from(folder_job))
         .id_source(id_source_folder)
         .open(Some(expanded))
         .show(ui, |ui| {
@@ -412,11 +425,12 @@ fn display_folder(
     Ok(file_selected)
 }
 
-/// Handle file display in tree view
-/// Render a badge with the play count using theme colors (subtle, less visible than file title)
-/// i18n: i18n messages for tooltip text
-fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
-    let badge_text = count.to_string();
+/// Render a badge with text and color (generalized badge renderer)
+/// Uses theme colors for background and border (subtle, less visible than file title)
+/// text: The text to display in the badge
+/// text_color: The color for the badge text
+/// tooltip: Tooltip text to show on hover
+fn render_badge(ui: &mut Ui, text: String, text_color: egui::Color32, tooltip: &str) {
     let visuals = &ui.style().visuals;
     
     // Use subtle theme colors for the badge - less visible than the file title
@@ -424,13 +438,11 @@ fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18
     let bg_color = visuals.faint_bg_color;
     // Use a very subtle border or no border
     let stroke_color = visuals.faint_bg_color.linear_multiply(0.8); // Slightly darker for subtle border
-    // Use a muted text color - less prominent than the file title
-    let text_color = visuals.text_color().linear_multiply(0.6); // 60% opacity for subtlety
     
     // Calculate badge size based on text
     let font = FontId::proportional(9.0); // Slightly smaller font
     let text_width = ui.fonts(|f| f.layout_no_wrap(
-        badge_text.clone(),
+        text.clone(),
         font.clone(),
         text_color,
     ).size().x);
@@ -451,15 +463,36 @@ fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18
         ui.set_height(badge_height);
         ui.centered_and_justified(|ui| {
             ui.label(
-                RichText::new(badge_text)
+                RichText::new(text)
                     .font(font)
-                    .color(text_color) // Muted text color
+                    .color(text_color)
             );
         });
     });
     
     // Add tooltip on hover
-    badge_response.response.on_hover_text_at_pointer(&i18n.play_count_tooltip);
+    badge_response.response.on_hover_text_at_pointer(tooltip);
+}
+
+/// Render a badge with the play count using theme colors (subtle, less visible than file title)
+/// i18n: i18n messages for tooltip text
+fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
+    let badge_text = count.to_string();
+    let visuals = &ui.style().visuals;
+    // Use text color for play count badges
+    let text_color = visuals.text_color().linear_multiply(0.6); // 60% opacity for subtlety
+    render_badge(ui, badge_text, text_color, &i18n.play_count_tooltip);
+}
+
+/// Render a badge with the star count using theme colors (subtle, less visible than file title)
+/// Shows multiple star symbols instead of a count number
+/// i18n: i18n messages for tooltip text
+fn render_star_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
+    // Repeat the star symbol 'count' times
+    let badge_text = egui_phosphor::regular::STAR.repeat(count as usize);
+    // Use plain yellow for stars
+    let star_color = egui::Color32::from_rgb(255, 215, 0); // Gold/yellow color
+    render_badge(ui, badge_text, star_color, &i18n.star_count_tooltip);
 }
 
 fn display_file(
@@ -470,40 +503,101 @@ fn display_file(
     ui: &mut Ui,
     i18n: &crate::app::i18n::I18NMessages,
 ) -> bool {
-    // Get play count from FileNode if available
-    let play_count = {
+    // Get play count and star count from FileNode if available
+    let (play_count, star_count, is_folder) = {
         let file_node = element.borrow();
         let node = file_node.node.borrow();
-        let count = node.play_count;
-        if count.is_none() {
-            debug!("Displaying file '{}' with no play count yet (path: {:?})", element_name, node.path);
+        let play = node.play_count;
+        let star = node.star_count;
+        let is_folder = node.is_folder;
+        if play.is_none() && star.is_none() {
+            debug!("Displaying file '{}' with no metadata yet (path: {:?})", element_name, node.path);
         } else {
-            debug!("Displaying file '{}' with play count: {:?} (path: {:?})", element_name, count, node.path);
+            debug!("Displaying file '{}' with play count: {:?}, star count: {:?} (path: {:?})", element_name, play, star, node.path);
         }
-        count
+        (play, star, is_folder)
     };
     
-    // Display file name with play count badge if available
+    // Display file name with play count and stars in the checkbox text
+    // Use LayoutJob to color stars differently and make filename bold
     let clicked = {
         let mut bele = element.borrow_mut();
         
-        // Use horizontal layout to place checkbox, filename, and badge side by side
-        let checkbox_clicked = ui.horizontal(|ui| {
-            // Checkbox with filename
-            let clicked = ui.checkbox(&mut bele.selected, &element_name).clicked();
-            
-            // Play count badge (only show if count > 0)
-            if let Some(count) = play_count {
-                if count > 0 {
-                    ui.add_space(4.0); // Small spacing between filename and badge
-                    render_play_count_badge(ui, count, i18n);
-                }
-            }
-            
-            clicked
-        }).inner;
+        // Build the checkbox label using LayoutJob for multi-colored text
+        use egui::text::{LayoutJob, TextFormat};
+        let mut job = LayoutJob::default();
+        let body_font = ui.style().text_styles.get(&egui::TextStyle::Body).unwrap().clone();
         
-        checkbox_clicked
+        // Bold format for filename - use a slightly larger font for bold effect
+        // TextFormat doesn't support font weight, so we use size to simulate bold
+        let bold_font = FontId::proportional(body_font.size * 1.05); // Slightly larger for bold effect
+        let bold_format = TextFormat::simple(
+            bold_font,
+            ui.style().visuals.text_color(),
+        );
+        
+        let default_format = TextFormat::simple(
+            body_font.clone(),
+            ui.style().visuals.text_color(),
+        );
+        // Smaller font for play count and stars
+        let small_font = FontId::proportional(body_font.size * 0.65); // 65% of body size
+        let small_format = TextFormat::simple(
+            small_font.clone(),
+            ui.style().visuals.text_color(),
+        );
+        let star_color = egui::Color32::from_rgb(255, 215, 0); // Yellow for stars
+        let star_format = TextFormat::simple(
+            small_font,
+            star_color,
+        );
+        
+        // Add folder icon if it's a folder
+        if is_folder {
+            job.append(&format!("{} ", egui_phosphor::regular::FOLDER), 0.0, bold_format.clone());
+        }
+        
+        // Add filename (bold)
+        job.append(&element_name, 0.0, bold_format);
+        
+        // Add play count if available (with smaller font)
+        if let Some(count) = play_count {
+            if count > 0 {
+                job.append(&format!(" ({})", count), 0.0, small_format.clone());
+            }
+        }
+        
+        // Add stars with yellow color if available (with smaller font)
+        if let Some(count) = star_count {
+            if count > 0 {
+                let stars = egui_phosphor::regular::STAR.repeat(count as usize);
+                job.append(&format!(" {}", stars), 0.0, star_format);
+            }
+        }
+        
+        // Simple checkbox with all info in the label - no wrapping issues
+        let checkbox_response = ui.checkbox(&mut bele.selected, egui::WidgetText::from(job));
+        
+        // Check if clicked first (before consuming response for tooltip)
+        let clicked = checkbox_response.clicked();
+        
+        // Add tooltip with detailed info on hover
+        let mut tooltip_text = String::new();
+        if let Some(count) = play_count {
+            if count > 0 {
+                tooltip_text.push_str(&format!("{}: {}\n", i18n.play_count_tooltip, count));
+            }
+        }
+        if let Some(count) = star_count {
+            if count > 0 {
+                tooltip_text.push_str(&format!("{}: {}", i18n.star_count_tooltip, count));
+            }
+        }
+        if !tooltip_text.is_empty() {
+            checkbox_response.on_hover_text_at_pointer(tooltip_text.trim_end());
+        }
+        
+        clicked
     };
     
     if clicked {
@@ -590,12 +684,18 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
             ..Default::default()
         })
         .show_inside(ui, |ui| {
-            egui::ScrollArea::both().show(ui, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // The ScrollArea automatically constrains width, but we need to ensure
+                // the content inside respects it. Use available_width() inside the ScrollArea.
+                let available_width = ui.available_width();
+                ui.set_width(available_width);
+                
                 StripBuilder::new(ui)
                     .size(Size::initial(6.0))
                     .size(Size::remainder())
                     .vertical(|mut strip| {
                         strip.cell(|ui| {
+                            ui.set_width(available_width);
                             ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
                                 if !app.current_typed_no.is_empty() {
                                     let s = app.i18n.filter.clone()
@@ -605,6 +705,8 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
                             });
                         });
                         strip.cell(|ui| {
+                            // Ensure the tree content respects the available width
+                            ui.set_width(available_width);
                             if let Some(filestore) = &mut app.file_store {
                                 let current_view = match app.current_typed_no.is_empty() {
                                     true => &mut filestore.default_view,

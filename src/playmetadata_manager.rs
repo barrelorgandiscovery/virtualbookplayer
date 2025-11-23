@@ -21,15 +21,24 @@ pub enum MetadataCommand {
     QueryPlayCounts(Vec<PathBuf>, Vec<PathBuf>),
     /// Record a play event for a file
     RecordPlayEvent(PathBuf),
+    /// Record a star event for a file
+    RecordStarEvent(PathBuf),
     /// Update the database path (when folder changes)
     UpdateDatabasePath(PathBuf),
+}
+
+/// File metadata (play count and star count)
+#[derive(Debug, Clone)]
+pub struct FileMetadata {
+    pub play_count: u32,
+    pub star_count: u32,
 }
 
 /// Results sent back from the background thread
 #[derive(Debug, Clone)]
 pub enum MetadataResult {
-    /// Play counts for files (path -> count)
-    PlayCounts(HashMap<PathBuf, u32>),
+    /// Play counts and star counts for files (path -> metadata)
+    PlayCounts(HashMap<PathBuf, FileMetadata>),
 }
 
 /// Play metadata manager - coordinates background thread for metadata operations
@@ -138,7 +147,7 @@ impl PlayMetadataManager {
                             if let Some(ref db) = database {
                                 if let Some(ref folder) = folder_path {
                                     debug!("Background thread: Database and folder available, folder={:?}", folder);
-                                    let mut play_counts = HashMap::new();
+                                    let mut file_metadata = HashMap::new();
                                     
                                     // Helper function to query a single path
                                     let mut query_path = |path: &PathBuf| {
@@ -148,21 +157,27 @@ impl PlayMetadataManager {
                                             let relative_str = relative_path.to_string_lossy()
                                                 .replace('\\', "/");
                                             
-                                            debug!("Background thread: Querying play count for relative path: {}", relative_str);
+                                            debug!("Background thread: Querying metadata for relative path: {}", relative_str);
                                             
                                             // Query with error handling (fail silently)
                                             match db.get_played_file_stats_with_statistics(relative_str.clone()) {
                                                 Ok(Some(stats)) => {
-                                                    debug!("Background thread: Found play count {} for {}", stats.total_play_number, relative_str);
-                                                    play_counts.insert(path.clone(), stats.total_play_number);
+                                                    debug!("Background thread: Found metadata for {}: play_count={}, star_count={}", relative_str, stats.total_play_number, stats.total_star_count);
+                                                    file_metadata.insert(path.clone(), FileMetadata {
+                                                        play_count: stats.total_play_number,
+                                                        star_count: stats.total_star_count,
+                                                    });
                                                 }
                                                 Ok(None) => {
-                                                    // File not in database yet - count is 0
-                                                    debug!("Background thread: No stats found for {}, using count 0", relative_str);
-                                                    play_counts.insert(path.clone(), 0);
+                                                    // File not in database yet - counts are 0
+                                                    debug!("Background thread: No stats found for {}, using counts 0", relative_str);
+                                                    file_metadata.insert(path.clone(), FileMetadata {
+                                                        play_count: 0,
+                                                        star_count: 0,
+                                                    });
                                                 }
                                                 Err(e) => {
-                                                    warn!("Background thread: Error querying play count for {:?} (relative: {}): {}", path, relative_str, e);
+                                                    warn!("Background thread: Error querying metadata for {:?} (relative: {}): {}", path, relative_str, e);
                                                     // Fail silently - don't break the app
                                                 }
                                             }
@@ -180,14 +195,14 @@ impl PlayMetadataManager {
                                         thread::sleep(Duration::from_millis(1));
                                     }
                                     
-                                    debug!("Background thread: Sending {} play counts back (only visible files)", play_counts.len());
-                                    if play_counts.len() <= 5 {
-                                        for (path, count) in &play_counts {
-                                            debug!("Background thread:   Result: {:?} -> {}", path, count);
+                                    debug!("Background thread: Sending {} metadata results back (only visible files)", file_metadata.len());
+                                    if file_metadata.len() <= 5 {
+                                        for (path, metadata) in &file_metadata {
+                                            debug!("Background thread:   Result: {:?} -> play={}, star={}", path, metadata.play_count, metadata.star_count);
                                         }
                                     }
                                     // Send results back (ignore if receiver is dropped)
-                                    if let Err(e) = result_sender.send(MetadataResult::PlayCounts(play_counts)) {
+                                    if let Err(e) = result_sender.send(MetadataResult::PlayCounts(file_metadata)) {
                                         warn!("Background thread: Failed to send results (receiver may be dropped): {}", e);
                                     } else {
                                         debug!("Background thread: Successfully sent results");
@@ -221,6 +236,7 @@ impl PlayMetadataManager {
                                                 file_md5_checksum: String::new(), // Not computed for performance
                                                 latest_play_time: Utc::now(),
                                                 total_play_number: 0, // Will be computed from history
+                                                total_star_count: 0, // Will be computed from star history
                                                 user_comments_or_notes: String::new(),
                                             }
                                         ) {
@@ -248,14 +264,17 @@ impl PlayMetadataManager {
                                         if play_event_recorded {
                                             match db.get_played_file_stats_with_statistics(relative_str.clone()) {
                                                 Ok(Some(stats)) => {
-                                                    info!("Play count updated: {} -> {}", relative_str, stats.total_play_number);
-                                                    let mut play_counts = HashMap::new();
-                                                    play_counts.insert(path.clone(), stats.total_play_number);
-                                                    // Send updated count back immediately
-                                                    if let Err(e) = result_sender.send(MetadataResult::PlayCounts(play_counts)) {
-                                                        warn!("Failed to send updated play count: {}", e);
+                                                    info!("Metadata updated: {} -> play={}, star={}", relative_str, stats.total_play_number, stats.total_star_count);
+                                                    let mut file_metadata = HashMap::new();
+                                                    file_metadata.insert(path.clone(), FileMetadata {
+                                                        play_count: stats.total_play_number,
+                                                        star_count: stats.total_star_count,
+                                                    });
+                                                    // Send updated metadata back immediately
+                                                    if let Err(e) = result_sender.send(MetadataResult::PlayCounts(file_metadata)) {
+                                                        warn!("Failed to send updated metadata: {}", e);
                                                     } else {
-                                                        debug!("Sent updated play count back to main thread");
+                                                        debug!("Sent updated metadata back to main thread");
                                                     }
                                                 }
                                                 Ok(None) => {
@@ -271,6 +290,76 @@ impl PlayMetadataManager {
                                         }
                                     } else {
                                         debug!("Could not strip prefix for play event: path={:?}, folder={:?}", path, folder);
+                                    }
+                                }
+                            }
+                            // If no database, silently ignore (don't break the app)
+                        }
+                        MetadataCommand::RecordStarEvent(path) => {
+                            if let Some(ref db) = database {
+                                if let Some(ref folder) = folder_path {
+                                    // Get relative path from folder path
+                                    if let Ok(relative_path) = path.strip_prefix(folder) {
+                                        // Normalize path separators
+                                        let relative_str = relative_path.to_string_lossy()
+                                            .replace('\\', "/");
+                                        
+                                        debug!("Recording star event for relative path: {}", relative_str);
+                                        
+                                        // First, ensure the file is in the database
+                                        match db.insert_or_update_played_file_stats(
+                                            crate::playmetadata::PlayedFileStats {
+                                                relative_file_path: relative_str.clone(),
+                                                file_md5_checksum: String::new(), // Not computed for performance
+                                                latest_play_time: Utc::now(),
+                                                total_play_number: 0, // Will be computed from history
+                                                total_star_count: 0, // Will be computed from star history
+                                                user_comments_or_notes: String::new(),
+                                            }
+                                        ) {
+                                            Ok(_) => {
+                                                debug!("Inserted/updated file stats for star event: {}", relative_str);
+                                            }
+                                            Err(e) => {
+                                                error!("Error inserting/updating file stats for star event {}: {}", relative_str, e);
+                                            }
+                                        }
+                                        
+                                        // Record the star event
+                                        match db.add_star_event(relative_str.clone(), Utc::now()) {
+                                            Ok(_) => {
+                                                info!("Successfully recorded star event for {}", relative_str);
+                                                
+                                                // Immediately query the updated star count
+                                                match db.get_played_file_stats_with_statistics(relative_str.clone()) {
+                                                    Ok(Some(stats)) => {
+                                                        info!("Star count updated: {} -> play={}, star={}", relative_str, stats.total_play_number, stats.total_star_count);
+                                                        // Send updated metadata back immediately
+                                                        let mut file_metadata = HashMap::new();
+                                                        file_metadata.insert(path.clone(), FileMetadata {
+                                                            play_count: stats.total_play_number,
+                                                            star_count: stats.total_star_count,
+                                                        });
+                                                        if let Err(e) = result_sender.send(MetadataResult::PlayCounts(file_metadata)) {
+                                                            warn!("Failed to send updated star metadata: {}", e);
+                                                        } else {
+                                                            debug!("Sent updated star metadata back to main thread");
+                                                        }
+                                                    }
+                                                    Ok(None) => {
+                                                        warn!("File not found after recording star event: {}", relative_str);
+                                                    }
+                                                    Err(e) => {
+                                                        error!("Error querying updated star count for {}: {}", relative_str, e);
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                error!("Error recording star event for {}: {}", relative_str, e);
+                                            }
+                                        }
+                                    } else {
+                                        debug!("Could not strip prefix for star event: path={:?}, folder={:?}", path, folder);
                                     }
                                 }
                             }
@@ -332,14 +421,22 @@ impl PlayMetadataManager {
         }
     }
 
+    /// Record a star event for a file
+    pub fn record_star_event(&self, path: PathBuf) {
+        info!("MetadataManager: Recording star event for file: {:?}", path);
+        if let Err(e) = self.command_sender.send(MetadataCommand::RecordStarEvent(path)) {
+            error!("MetadataManager: Failed to send record star event command: {}", e);
+        }
+    }
+
     /// Check for and process any results from background thread
-    /// Returns play counts if available
-    pub fn process_results(&self) -> Option<HashMap<PathBuf, u32>> {
+    /// Returns file metadata (play counts and star counts) if available
+    pub fn process_results(&self) -> Option<HashMap<PathBuf, FileMetadata>> {
         // Use try_recv to avoid blocking
         match self.result_receiver.try_recv() {
-            Ok(MetadataResult::PlayCounts(counts)) => {
-                debug!("MetadataManager: Received {} play counts from background thread", counts.len());
-                Some(counts)
+            Ok(MetadataResult::PlayCounts(metadata)) => {
+                debug!("MetadataManager: Received {} metadata results from background thread", metadata.len());
+                Some(metadata)
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => {
                 // No results yet - this is normal

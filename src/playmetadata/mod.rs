@@ -39,6 +39,7 @@ pub struct PlayedFileStats {
     pub file_md5_checksum: String,
     pub latest_play_time: DateTime<Utc>,
     pub total_play_number: u32, // this is computed from the play history
+    pub total_star_count: u32, // this is computed from the star history
     pub user_comments_or_notes: String,
 }
 
@@ -249,6 +250,45 @@ impl PlayMetadataDatabase {
             )
             .map_err(|e| Box::new(e))?;
 
+        // create the played_file_stats_stars table
+        // stores individual star events to compute star count
+        self.connection
+            .execute(
+                "CREATE TABLE IF NOT EXISTS played_file_stats_stars (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ref_played_file_stats_id INTEGER,
+            star_time DATE,
+            FOREIGN KEY(ref_played_file_stats_id) REFERENCES played_file_stats(id)
+        )",
+                (),
+            )
+            .map_err(|e| Box::new(e))?;
+
+        // Create indexes for star events
+        self.connection
+            .execute(
+                "CREATE INDEX IF NOT EXISTS idx_played_file_stats_stars_ref \
+                ON played_file_stats_stars(ref_played_file_stats_id)",
+                (),
+            )
+            .map_err(|e| Box::new(e))?;
+
+        self.connection
+            .execute(
+                "CREATE INDEX IF NOT EXISTS idx_played_file_stats_stars_time \
+                ON played_file_stats_stars(star_time)",
+                (),
+            )
+            .map_err(|e| Box::new(e))?;
+
+        self.connection
+            .execute(
+                "CREATE INDEX IF NOT EXISTS idx_played_file_stats_stars_ref_time \
+                ON played_file_stats_stars(ref_played_file_stats_id, star_time)",
+                (),
+            )
+            .map_err(|e| Box::new(e))?;
+
         Ok(())
     }
 
@@ -313,6 +353,41 @@ impl PlayMetadataDatabase {
         }
         
         debug!("Successfully inserted play event: {} rows affected for '{}'", rows_affected, file_path_for_log);
+        Ok(())
+    }
+
+    /// Add a star event to the star history table
+    pub fn add_star_event(
+        &self,
+        relative_file_path: String,
+        star_time: DateTime<Utc>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Use a single query with subquery to avoid two round trips
+        // But check if any rows were affected to ensure the file exists
+        let star_time_str = datetime_to_sqlite_date(&star_time);
+        let file_path_for_log = relative_file_path.clone();
+        info!("Adding star event to history: file='{}', time='{}'", file_path_for_log, star_time_str);
+        
+        let rows_affected = self.connection
+            .execute(
+                "INSERT INTO played_file_stats_stars (ref_played_file_stats_id, star_time) \
+                SELECT id, ? FROM played_file_stats WHERE relative_file_path = ?",
+                (star_time_str, relative_file_path.clone()),
+            )
+            .map_err(|e| {
+                error!("Database error inserting star event for '{}': {}", file_path_for_log, e);
+                Box::new(e)
+            })?;
+        
+        if rows_affected == 0 {
+            error!("No rows affected when inserting star event for '{}' - file may not exist in played_file_stats", file_path_for_log);
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("File '{}' not found in played_file_stats", file_path_for_log)
+            )));
+        }
+        
+        info!("Successfully inserted star event: {} rows affected for '{}'", rows_affected, file_path_for_log);
         Ok(())
     }
 
@@ -417,7 +492,9 @@ impl PlayMetadataDatabase {
                 (SELECT MAX(played_time) FROM played_file_stats_history \
                  WHERE ref_played_file_stats_id = played_file_stats.id) as latest_play_time, \
                 (SELECT COUNT(*) FROM played_file_stats_history \
-                 WHERE ref_played_file_stats_id = played_file_stats.id) as total_play_number \
+                 WHERE ref_played_file_stats_id = played_file_stats.id) as total_play_number, \
+                (SELECT COUNT(*) FROM played_file_stats_stars \
+                 WHERE ref_played_file_stats_id = played_file_stats.id) as total_star_count \
             FROM played_file_stats \
             WHERE played_file_stats.relative_file_path = ?";
         
@@ -435,8 +512,9 @@ impl PlayMetadataDatabase {
             // Get computed values from history
             let latest_play_time_str: Option<String> = row.get(4)?;
             let total_play_number: i64 = row.get(5)?;
+            let total_star_count: i64 = row.get(6)?;
             
-            debug!("Found file in database: '{}', play_count={}", relative_file_path, total_play_number);
+            debug!("Found file in database: '{}', play_count={}, star_count={}", relative_file_path, total_play_number, total_star_count);
             
             // Convert latest_play_time from SQLite DATE format to DateTime<Utc>
             // If no history exists, use a default (epoch or current time)
@@ -453,6 +531,7 @@ impl PlayMetadataDatabase {
                 file_md5_checksum,
                 latest_play_time,
                 total_play_number: total_play_number as u32,
+                total_star_count: total_star_count as u32,
                 user_comments_or_notes,
             })
         });
@@ -505,6 +584,7 @@ mod tests {
             file_md5_checksum: format!("md5_{}", path),
             latest_play_time: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
             total_play_number: 0,
+            total_star_count: 0,
             user_comments_or_notes: format!("Notes for {}", path),
         }
     }
@@ -917,6 +997,7 @@ mod tests {
             file_md5_checksum: "md5_hash".to_string(),
             latest_play_time: Utc::now(),
             total_play_number: 0,
+            total_star_count: 0,
             user_comments_or_notes: "Test notes".to_string(),
         };
 
@@ -940,6 +1021,7 @@ mod tests {
             file_md5_checksum: "md5_hash".to_string(),
             latest_play_time: Utc::now(),
             total_play_number: 0,
+            total_star_count: 0,
             user_comments_or_notes: "Test".to_string(),
         };
 

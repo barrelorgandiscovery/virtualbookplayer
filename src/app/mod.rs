@@ -506,43 +506,43 @@ impl VirtualBookApp {
         }
     }
 
-    /// Update metadata - query play counts for displayed files and process results
+    /// Update metadata - query play counts and star counts for displayed files and process results
     fn update_metadata(&mut self) {
         // Process any results from background thread
-        if let Some(play_counts) = self.metadata_manager.process_results() {
-            debug!("Received {} play count results from background thread", play_counts.len());
+        if let Some(file_metadata) = self.metadata_manager.process_results() {
+            debug!("Received {} metadata results from background thread", file_metadata.len());
             
-            // Update current playing file's play count if it's in the results
+            // Update current playing file's metadata if it's in the results
             if let Some((current_path, _)) = &self.current_playing_file {
-                if let Some(&count) = play_counts.get(current_path) {
+                if let Some(metadata) = file_metadata.get(current_path) {
                     let path_clone = current_path.clone();
-                    self.current_playing_file = Some((path_clone.clone(), Some(count)));
-                    info!("Current playing file play count: {} -> {}", path_clone.display(), count);
+                    self.current_playing_file = Some((path_clone.clone(), Some(metadata.play_count)));
+                    info!("Current playing file metadata: {} -> play={}, star={}", path_clone.display(), metadata.play_count, metadata.star_count);
                 }
             }
             
-            // Update FileNode play counts in the file store
+            // Update FileNode metadata in the file store
             if let Some(file_store) = &mut self.file_store {
                 let mut updated_count = 0;
-                Self::update_file_node_play_counts_with_debug(&mut file_store.root, &play_counts, &mut updated_count);
+                Self::update_file_node_metadata_with_debug(&mut file_store.root, &file_metadata, &mut updated_count);
                 if updated_count > 0 {
-                    debug!("Updated {} FileNode play counts in root", updated_count);
+                    debug!("Updated {} FileNode metadata in root", updated_count);
                 }
                 
                 // Also update filtered view if it exists
                 if let Some(ref mut filtered_view) = file_store.filtered_view {
                     let mut updated_count = 0;
-                    Self::update_file_view_node_play_counts_with_debug(&mut filtered_view.root, &play_counts, &mut updated_count);
+                    Self::update_file_view_node_metadata_with_debug(&mut filtered_view.root, &file_metadata, &mut updated_count);
                     if updated_count > 0 {
-                        debug!("Updated {} FileViewNode play counts in filtered view", updated_count);
+                        debug!("Updated {} FileViewNode metadata in filtered view", updated_count);
                     }
                 }
                 // Update default view
                 if let Some(ref mut default_view) = file_store.default_view {
                     let mut updated_count = 0;
-                    Self::update_file_view_node_play_counts_with_debug(&mut default_view.root, &play_counts, &mut updated_count);
+                    Self::update_file_view_node_metadata_with_debug(&mut default_view.root, &file_metadata, &mut updated_count);
                     if updated_count > 0 {
-                        debug!("Updated {} FileViewNode play counts in default view", updated_count);
+                        debug!("Updated {} FileViewNode metadata in default view", updated_count);
                     }
                 }
             }
@@ -689,75 +689,72 @@ impl VirtualBookApp {
         }
     }
     
-    /// Recursively update FileNode play counts
-    fn update_file_node_play_counts(
+    /// Recursively update FileNode metadata (play counts and star counts) with debug tracking
+    fn update_file_node_metadata_with_debug(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileNode>>,
-        play_counts: &std::collections::HashMap<PathBuf, u32>,
-    ) {
-        let mut updated_count = 0;
-        Self::update_file_node_play_counts_with_debug(node, play_counts, &mut updated_count);
-    }
-    
-    /// Recursively update FileNode play counts with debug tracking
-    fn update_file_node_play_counts_with_debug(
-        node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileNode>>,
-        play_counts: &std::collections::HashMap<PathBuf, u32>,
+        file_metadata: &std::collections::HashMap<PathBuf, crate::playmetadata_manager::FileMetadata>,
         updated_count: &mut usize,
     ) {
         let mut file_node = node.borrow_mut();
         if !file_node.is_folder {
-            if let Some(count) = play_counts.get(&file_node.path) {
-                let old_count = file_node.play_count;
-                file_node.play_count = Some(*count);
-                if old_count != Some(*count) {
-                    debug!("Updated FileNode play count: {:?} -> {} (was {:?})", file_node.path, count, old_count);
+            if let Some(metadata) = file_metadata.get(&file_node.path) {
+                let old_play_count = file_node.play_count;
+                let old_star_count = file_node.star_count;
+                file_node.play_count = Some(metadata.play_count);
+                file_node.star_count = Some(metadata.star_count);
+                if old_play_count != Some(metadata.play_count) || old_star_count != Some(metadata.star_count) {
+                    debug!("Updated FileNode metadata: {:?} -> play={} (was {:?}), star={} (was {:?})", 
+                        file_node.path, metadata.play_count, old_play_count, metadata.star_count, old_star_count);
                     *updated_count += 1;
                 }
             } else {
-                debug!("No play count found for FileNode: {:?}", file_node.path);
+                debug!("No metadata found for FileNode: {:?}", file_node.path);
             }
         }
         
         for child in &mut file_node.folder_files {
-            Self::update_file_node_play_counts_with_debug(child, play_counts, updated_count);
+            Self::update_file_node_metadata_with_debug(child, file_metadata, updated_count);
         }
     }
     
-    /// Recursively update FileViewNode play counts (updates underlying FileNode)
-    fn update_file_view_node_play_counts(
+    /// Recursively update FileViewNode metadata (updates underlying FileNode)
+    fn update_file_view_node_metadata(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
-        play_counts: &std::collections::HashMap<PathBuf, u32>,
+        file_metadata: &std::collections::HashMap<PathBuf, crate::playmetadata_manager::FileMetadata>,
     ) {
         let mut updated_count = 0;
-        Self::update_file_view_node_play_counts_with_debug(node, play_counts, &mut updated_count);
+        Self::update_file_view_node_metadata_with_debug(node, file_metadata, &mut updated_count);
     }
     
-    /// Recursively update FileViewNode play counts with debug tracking
-    fn update_file_view_node_play_counts_with_debug(
+    /// Recursively update FileViewNode metadata (play counts and star counts) with debug tracking
+    fn update_file_view_node_metadata_with_debug(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
-        play_counts: &std::collections::HashMap<PathBuf, u32>,
+        file_metadata: &std::collections::HashMap<PathBuf, crate::playmetadata_manager::FileMetadata>,
         updated_count: &mut usize,
     ) {
         let mut view_node = node.borrow_mut();
         let mut file_node = view_node.node.borrow_mut();
         
         if !file_node.is_folder {
-            if let Some(count) = play_counts.get(&file_node.path) {
-                let old_count = file_node.play_count;
-                file_node.play_count = Some(*count);
-                if old_count != Some(*count) {
-                    debug!("Updated FileViewNode play count: {:?} -> {} (was {:?})", file_node.path, count, old_count);
+            if let Some(metadata) = file_metadata.get(&file_node.path) {
+                let old_play_count = file_node.play_count;
+                let old_star_count = file_node.star_count;
+                file_node.play_count = Some(metadata.play_count);
+                file_node.star_count = Some(metadata.star_count);
+                if old_play_count != Some(metadata.play_count) || old_star_count != Some(metadata.star_count) {
+                    debug!("Updated FileViewNode metadata: {:?} -> play={} (was {:?}), star={} (was {:?})", 
+                        file_node.path, metadata.play_count, old_play_count, metadata.star_count, old_star_count);
                     *updated_count += 1;
                 }
             } else {
-                debug!("No play count found for FileViewNode: {:?}", file_node.path);
+                debug!("No metadata found for FileViewNode: {:?}", file_node.path);
             }
         }
         
         drop(file_node);
         
         for child in &mut view_node.childs {
-            Self::update_file_view_node_play_counts_with_debug(child, play_counts, updated_count);
+            Self::update_file_view_node_metadata_with_debug(child, file_metadata, updated_count);
         }
     }
 
@@ -970,7 +967,20 @@ impl VirtualBookApp {
                             ));
 
                             ui.label(rt.monospace());
-                        });
+                            
+                            // Star button - only show when file is playing
+                            if ui.button(egui_phosphor::regular::STAR)
+                                .on_hover_text_at_pointer(&self.i18n.star_file_tooltip)
+                                .clicked()
+                            {
+                                // Get the current playing file path
+                                if let Some(current_play) = current_playlist.current() {
+                                    let full_path = &current_play.path;
+                                    info!("Star button clicked for file: {:?}", full_path);
+                                    self.metadata_manager.record_star_event(full_path.clone());
+                    }
+                }
+            });
                     }
                 }
     }

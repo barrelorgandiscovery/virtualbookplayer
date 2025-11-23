@@ -27,6 +27,8 @@ pub struct I18NMessages {
     pub hover_activate_the_play_of_the_playlist: String,
     pub hover_retour_a_la_playlist: String,
     pub play_count_tooltip: String,
+    pub star_file_tooltip: String,
+    pub star_count_tooltip: String,
 }
 
 fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
@@ -99,7 +101,9 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         hover_activate_the_play_of_the_playlist: "Activate the play of the playlist".into(),
         hover_retour_a_la_playlist: "Back to playlist".into(),
         play_count_tooltip: "Number of times this file has been played".into(),
-    })
+        star_file_tooltip: "Star this file".into(),
+        star_count_tooltip: "Number of times this file has been starred".into(),
+            })
 }
 
 pub fn create_i18n_fr_message() -> Box<I18NMessages> {
@@ -132,5 +136,7 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         hover_activate_the_play_of_the_playlist: "Jouer ou Arreter le jeu de la playlist".into(),
         hover_retour_a_la_playlist: "Retour à la playlist".into(),
         play_count_tooltip: "Nombre de fois que ce fichier a été joué".into(),
-    })
+        star_file_tooltip: "Mettre une étoile à ce fichier".into(),
+        star_count_tooltip: "Nombre de fois que ce fichier a été étoilé".into(),
+            })
 }
