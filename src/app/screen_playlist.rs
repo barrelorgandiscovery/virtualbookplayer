@@ -62,11 +62,12 @@ fn handle_enter_key(
 /// Update file store filtered view based on current typed number
 fn update_file_store_filter(
     file_store: &mut Option<FileStore>,
-    current_typed_no: &String,
+    current_typed_no: &str,
     extensions_filter: &Option<Vec<String>>,
 ) {
     if let Some(filestore) = file_store {
-        if let Ok(mut new_view) = filestore.view(&Some(current_typed_no.clone()), extensions_filter)
+        if let Ok(mut new_view) =
+            filestore.view(&Some(current_typed_no.to_owned()), extensions_filter)
         {
             new_view.recurse_expand_first();
             filestore.filtered_view = Some(new_view);
@@ -82,7 +83,7 @@ pub fn handling_key(
     appplayer: &mut AppPlayer,
     extensions_filter: &Option<Vec<String>>,
 ) {
-    match no.as_str() {
+    match no {
         BACKSPACE => {
             if !current_typed_no.is_empty() {
                 *current_typed_no = current_typed_no[0..current_typed_no.len() - 1].to_string();
@@ -456,6 +457,7 @@ fn display_folder(
 /// text: The text to display in the badge
 /// text_color: The color for the badge text
 /// tooltip: Tooltip text to show on hover
+#[allow(dead_code)]
 fn render_badge(ui: &mut Ui, text: String, text_color: egui::Color32, tooltip: &str) {
     let visuals = &ui.style().visuals;
 
@@ -498,6 +500,7 @@ fn render_badge(ui: &mut Ui, text: String, text_color: egui::Color32, tooltip: &
 
 /// Render a badge with the play count using theme colors (subtle, less visible than file title)
 /// i18n: i18n messages for tooltip text
+#[allow(dead_code)]
 fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
     let badge_text = count.to_string();
     let visuals = &ui.style().visuals;
@@ -509,6 +512,7 @@ fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18
 /// Render a badge with the star count using theme colors (subtle, less visible than file title)
 /// Shows multiple star symbols instead of a count number
 /// i18n: i18n messages for tooltip text
+#[allow(dead_code)]
 fn render_star_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
     // Repeat the star symbol 'count' times (using fill variant for filled stars)
     let badge_text = egui_phosphor::fill::STAR.repeat(count as usize);
@@ -565,7 +569,8 @@ fn display_file(
         let bold_font = FontId::new(body_font.size, FontFamily::Name("rubik_bold".into()));
         let bold_format = TextFormat::simple(bold_font, ui.style().visuals.text_color());
 
-        let default_format = TextFormat::simple(body_font.clone(), ui.style().visuals.text_color());
+        let _default_format =
+            TextFormat::simple(body_font.clone(), ui.style().visuals.text_color());
         // Smaller font for play count and stars
         let small_font = FontId::proportional(body_font.size * 0.65); // 65% of body size
         let small_format = TextFormat::simple(small_font.clone(), ui.style().visuals.text_color());

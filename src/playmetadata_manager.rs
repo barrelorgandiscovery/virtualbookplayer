@@ -48,8 +48,10 @@ pub struct PlayMetadataManager {
     /// Receiver for results from background thread
     result_receiver: Receiver<MetadataResult>,
     /// Current database path
+    #[allow(dead_code)]
     database_path: Arc<Mutex<Option<PathBuf>>>,
     /// Flag to track if database is ready (initialized)
+    #[allow(dead_code)]
     database_ready: Arc<Mutex<bool>>,
 }
 

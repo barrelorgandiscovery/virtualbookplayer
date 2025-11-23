@@ -45,15 +45,18 @@ pub struct PlayedFileStats {
     pub user_comments_or_notes: String,
 }
 
+#[allow(dead_code)]
 pub struct PlayedFileStatsHistory {
     played_file_stats: PlayedFileStats,
     play_time_history: Vec<PlayedFileStatsHistoryEntry>,
 }
 
+#[allow(dead_code)]
 pub struct PlayedFileStatsHistoryEntry {
     timestamp: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
 pub struct PlayedFileStarsHistoryEntry {
     timestamp: DateTime<Utc>,
     rank: u8,

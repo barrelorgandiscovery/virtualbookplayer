@@ -1,6 +1,6 @@
 [package]
 name = "virtualbookplayer"
-version = "0.0.58"
+version = "0.0.59"
 authors = ["frett27@gmail.com"]
 edition = "2021"
 rust-version = "1.65"
@@ -58,7 +58,7 @@ eframe = { version="0.27.2" , default-features = false, features = [
 rusqlite = { version = "0.37", features = ["bundled"] }
 
 profiling = {version = "1.0.11", features=["profile-with-tracy"], optional=true }
-tracy-client = { version = "0.16.3", optional = true }
+tracy-client = { version = "0.17", optional = true }
 
 [features]
 default = []

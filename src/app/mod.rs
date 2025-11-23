@@ -387,67 +387,67 @@ impl VirtualBookApp {
     /// Logo colors: golden yellow/orange pipes, reddish-brown console, dark blue accents
     fn create_logo_light_theme() -> Visuals {
         let mut visuals = Visuals::light();
-        
+
         // Warm beige/cream background (inspired by logo background)
         let warm_beige = Color32::from_rgb(250, 245, 235);
-        
+
         // Golden/amber tones (inspired by organ pipes)
         let golden_amber = Color32::from_rgb(255, 200, 100);
         let golden_amber_light = Color32::from_rgb(255, 220, 150);
-        
+
         // Reddish-brown tones (inspired by organ console)
         let reddish_brown = Color32::from_rgb(180, 100, 60);
         let reddish_brown_light = Color32::from_rgb(200, 120, 80);
-        
+
         // Dark brown (for outlines/strokes)
         let dark_brown = Color32::from_rgb(80, 50, 30);
-        
+
         // Dark blue (inspired by keys and film reel)
         let dark_blue = Color32::from_rgb(30, 50, 90);
         let dark_blue_light = Color32::from_rgb(50, 70, 120);
-        
+
         // Update window and panel colors with warm tones
         visuals.window_fill = warm_beige;
         visuals.panel_fill = warm_beige;
         visuals.window_stroke = Stroke::new(1.0, dark_brown);
-        
+
         // Update widget colors with golden/amber tones
         visuals.widgets.noninteractive.bg_fill = warm_beige;
         visuals.widgets.noninteractive.weak_bg_fill = warm_beige;
         visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, dark_brown);
         visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, dark_blue);
-        
+
         visuals.widgets.inactive.bg_fill = golden_amber_light;
         visuals.widgets.inactive.weak_bg_fill = golden_amber_light;
         visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, dark_blue);
-        
+
         visuals.widgets.hovered.bg_fill = golden_amber;
         visuals.widgets.hovered.weak_bg_fill = golden_amber;
         visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, reddish_brown);
         visuals.widgets.hovered.fg_stroke = Stroke::new(1.5, dark_blue);
-        
+
         visuals.widgets.active.bg_fill = reddish_brown_light;
         visuals.widgets.active.weak_bg_fill = reddish_brown_light;
         visuals.widgets.active.bg_stroke = Stroke::new(1.0, dark_brown);
         visuals.widgets.active.fg_stroke = Stroke::new(2.0, Color32::WHITE);
-        
+
         visuals.widgets.open.bg_fill = golden_amber_light;
         visuals.widgets.open.weak_bg_fill = golden_amber_light;
         visuals.widgets.open.bg_stroke = Stroke::new(1.0, reddish_brown);
         visuals.widgets.open.fg_stroke = Stroke::new(1.0, dark_blue);
-        
+
         // Selection colors with dark blue accent
         visuals.selection.bg_fill = dark_blue_light;
         visuals.selection.stroke = Stroke::new(1.0, dark_blue);
-        
+
         // Text edit and code backgrounds
         visuals.extreme_bg_color = Color32::from_rgb(255, 250, 240);
         visuals.code_bg_color = Color32::from_rgb(255, 245, 230);
         visuals.faint_bg_color = Color32::from_rgb(250, 240, 225);
-        
+
         // Hyperlink color using dark blue
         visuals.hyperlink_color = dark_blue_light;
-        
+
         visuals
     }
 
@@ -720,6 +720,7 @@ impl VirtualBookApp {
     }
 
     /// Recursively collect all displayed file paths from the file store
+    #[allow(dead_code)]
     fn collect_displayed_file_paths(file_store: &FileStore) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         let current_view = file_store.default_view.as_ref();
@@ -773,6 +774,7 @@ impl VirtualBookApp {
     }
 
     /// Recursively collect paths from a FileViewNode (all files, regardless of expansion)
+    #[allow(dead_code)]
     fn collect_paths_from_view_node(
         paths: &mut Vec<PathBuf>,
         node: &std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
@@ -895,6 +897,7 @@ impl VirtualBookApp {
     }
 
     /// Recursively update FileViewNode metadata (updates underlying FileNode)
+    #[allow(dead_code)]
     fn update_file_view_node_metadata(
         node: &mut std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
         file_metadata: &std::collections::HashMap<
@@ -1225,7 +1228,7 @@ impl VirtualBookApp {
                     };
                     // Always use white text for maximum contrast against the dark background
                     let title_text_color = Color32::WHITE;
-                    
+
                     // Use bold font family (rubik_bold) for better visibility
                     let bold_font = FontId::new(16.0, FontFamily::Name("rubik_bold".into()));
                     // Use simple ASCII characters that will render reliably: " > " and " < "
@@ -1254,7 +1257,7 @@ impl VirtualBookApp {
             }
         } else {
             // Show empty state when not playing - no text displayed
-            ui.horizontal_centered(|ui| {
+            ui.horizontal_centered(|_ui| {
                 // Empty - no text shown when not playing
             });
         }
@@ -1454,7 +1457,7 @@ impl VirtualBookApp {
     }
 
     /// Render central panel content
-    fn render_central_panel(&mut self, ctx: &egui::Context, top_panel_bottom: f32) {
+    fn render_central_panel(&mut self, ctx: &egui::Context, _top_panel_bottom: f32) {
         // Central panel should use available_rect which already accounts for top panel
         let mut rect = ctx.available_rect();
         *rect.bottom_mut() -= 0.0; // Remove bottom spacing
