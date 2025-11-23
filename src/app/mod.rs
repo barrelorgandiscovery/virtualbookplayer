@@ -383,10 +383,78 @@ impl VirtualBookApp {
         }
     }
 
+    /// Create a custom light theme matching the logo colors
+    /// Logo colors: golden yellow/orange pipes, reddish-brown console, dark blue accents
+    fn create_logo_light_theme() -> Visuals {
+        let mut visuals = Visuals::light();
+        
+        // Warm beige/cream background (inspired by logo background)
+        let warm_beige = Color32::from_rgb(250, 245, 235);
+        
+        // Golden/amber tones (inspired by organ pipes)
+        let golden_amber = Color32::from_rgb(255, 200, 100);
+        let golden_amber_light = Color32::from_rgb(255, 220, 150);
+        
+        // Reddish-brown tones (inspired by organ console)
+        let reddish_brown = Color32::from_rgb(180, 100, 60);
+        let reddish_brown_light = Color32::from_rgb(200, 120, 80);
+        
+        // Dark brown (for outlines/strokes)
+        let dark_brown = Color32::from_rgb(80, 50, 30);
+        
+        // Dark blue (inspired by keys and film reel)
+        let dark_blue = Color32::from_rgb(30, 50, 90);
+        let dark_blue_light = Color32::from_rgb(50, 70, 120);
+        
+        // Update window and panel colors with warm tones
+        visuals.window_fill = warm_beige;
+        visuals.panel_fill = warm_beige;
+        visuals.window_stroke = Stroke::new(1.0, dark_brown);
+        
+        // Update widget colors with golden/amber tones
+        visuals.widgets.noninteractive.bg_fill = warm_beige;
+        visuals.widgets.noninteractive.weak_bg_fill = warm_beige;
+        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, dark_brown);
+        visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, dark_blue);
+        
+        visuals.widgets.inactive.bg_fill = golden_amber_light;
+        visuals.widgets.inactive.weak_bg_fill = golden_amber_light;
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, dark_blue);
+        
+        visuals.widgets.hovered.bg_fill = golden_amber;
+        visuals.widgets.hovered.weak_bg_fill = golden_amber;
+        visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, reddish_brown);
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.5, dark_blue);
+        
+        visuals.widgets.active.bg_fill = reddish_brown_light;
+        visuals.widgets.active.weak_bg_fill = reddish_brown_light;
+        visuals.widgets.active.bg_stroke = Stroke::new(1.0, dark_brown);
+        visuals.widgets.active.fg_stroke = Stroke::new(2.0, Color32::WHITE);
+        
+        visuals.widgets.open.bg_fill = golden_amber_light;
+        visuals.widgets.open.weak_bg_fill = golden_amber_light;
+        visuals.widgets.open.bg_stroke = Stroke::new(1.0, reddish_brown);
+        visuals.widgets.open.fg_stroke = Stroke::new(1.0, dark_blue);
+        
+        // Selection colors with dark blue accent
+        visuals.selection.bg_fill = dark_blue_light;
+        visuals.selection.stroke = Stroke::new(1.0, dark_blue);
+        
+        // Text edit and code backgrounds
+        visuals.extreme_bg_color = Color32::from_rgb(255, 250, 240);
+        visuals.code_bg_color = Color32::from_rgb(255, 245, 230);
+        visuals.faint_bg_color = Color32::from_rgb(250, 240, 225);
+        
+        // Hyperlink color using dark blue
+        visuals.hyperlink_color = dark_blue_light;
+        
+        visuals
+    }
+
     /// Setup visuals and style for the UI
     fn setup_visuals_and_style(&self, ctx: &egui::Context) {
         let old = if self.islight {
-            Visuals::light()
+            Self::create_logo_light_theme()
         } else {
             Visuals::dark()
         };
@@ -1145,11 +1213,26 @@ impl VirtualBookApp {
 
                     ui.add_space(12.0);
 
-                    // Title with arrows
-                    let mut rt = RichText::new(format!(" ➡ {} ⬅ ", name));
-                    rt = rt.font(FontId::proportional(14.0));
-                    rt = rt.background_color(ui.style().visuals.selection.bg_fill);
-                    rt = rt.color(ui.style().visuals.selection.stroke.color);
+                    // Title with simple separators - enhanced visibility with high contrast
+                    let visuals = &ui.style().visuals;
+                    // Use a darker background for better contrast - use the selection stroke color (dark blue) as base
+                    // and make it darker for the background
+                    let title_bg_color = if visuals.dark_mode {
+                        visuals.selection.bg_fill
+                    } else {
+                        // In light mode, use a darker blue for better contrast with white text
+                        Color32::from_rgb(30, 50, 90) // Dark blue - darker than selection.bg_fill
+                    };
+                    // Always use white text for maximum contrast against the dark background
+                    let title_text_color = Color32::WHITE;
+                    
+                    // Use bold font family (rubik_bold) for better visibility
+                    let bold_font = FontId::new(16.0, FontFamily::Name("rubik_bold".into()));
+                    // Use simple ASCII characters that will render reliably: " > " and " < "
+                    let mut rt = RichText::new(format!(" > {} < ", name));
+                    rt = rt.font(bold_font); // Uses Rubik-Bold font for better visibility
+                    rt = rt.background_color(title_bg_color);
+                    rt = rt.color(title_text_color);
                     ui.label(rt);
 
                     ui.add_space(8.0);
@@ -1180,9 +1263,12 @@ impl VirtualBookApp {
     /// Render top panel menu bar
     #[cfg(not(target_arch = "wasm32"))]
     fn render_top_panel(&mut self, ctx: &egui::Context) -> egui::Response {
+        // Use inactive widget background for a subtle theme variant color
+        let theme_variant_color = ctx.style().visuals.widgets.inactive.weak_bg_fill;
         let top_panel_response = egui::TopBottomPanel::top("top_panel")
             .frame(
                 Frame::default()
+                    .fill(theme_variant_color)
                     .inner_margin(Margin::same(4.0))
                     .outer_margin(Margin::same(0.0)),
             )

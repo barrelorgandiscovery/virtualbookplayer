@@ -29,6 +29,7 @@ pub struct I18NMessages {
     pub play_count_tooltip: String,
     pub star_file_tooltip: String,
     pub star_count_tooltip: String,
+    pub panel_title: String,
 }
 
 fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
@@ -103,6 +104,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         play_count_tooltip: "Number of times this file has been played".into(),
         star_file_tooltip: "Star this file".into(),
         star_count_tooltip: "Number of times this file has been starred".into(),
+        panel_title: "playlist".into(),
     })
 }
 
@@ -138,5 +140,6 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         play_count_tooltip: "Nombre de fois que ce fichier a été joué".into(),
         star_file_tooltip: "Mettre une étoile à ce fichier".into(),
         star_count_tooltip: "Nombre de fois que ce fichier a été étoilé".into(),
+        panel_title: "Liste de lecture".into(),
     })
 }

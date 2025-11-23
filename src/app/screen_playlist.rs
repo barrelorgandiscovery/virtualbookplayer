@@ -173,9 +173,9 @@ fn render_playlist_header(app: &mut VirtualBookApp, ui: &mut Ui) {
         ui.add_enabled_ui(!appplayer.is_playlist_empty(), |ui| {
             ui.label(
                 RichText::new(format!(
-                    "{} {}",
+                    "{} {} : ",
                     egui_phosphor::regular::FILES,
-                    "PlayList : "
+                    app.i18n.panel_title
                 ))
                 .heading(),
             );
