@@ -402,8 +402,9 @@ impl VirtualBookApp {
         let mut style: Style = Style::default();
         style.clone_from(&ctx.style());
 
+        // Make window_fill fully opaque (alpha 255) for menus and windows
         let mut c = style.visuals.window_fill;
-        c = Color32::from_rgba_premultiplied(c.r(), c.g(), c.b(), 60);
+        c = Color32::from_rgba_premultiplied(c.r(), c.g(), c.b(), 255);
         style.visuals.window_fill = c;
         style.visuals.window_rounding = Rounding::same(0.0);
 
@@ -944,13 +945,14 @@ impl VirtualBookApp {
             egui_phosphor::fill::PLAY
         };
 
-        // Position the button at top-right of window with equal margins
+        // Position the button at top-right, aligned with the top panel
+        // Use absolute screen coordinates to ensure it doesn't affect layout
         let button_size = 32.0;
         let margin = 8.0;
         let screen_rect = ctx.screen_rect();
         let button_pos = Pos2::new(
             screen_rect.right() - button_size - margin,
-            screen_rect.top() + margin,
+            top_panel_rect.top() + margin,
         );
 
         let visuals = &ctx.style().visuals;
@@ -972,9 +974,11 @@ impl VirtualBookApp {
             visuals.text_color()
         };
 
-        // Create floating area for the button
+        // Create floating area for the button - use movable(false) to prevent dragging
+        // and ensure it doesn't affect layout calculations
         let area = Area::new(Id::new("floating_play_button"))
             .fixed_pos(button_pos)
+            .movable(false)
             .order(Order::Foreground)
             .interactable(true);
 
@@ -1276,8 +1280,10 @@ impl VirtualBookApp {
                     max: pos2(1.0, 1.0),
                 };
 
+                // Background should fill the entire area below the top panel
+                // Since it's rendered at Background layer, use screen_rect and adjust for top panel
                 let mut displayed_image = ctx.screen_rect();
-        *displayed_image.top_mut() += top_panel_bottom;
+        *displayed_image.top_mut() = top_panel_bottom;
 
         if let Some(t) = &self.texture_handle {
                     // background image
@@ -1287,8 +1293,8 @@ impl VirtualBookApp {
 
     /// Render central panel content
     fn render_central_panel(&mut self, ctx: &egui::Context, top_panel_bottom: f32) {
-                let mut rect = ctx.screen_rect();
-        *rect.top_mut() += top_panel_bottom;
+                // Central panel should use available_rect which already accounts for top panel
+                let mut rect = ctx.available_rect();
         *rect.bottom_mut() -= 0.0; // Remove bottom spacing
 
                 // windows is the only way to have a transparent overlap in egui
