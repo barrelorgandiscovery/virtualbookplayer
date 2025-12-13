@@ -374,6 +374,20 @@ impl AppPlayer {
             .is_empty()
     }
 
+    /// Get the name of the next file in the playlist (if any)
+    /// Returns None if there's no next file or if the playlist is locked
+    pub fn next_file_name(&self) -> Option<String> {
+        if let Ok(playlist) = self.playlist.lock() {
+            if playlist.file_list.len() > 1 {
+                Some(playlist.file_list[1].name.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn is_playing(&self) -> bool {
         if let Some(player) = &self.player {
             let p = player.lock().unwrap();

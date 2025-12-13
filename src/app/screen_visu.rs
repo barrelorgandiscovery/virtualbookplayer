@@ -32,6 +32,11 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mu
                 .horizontal(|mut strip| {
                     strip.cell(|ui| {
                         ui.horizontal_centered(|ui| {
+                            // Display next file name if available
+                            if let Some(name) = appplayer.next_file_name() {
+                                ui.label(name);
+                            }
+
                             if ui.button(egui_phosphor::regular::FAST_FORWARD).clicked() {
                                 appplayer.next();
                             }
