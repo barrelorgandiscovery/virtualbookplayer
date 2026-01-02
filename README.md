@@ -9,17 +9,23 @@ This software is a simplier "Vanbasco player" alternative.
 
 ## Features:
 
-- Play MIDI files.
-- Play Book Files (barrelorgandiscovery aprint software), with custom midi events to trigger elements
+- Play MIDI files from a folder, in 1 click
+- Easy send Midi file to midi Output (midi virtual hub, or other midi cables)
+- Play organ specific Book Files (barrelorgandiscovery aprint software), with custom midi translation
 - View the playback in piano roll format, and book layout
 - Large and clear tree view for files.
 - Load prepopulated playlists (text files containing lists of files).
-- Add files to the current playlist using a number and the enter key.
-- Remove a file from the playlist by clicking on it.
+- Add files to the current playlist using a number and the enter key. (midi files with numbers)
+- Manage a playlist Remove a file from the playlist by clicking on it.
 - Skip the current playing file for exploration.
 - Send panic or note-off messages to all channels when starting/stopping playback.
+- Add stars to files to see your best midi files
+- Number of play of Midi file remembered
+- Dark and Light theme
+- Launchable with fullscreen mode to get rid of the windows
+- Available in en/fr/nl, translations may also be added 
 - Adjust zoom factor for touch and reading from far await.
-- Work on linux, windows (macos untested)
+- Work on linux, windows (macos untested), single executable soft (all in one), implemented in rust, hardware display acceleration
 
 ## Download and install
 
