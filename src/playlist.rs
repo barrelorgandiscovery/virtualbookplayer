@@ -7,6 +7,7 @@ use std::{
     hash::Hash,
     path::PathBuf,
     rc::Rc,
+    sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime},
 };
 
@@ -24,6 +25,8 @@ pub struct PlayList {
 /// Element in the play list (with additional informations)
 #[derive(Clone, PartialEq, Eq)]
 pub struct PlaylistElement {
+    /// Unique for this process, including two copies of the same file.
+    pub id: u64,
     // system time when the file has been added
     pub added_at: SystemTime,
     pub name: String,
@@ -31,9 +34,15 @@ pub struct PlaylistElement {
     pub additional_informations: Option<FileInformations>,
 }
 
+fn next_playlist_element_id() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
+}
+
 /// hash implementation for playlist element
 impl Hash for PlaylistElement {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
         self.added_at.hash(state);
         self.name.hash(state);
         self.path.hash(state);
@@ -43,6 +52,7 @@ impl Hash for PlaylistElement {
         Self: Sized,
     {
         for playlist_element in data {
+            playlist_element.id.hash(state);
             playlist_element.added_at.hash(state);
             playlist_element.name.hash(state);
             playlist_element.path.hash(state);
@@ -59,6 +69,7 @@ impl From<&PathBuf> for PlaylistElement {
         }
 
         PlaylistElement {
+            id: next_playlist_element_id(),
             added_at: SystemTime::now(),
             name,
             path: value.clone(),
@@ -162,4 +173,10 @@ pub fn load(filepath: &PathBuf) -> Result<PlayList, Box<dyn Error>> {
 }
 
 #[test]
-pub fn test_playlist() {}
+fn duplicate_paths_get_distinct_ids() {
+    let path = PathBuf::from("/tunes/012378_0.mid");
+    let first = PlaylistElement::from(&path);
+    let second = PlaylistElement::from(&path);
+    assert_ne!(first.id, second.id);
+    assert_eq!(first.path, second.path);
+}

@@ -298,7 +298,7 @@ fn render_playlist_items(app: &mut VirtualBookApp, ui: &mut Ui) {
                     #[allow(clippy::needless_borrows_for_generic_args)]
                     iter.next(
                         ui,
-                        Id::new(("playlist_item", &item.name, &item.path)),
+                        Id::new(("playlist_item", item.id)),
                         index,
                         true,
                         |ui, item_handle| {
