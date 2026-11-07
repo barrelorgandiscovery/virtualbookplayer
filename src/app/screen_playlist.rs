@@ -780,7 +780,7 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
 /// Render the virtual book preview component
 fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
     let foffset: f64 = app.visual_offset_ms();
-    let playing = app.appplayer.is_playing();
+    let playing = app.appplayer.is_playing() && !app.appplayer.is_paused();
     let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
     let book_effect = app.book_effect;
     let book_effect_scale = app.book_effect_scale;

@@ -35,6 +35,8 @@ pub struct I18NMessages {
 
     pub hover_click_to_enlarge_view: String,
     pub hover_activate_the_play_of_the_playlist: String,
+    pub hover_pause_the_tune: String,
+    pub hover_resume_the_tune: String,
     pub hover_retour_a_la_playlist: String,
     pub play_count_tooltip: String,
     pub star_file_tooltip: String,
@@ -131,6 +133,8 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
 
         hover_click_to_enlarge_view: "Click to enlarge the view".into(),
         hover_activate_the_play_of_the_playlist: "Activate the play of the playlist".into(),
+        hover_pause_the_tune: "Pause the tune".into(),
+        hover_resume_the_tune: "Resume the tune".into(),
         hover_retour_a_la_playlist: "Back to playlist".into(),
         play_count_tooltip: "Number of times this file has been played".into(),
         star_file_tooltip: "Star this file".into(),
@@ -175,6 +179,8 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
 
         hover_click_to_enlarge_view: "Clickez pour agrandir".into(),
         hover_activate_the_play_of_the_playlist: "Jouer ou Arreter le jeu de la playlist".into(),
+        hover_pause_the_tune: "Mettre le morceau en pause".into(),
+        hover_resume_the_tune: "Reprendre le morceau".into(),
         hover_retour_a_la_playlist: "Retour à la playlist".into(),
         play_count_tooltip: "Nombre de fois que ce fichier a été joué".into(),
         star_file_tooltip: "Mettre une étoile à ce fichier".into(),

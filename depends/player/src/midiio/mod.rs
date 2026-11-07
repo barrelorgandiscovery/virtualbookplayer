@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     error::Error,
     fs::File,
     io::BufReader,
@@ -204,6 +205,154 @@ fn send_panic(con: &mut MutexGuard<MidiOutputConnection>) {
     buf.push(123);
     if let Err(e) = con.send(&buf) {
         error!("error in sending panic code :{}", e);
+    }
+}
+
+/// CC 120 (All Sound Off) and CC 123 (All Notes Off) on every channel.
+fn all_sound_off_messages() -> [[u8; 3]; 32] {
+    let mut messages = [[0u8; 3]; 32];
+    for ch in 0..16u8 {
+        let status = 0xB0 | ch;
+        messages[ch as usize * 2] = [status, 120, 0];
+        messages[ch as usize * 2 + 1] = [status, 123, 0];
+    }
+    messages
+}
+
+fn all_sound_off(con: &mut MutexGuard<MidiOutputConnection>) {
+    for message in all_sound_off_messages() {
+        if let Err(e) = con.send(&message) {
+            warn!("fail to send all-sound-off {message:?}: {e}");
+        }
+    }
+}
+
+fn note_on_message(channel: u8, key: u8, vel: u8) -> [u8; 3] {
+    [0x90 | (channel & 0x0F), key & 0x7F, vel & 0x7F]
+}
+
+/// Notes already sent and not yet released: `(channel, key) -> velocity`.
+fn track_sounding(sounding: &mut HashMap<(u8, u8), u8>, channel: u8, message: &MidiMessage) {
+    match message {
+        MidiMessage::NoteOff { key, .. } => {
+            sounding.remove(&(channel, key.as_int()));
+        }
+        MidiMessage::NoteOn { key, vel } => {
+            let key = key.as_int();
+            let vel = vel.as_int();
+            if vel == 0 {
+                sounding.remove(&(channel, key));
+            } else {
+                sounding.insert((channel, key), vel);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn replay_sounding(con: &mut MutexGuard<MidiOutputConnection>, sounding: &HashMap<(u8, u8), u8>) {
+    for (&(channel, key), &vel) in sounding {
+        let message = note_on_message(channel, key, vel);
+        if let Err(e) = con.send(&message) {
+            warn!("fail to resume note {message:?}: {e}");
+        }
+    }
+}
+
+fn drain_commands(commands: &Mutex<Receiver<Command>>) {
+    if let Ok(receiver) = commands.lock() {
+        while receiver.try_recv().is_ok() {}
+    }
+}
+
+/// Apply one explicit pause or resume. A repeated value is ignored.
+fn poll_pause_command(
+    commands: &Mutex<Receiver<Command>>,
+    ispaused: &Mutex<bool>,
+    con: &mut MutexGuard<MidiOutputConnection>,
+    sounding: &HashMap<(u8, u8), u8>,
+    output: &Mutex<Sender<Response>>,
+    play_time: Duration,
+) {
+    let command = {
+        let Ok(receiver) = commands.lock() else {
+            return;
+        };
+        receiver.try_recv().ok()
+    };
+    let Some(command) = command else {
+        return;
+    };
+    let Command::Pause(pause) = command else {
+        debug!("command not yet supported");
+        return;
+    };
+
+    let currently = ispaused.lock().map(|paused| *paused).unwrap_or(false);
+    if pause == currently {
+        return;
+    }
+    if let Ok(mut paused) = ispaused.lock() {
+        *paused = pause;
+    }
+    if pause {
+        all_sound_off(con);
+    } else {
+        replay_sounding(con, sounding);
+    }
+    if let Ok(output_locked) = output.lock() {
+        let _ = output_locked.send(Response::CurrentPlayTime(play_time));
+    }
+}
+
+/// Sleep `total`, but keep polling pause and cancel.
+/// Pause freezes the remaining sleep. Returns true when the file was cancelled.
+fn sleep_interruptible(
+    total: Duration,
+    cancel: &Receiver<bool>,
+    commands: &Mutex<Receiver<Command>>,
+    ispaused: &Mutex<bool>,
+    con: &mut MutexGuard<MidiOutputConnection>,
+    sounding: &HashMap<(u8, u8), u8>,
+    output: &Mutex<Sender<Response>>,
+    play_time: Duration,
+) -> bool {
+    let slice = Duration::from_millis(50);
+    let mut left = total;
+    loop {
+        if cancel.try_recv().is_ok() {
+            return true;
+        }
+        poll_pause_command(commands, ispaused, con, sounding, output, play_time);
+        let paused = ispaused.lock().map(|flag| *flag).unwrap_or(false);
+        if paused {
+            thread::sleep(Duration::from_millis(100));
+            continue;
+        }
+        if left.is_zero() {
+            return false;
+        }
+        let step = if left > slice { slice } else { left };
+        thread::sleep(step);
+        left = left.saturating_sub(step);
+    }
+}
+
+fn finish_cancelled(
+    con: &mut MutexGuard<MidiOutputConnection>,
+    isplaying: &Mutex<bool>,
+    ispaused: &Mutex<bool>,
+    output: &Mutex<Sender<Response>>,
+) {
+    all_notes_off(con);
+    if let Ok(mut paused) = ispaused.lock() {
+        *paused = false;
+    }
+    if let Ok(mut playing) = isplaying.lock() {
+        *playing = false;
+    }
+    if let Ok(output_locked) = output.lock() {
+        output_locked.send(Response::FileCancelled).unwrap();
     }
 }
 
@@ -438,6 +587,8 @@ impl Player for MidiPlayer {
             if let Ok(mut con) = con.lock() {
                 debug!("midi connexion aquired");
 
+                // A pause clicked as the previous file ended must not freeze this one.
+                drain_commands(&commands);
                 all_notes_off(&mut con);
 
                 if let Ok(output_locked) = output_reference.lock() {
@@ -492,32 +643,49 @@ impl Player for MidiPlayer {
                             }
                         }
 
+                        // Holes already sounding. Pause silences the organ; resume
+                        // replays these NoteOns so held notes come back.
+                        let mut sounding: HashMap<(u8, u8), u8> = HashMap::new();
+
                         // start waiting, before the play
                         let _start_wait_time = Instant::now();
                         if let Some(wait) = start_wait {
                             let mut remain = wait;
                             const INCREMENT: f32 = 0.2;
                             while remain > 0.0f32 {
-                                thread::sleep(Duration::from_secs_f32(INCREMENT));
-                                remain -= INCREMENT;
-
-                                // check stopped
                                 if receiver.try_recv().is_ok() {
-                                    // stopped
-                                    all_notes_off(&mut con);
-                                    if let Ok(mut m) = isplaying_info.lock() {
-                                        *m = false;
-                                    }
-                                    if let Ok(output_locked) = output_reference.lock() {
-                                        output_locked.send(Response::FileCancelled).unwrap();
-                                    }
+                                    finish_cancelled(
+                                        &mut con,
+                                        &isplaying_info,
+                                        &ispaused,
+                                        &output_reference,
+                                    );
                                     return;
                                 }
+
+                                let played = Duration::from_secs_f32((wait - remain).max(0.0));
+                                poll_pause_command(
+                                    &commands,
+                                    &ispaused,
+                                    &mut con,
+                                    &sounding,
+                                    &output_reference,
+                                    played,
+                                );
+                                let paused = ispaused.lock().map(|flag| *flag).unwrap_or(false);
+                                if paused {
+                                    // Freeze the remaining lead-in. Do not cancel the file.
+                                    thread::sleep(Duration::from_millis(100));
+                                    continue;
+                                }
+
+                                thread::sleep(Duration::from_secs_f32(INCREMENT));
+                                remain -= INCREMENT;
 
                                 if let Ok(output_locked) = output_reference.lock() {
                                     output_locked
                                         .send(Response::CurrentPlayTime(Duration::from_secs_f32(
-                                            wait - remain,
+                                            (wait - remain).max(0.0),
                                         )))
                                         .unwrap();
                                 }
@@ -529,47 +697,29 @@ impl Player for MidiPlayer {
                         loop {
                             // for moment in midi_sheet {
                             if receiver.try_recv().is_ok() {
-                                // cancel received
-                                // stopped
-                                all_notes_off(&mut con);
-                                if let Ok(mut m) = isplaying_info.lock() {
-                                    *m = false;
-                                }
-                                if let Ok(output_locked) = output_reference.lock() {
-                                    output_locked.send(Response::FileCancelled).unwrap();
-                                }
+                                finish_cancelled(
+                                    &mut con,
+                                    &isplaying_info,
+                                    &ispaused,
+                                    &output_reference,
+                                );
                                 return;
                             }
 
-                            if let Ok(receiver) = commands.lock() {
-                                if let Ok(command) = receiver.try_recv() {
-                                    match command {
-                                        Command::Pause => {
-                                            if let Ok(mut p) = ispaused.lock() {
-                                                let readvalue: bool = *p;
-                                                *p = !readvalue;
-                                            }
-                                        }
+                            poll_pause_command(
+                                &commands,
+                                &ispaused,
+                                &mut con,
+                                &sounding,
+                                &output_reference,
+                                total_duration + wait_time,
+                            );
 
-                                        _e => {
-                                            debug!("command not yet supported");
-                                        }
-                                    }
-                                }
-                            }
-
-                            if let Ok(p) = ispaused.lock() {
-                                if *p {
-                                    thread::sleep(Duration::from_millis(100));
-                                    if let Ok(output_locked) = output_reference.lock() {
-                                        output_locked
-                                            .send(Response::CurrentPlayTime(
-                                                total_duration + wait_time,
-                                            ))
-                                            .unwrap();
-                                    }
-                                    continue;
-                                }
+                            if ispaused.lock().map(|flag| *flag).unwrap_or(false) {
+                                // Hold the playhead. One CurrentPlayTime was sent
+                                // on the transition; do not walk the clock here.
+                                thread::sleep(Duration::from_millis(100));
+                                continue;
                             }
 
                             let current = iter_moment.next();
@@ -580,7 +730,24 @@ impl Player for MidiPlayer {
                                     }
                                     let d = timer.sleep_duration(ticks_counter);
 
-                                    timer.sleep(ticks_counter);
+                                    if sleep_interruptible(
+                                        d,
+                                        &receiver,
+                                        &commands,
+                                        &ispaused,
+                                        &mut con,
+                                        &sounding,
+                                        &output_reference,
+                                        total_duration + wait_time,
+                                    ) {
+                                        finish_cancelled(
+                                            &mut con,
+                                            &isplaying_info,
+                                            &ispaused,
+                                            &output_reference,
+                                        );
+                                        return;
+                                    }
 
                                     total_duration += d;
                                     // total_duration = Instant::now() - start_play_time;
@@ -599,6 +766,11 @@ impl Player for MidiPlayer {
                                             }
 
                                             Event::Midi(msg) => {
+                                                track_sounding(
+                                                    &mut sounding,
+                                                    msg.channel.as_int(),
+                                                    &msg.message,
+                                                );
                                                 buf.clear();
                                                 let _ = msg.write(&mut buf);
                                                 let _ = con.send(&buf);
@@ -644,11 +816,11 @@ impl Player for MidiPlayer {
 
     // is in pause ?
     fn is_paused(&self) -> bool {
-        if let Ok(paused) = self.ispaused.lock() {
-            *paused
-        } else {
-            false
+        let playing = self.isplaying.lock().map(|flag| *flag).unwrap_or(false);
+        if !playing {
+            return false;
         }
+        self.ispaused.lock().map(|paused| *paused).unwrap_or(false)
     }
 
     fn stop(&mut self) {
@@ -811,4 +983,50 @@ pub fn to_notes(
         counter += 1;
     }
     Ok(notes)
+}
+
+#[cfg(test)]
+mod tune_pause_tests {
+    use super::{all_sound_off_messages, note_on_message, track_sounding};
+    use nodi::midly::{num::u7, MidiMessage};
+    use std::collections::HashMap;
+
+    fn note_on(key: u8, vel: u8) -> MidiMessage {
+        MidiMessage::NoteOn {
+            key: u7::new(key),
+            vel: u7::new(vel),
+        }
+    }
+
+    #[test]
+    fn all_sound_off_is_three_byte_cc_on_every_channel() {
+        let messages = all_sound_off_messages();
+        assert_eq!(messages.len(), 32);
+        assert_eq!(messages[0], [0xB0, 120, 0]);
+        assert_eq!(messages[1], [0xB0, 123, 0]);
+        assert_eq!(messages[30], [0xBF, 120, 0]);
+        assert_eq!(messages[31], [0xBF, 123, 0]);
+    }
+
+    #[test]
+    fn resume_keeps_held_notes_and_drops_released_ones() {
+        let mut sounding = HashMap::new();
+        track_sounding(&mut sounding, 2, &note_on(60, 100));
+        track_sounding(&mut sounding, 2, &note_on(64, 80));
+        track_sounding(
+            &mut sounding,
+            2,
+            &MidiMessage::NoteOff {
+                key: u7::new(60),
+                vel: u7::new(0),
+            },
+        );
+        track_sounding(&mut sounding, 2, &note_on(64, 0));
+
+        assert!(sounding.is_empty());
+
+        track_sounding(&mut sounding, 0, &note_on(67, 90));
+        assert_eq!(note_on_message(0, 67, 90), [0x90, 67, 90]);
+        assert_eq!(sounding.get(&(0, 67)), Some(&90));
+    }
 }

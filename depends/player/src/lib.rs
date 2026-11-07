@@ -143,7 +143,9 @@ pub enum Command {
     Reset,
     Solo,
     Info,
-    Pause,
+    /// Pause (`true`) or resume (`false`) the current file.
+    /// Does not cancel the file and does not change playlist play mode.
+    Pause(bool),
     /// Changes the speed by the value given.
     Speed(f32),
 }

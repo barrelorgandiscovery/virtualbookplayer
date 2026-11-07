@@ -397,10 +397,19 @@ impl AppPlayer {
         }
     }
 
-    pub fn pause(&self) {
-        // send pause
-        if let Err(error) = self.commands.send(Command::Pause) {
-            debug!("error in sending command :{}", error);
+    /// Freeze or continue the current file. Playlist play mode is left unchanged.
+    pub fn set_tune_paused(&self, paused: bool) {
+        if let Err(error) = self.commands.send(Command::Pause(paused)) {
+            debug!("error in sending pause command :{}", error);
+        }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        if let Some(player) = &self.player {
+            let player = player.lock().unwrap();
+            player.is_paused()
+        } else {
+            false
         }
     }
 }

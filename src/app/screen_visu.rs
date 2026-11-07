@@ -8,7 +8,7 @@ use egui_extras::{Size, StripBuilder};
 use crate::{virtualbookcomponent::VirtualBookComponent, VirtualBookApp};
 
 pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
-    let playing = app.appplayer.is_playing();
+    let playing = app.appplayer.is_playing() && !app.appplayer.is_paused();
     let opt_vb = app.appplayer.virtual_book.read().clone();
     let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
     let book_effect = app.book_effect;
@@ -68,17 +68,16 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
         }
         let background_textureid = app.background_textureid;
 
-        let mut component = VirtualBookComponent::from_some_indexedvirtualbook(Some(Arc::clone(
-            &vbc,
-        )))
-        .offset_ms(display_offset_ms)
-        .xscale(xscale)
-        .scrollbar_width(32.0)
-        .set_background_texture_id(background_textureid)
-        .with_gpu_fx(gpu)
-        .book_effect(book_effect)
-        .book_effect_scale(book_effect_scale)
-        .playing(playing);
+        let mut component =
+            VirtualBookComponent::from_some_indexedvirtualbook(Some(Arc::clone(&vbc)))
+                .offset_ms(display_offset_ms)
+                .xscale(xscale)
+                .scrollbar_width(32.0)
+                .set_background_texture_id(background_textureid)
+                .with_gpu_fx(gpu)
+                .book_effect(book_effect)
+                .book_effect_scale(book_effect_scale)
+                .playing(playing);
 
         component.ui_content_with_fx(ui, app.book_fx.as_mut());
     }

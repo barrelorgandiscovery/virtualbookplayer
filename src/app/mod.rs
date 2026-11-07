@@ -106,6 +106,9 @@ pub struct VirtualBookApp {
     latest_duration_time: Duration,
     #[serde(skip)]
     adjusted_start_time: Instant,
+    /// Wall time when tune pause began. Resume shifts the playhead anchor by this.
+    #[serde(skip)]
+    tune_pause_started: Option<Instant>,
 
     //date code when the user has the last interaction with the application
     #[serde(skip)]
@@ -196,6 +199,7 @@ impl Default for VirtualBookApp {
 
             latest_duration_time: Duration::new(0, 0),
             adjusted_start_time: Instant::now(), // start time since we start the play
+            tune_pause_started: None,
 
             play_lattency_ms: 0, // 0 ms lattency
             book_effect: BookEffectKind::NoteFire,
@@ -549,8 +553,24 @@ impl VirtualBookApp {
 
         // Hold the last player position unless a book is actually playing.
         // Latency is NOT folded into this target; see `visual_offset_ms`.
+        // Tune pause keeps `is_playing` true but must not walk the roll.
+        let paused = self.appplayer.is_paused();
+        if paused {
+            if self.tune_pause_started.is_none() {
+                self.tune_pause_started = Some(now);
+            }
+        } else if let Some(started) = self.tune_pause_started.take() {
+            // Drop the wall time spent paused so the roll continues where it froze.
+            let paused_for = now.saturating_duration_since(started);
+            self.adjusted_start_time = self
+                .adjusted_start_time
+                .checked_add(paused_for)
+                .unwrap_or(now);
+        }
+
         let mut target_ms = self.display_offset_ms;
         if self.appplayer.is_playing()
+            && !paused
             && self.adjusted_start_time + Duration::from_millis(100) < now
         {
             if self.appplayer.virtual_book.read().is_some() {
@@ -585,7 +605,11 @@ impl VirtualBookApp {
                     self.latest_duration_time = *duration;
                     // Re-anchor the wall clock to the MIDI player's reported time.
                     // Visual latency is applied in `visual_offset_ms`, not here.
-                    self.adjusted_start_time = Instant::now() - *duration;
+                    // While paused (and on the frame that closes the pause) keep the
+                    // anchor so the roll does not jump back to the last MIDI event.
+                    if !self.appplayer.is_paused() && self.tune_pause_started.is_none() {
+                        self.adjusted_start_time = Instant::now() - *duration;
+                    }
                 }
                 Response::FileCancelled => {
                     // Clear current playing file when cancelled
@@ -1184,94 +1208,71 @@ impl VirtualBookApp {
         }
     }
 
-    /// Render floating play button (not part of top panel layout)
+    /// Render playlist play/stop and, while a file is open, tune pause.
+    ///
+    /// Playlist play/stop cancels the file and leaves the queue. Tune pause
+    /// freezes that file and keeps playlist play mode.
     fn render_floating_play_button(&mut self, ctx: &egui::Context, top_panel_rect: Rect) {
         let play_mod = self.appplayer.play_mod;
+        let tune_open = self.appplayer.is_playing();
+        let tune_paused = tune_open && self.appplayer.is_paused();
 
-        // Use filled icons for better visibility - show PAUSE when in play mode, PLAY when stopped
-        let icon = if play_mod {
-            egui_phosphor::fill::PAUSE
+        let button_size = 32.0;
+        let margin = 8.0;
+        let gap = 8.0;
+        let screen_rect = ctx.content_rect();
+        let y = top_panel_rect.top() + margin;
+        let playlist_x = screen_rect.right() - button_size - margin;
+
+        if tune_open {
+            let tune_icon = if tune_paused {
+                egui_phosphor::fill::PLAY
+            } else {
+                egui_phosphor::fill::PAUSE
+            };
+            let tune_hover = if tune_paused {
+                self.i18n.hover_resume_the_tune.clone()
+            } else {
+                self.i18n.hover_pause_the_tune.clone()
+            };
+            if show_transport_button(
+                ctx,
+                Id::new("tune_pause_button"),
+                Pos2::new(playlist_x - gap - button_size, y),
+                button_size,
+                tune_icon,
+                tune_paused,
+                &tune_hover,
+            ) {
+                self.appplayer.set_tune_paused(!tune_paused);
+                ctx.request_repaint();
+            }
+        }
+
+        let playlist_icon = if play_mod {
+            egui_phosphor::fill::STOP
         } else {
             egui_phosphor::fill::PLAY
         };
-
-        // Position the button at top-right, aligned with the top panel
-        // Use absolute screen coordinates to ensure it doesn't affect layout
-        let button_size = 32.0;
-        let margin = 8.0;
-        let screen_rect = ctx.content_rect();
-        let button_pos = Pos2::new(
-            screen_rect.right() - button_size - margin,
-            top_panel_rect.top() + margin,
-        );
-
-        let visuals = &ctx.global_style().visuals;
-        let button_fill = if play_mod {
-            visuals.selection.bg_fill
-        } else {
-            visuals.extreme_bg_color
-        };
-
-        let button_stroke = if play_mod {
-            Stroke::new(2.0, visuals.selection.stroke.color)
-        } else {
-            visuals.window_stroke
-        };
-
-        let icon_color = if play_mod {
-            visuals.selection.stroke.color
-        } else {
-            visuals.text_color()
-        };
-
-        // Create floating area for the button - use movable(false) to prevent dragging
-        // and ensure it doesn't affect layout calculations
-        let area = Area::new(Id::new("floating_play_button"))
-            .fixed_pos(button_pos)
-            .movable(false)
-            .order(Order::Foreground)
-            .interactable(true);
-
-        area.show(ctx, |ui| {
-            // Allocate exact size for the button area
-            let (rect, response) =
-                ui.allocate_exact_size(Vec2::new(button_size, button_size), Sense::click());
-
-            // Draw the button background
-            ui.painter()
-                .rect_filled(rect, CornerRadius::same(8), button_fill);
-            ui.painter().rect_stroke(
-                rect,
-                CornerRadius::same(8),
-                button_stroke,
-                StrokeKind::Inside,
-            );
-
-            // Draw the icon centered
-            let galley = ui.fonts_mut(|f| {
-                f.layout_no_wrap(icon.to_string(), FontId::proportional(20.0), icon_color)
-            });
-            let icon_pos = rect.center() - galley.size() / 2.0;
-            ui.painter()
-                .galley_with_override_text_color(icon_pos, galley, icon_color);
-
-            // Handle clicks
-            if response.clicked() {
-                if play_mod {
-                    // Currently in play mode - pause/stop
-                    self.appplayer.stop();
-                    self.appplayer.play_mod = false;
-                } else {
-                    // Not in play mode - start
-                    self.appplayer.play_mod = true;
-                    self.appplayer.play_file_on_top();
-                }
-                // Request immediate repaint to update button state
-                ctx.request_repaint();
+        let playlist_hover = self.i18n.hover_activate_the_play_of_the_playlist.clone();
+        if show_transport_button(
+            ctx,
+            Id::new("floating_play_button"),
+            Pos2::new(playlist_x, y),
+            button_size,
+            playlist_icon,
+            play_mod,
+            &playlist_hover,
+        ) {
+            if play_mod {
+                self.appplayer.stop();
+                self.appplayer.play_mod = false;
+            } else {
+                self.appplayer.play_mod = true;
+                self.appplayer.play_file_on_top();
             }
-
-            response.on_hover_text_at_pointer(&self.i18n.hover_activate_the_play_of_the_playlist);
-        });
+            ctx.request_repaint();
+        }
     }
 
     /// Render play time and title (centered)
@@ -1692,6 +1693,61 @@ fn crossfade_tile_edges(img: &mut ColorImage, feather: usize) {
             img.pixels[i1] = lerp_color32(avg, p1, wgt);
         }
     }
+}
+
+/// Hand-painted square transport control. Returns true when it was clicked.
+fn show_transport_button(
+    ctx: &egui::Context,
+    id: Id,
+    pos: Pos2,
+    size: f32,
+    icon: &str,
+    highlighted: bool,
+    hover: &str,
+) -> bool {
+    let visuals = &ctx.global_style().visuals;
+    let button_fill = if highlighted {
+        visuals.selection.bg_fill
+    } else {
+        visuals.extreme_bg_color
+    };
+    let button_stroke = if highlighted {
+        Stroke::new(2.0, visuals.selection.stroke.color)
+    } else {
+        visuals.window_stroke
+    };
+    let icon_color = if highlighted {
+        visuals.selection.stroke.color
+    } else {
+        visuals.text_color()
+    };
+
+    let mut clicked = false;
+    Area::new(id)
+        .fixed_pos(pos)
+        .movable(false)
+        .order(Order::Foreground)
+        .interactable(true)
+        .show(ctx, |ui| {
+            let (rect, response) = ui.allocate_exact_size(Vec2::new(size, size), Sense::click());
+            ui.painter()
+                .rect_filled(rect, CornerRadius::same(8), button_fill);
+            ui.painter().rect_stroke(
+                rect,
+                CornerRadius::same(8),
+                button_stroke,
+                StrokeKind::Inside,
+            );
+            let galley = ui.fonts_mut(|fonts| {
+                fonts.layout_no_wrap(icon.to_string(), FontId::proportional(20.0), icon_color)
+            });
+            let icon_pos = rect.center() - galley.size() / 2.0;
+            ui.painter()
+                .galley_with_override_text_color(icon_pos, galley, icon_color);
+            clicked = response.clicked();
+            response.on_hover_text_at_pointer(hover);
+        });
+    clicked
 }
 
 /// Time constant of the roll follow, in seconds.
