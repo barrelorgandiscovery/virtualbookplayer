@@ -433,6 +433,13 @@ fn display_folder(
     );
     folder_job.append(&element_name, 0.0, regular_format);
 
+    let (played, total) = folder_read_ratio(element);
+    if total > 0 {
+        let small_font = FontId::proportional(body_font.size * 0.65);
+        let small_format = TextFormat::simple(small_font, ui.style().visuals.text_color());
+        folder_job.append(&format!(" ({played}/{total})"), 0.0, small_format);
+    }
+
     let r = CollapsingHeader::new(egui::WidgetText::from(folder_job))
         .id_salt(id_source_folder)
         .open(Some(expanded))
@@ -452,11 +459,42 @@ fn display_folder(
         });
 
     let mut borrowed_element = element.borrow_mut();
-    if r.header_response.clicked() {
+    let header = if total > 0 {
+        r.header_response
+            .on_hover_text_at_pointer(format!("{}: {played}/{total}", i18n.folder_read_tooltip))
+    } else {
+        r.header_response
+    };
+    if header.clicked() {
         borrowed_element.expanded ^= true;
     }
 
     Ok(file_selected)
+}
+
+/// Played files over every file in this folder and its subfolders.
+/// A file counts as played once its play count is known and greater than zero.
+fn folder_read_ratio(element: &Rc<RefCell<FileViewNode>>) -> (u32, u32) {
+    let children = element.borrow().childs.clone();
+    let mut played = 0u32;
+    let mut total = 0u32;
+    for child in children {
+        let child_ref = child.borrow();
+        let file = child_ref.node.borrow();
+        if file.is_folder {
+            drop(file);
+            drop(child_ref);
+            let (child_played, child_total) = folder_read_ratio(&child);
+            played += child_played;
+            total += child_total;
+        } else {
+            total += 1;
+            if file.play_count.unwrap_or(0) > 0 {
+                played += 1;
+            }
+        }
+    }
+    (played, total)
 }
 
 /// Render a badge with text and color (generalized badge renderer)
@@ -560,9 +598,7 @@ fn display_file(
     // Display file name with play count and stars in the checkbox text
     // Use LayoutJob to color stars differently and make filename bold
     let clicked = {
-        let mut bele = element.borrow_mut();
-
-        // Build the checkbox label using LayoutJob for multi-colored text
+        // Build the label using LayoutJob for multi-colored text
         use egui::text::{LayoutJob, TextFormat};
         let mut job = LayoutJob::default();
         let body_font = ui
@@ -616,13 +652,8 @@ fn display_file(
             }
         }
 
-        // Simple checkbox with all info in the label - no wrapping issues
-        let checkbox_response = ui.checkbox(&mut bele.selected, egui::WidgetText::from(job));
-
-        // Check if clicked first (before consuming response for tooltip)
-        let clicked = checkbox_response.clicked();
-
-        // Add tooltip with detailed info on hover
+        // Same line height as the old checkbox: a small plus, not a tall button.
+        let row_height = ui.text_style_height(&TextStyle::Body);
         let mut tooltip_text = String::new();
         if let Some(count) = play_count {
             if count > 0 {
@@ -634,20 +665,29 @@ fn display_file(
                 tooltip_text.push_str(&format!("{}: {}", i18n.star_count_tooltip, count));
             }
         }
-        if !tooltip_text.is_empty() {
-            checkbox_response.on_hover_text_at_pointer(tooltip_text.trim_end());
-        }
 
-        clicked
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            let plus = ui
+                .add(
+                    Button::new(egui_phosphor::regular::PLUS)
+                        .small()
+                        .min_size(vec2(row_height, row_height)),
+                )
+                .on_hover_text_at_pointer(&i18n.add_to_playlist);
+            let name = ui
+                .add(Label::new(egui::WidgetText::from(job)).sense(Sense::click()))
+                .on_hover_text_at_pointer(if tooltip_text.is_empty() {
+                    i18n.add_to_playlist.as_str()
+                } else {
+                    tooltip_text.trim_end()
+                });
+            plus.clicked() || name.clicked()
+        })
+        .inner
     };
 
     if clicked {
-        // Set selected to false and drop the borrow before locking playlist
-        {
-            let mut bele = element.borrow_mut();
-            bele.selected = false;
-        } // Drop the borrow here
-
         // Now lock the playlist (no conflict with element borrow)
         {
             let mut locked_playlist = appplayer
@@ -862,4 +902,53 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                     });
                 });
         });
+}
+
+#[cfg(test)]
+mod folder_ratio_tests {
+    use std::cell::RefCell;
+    use std::fs;
+    use std::rc::Rc;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use crate::file_store::{FileStore, FileViewNode};
+
+    use super::folder_read_ratio;
+
+    fn mark_played(node: &Rc<RefCell<FileViewNode>>, name: &str) {
+        let view = node.borrow();
+        {
+            let mut file = view.node.borrow_mut();
+            if file.name == name {
+                file.play_count = Some(1);
+            }
+        }
+        let children = view.childs.clone();
+        drop(view);
+        for child in children {
+            mark_played(&child, name);
+        }
+    }
+
+    #[test]
+    fn counts_played_files_through_subfolders() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("vbp-folder-ratio-{stamp}"));
+        fs::create_dir_all(root.join("sub")).unwrap();
+        fs::write(root.join("a.mid"), b"a").unwrap();
+        fs::write(root.join("sub").join("b.mid"), b"b").unwrap();
+        fs::write(root.join("sub").join("c.mid"), b"c").unwrap();
+
+        let store = FileStore::new(&root).unwrap().expect("file store");
+        let view = store.default_view.as_ref().unwrap();
+        mark_played(&view.root, "a.mid");
+        mark_played(&view.root, "b.mid");
+
+        assert_eq!(folder_read_ratio(&view.root), (2, 3));
+
+        let _ = fs::remove_dir_all(root);
+    }
 }

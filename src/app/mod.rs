@@ -833,6 +833,20 @@ impl VirtualBookApp {
                 self.request_history_lists();
             }
         }
+        if self.metadata_query_frame_counter % 120 == 0 || self.metadata_query_frame_counter == 1 {
+            // Folder headers show played/total for collapsed subtrees too, so fill
+            // play counts that the visible-file query has not reached yet.
+            if let Some(file_store) = &self.file_store {
+                let missing = Self::collect_unqueried_file_paths(file_store, 48);
+                if !missing.is_empty() {
+                    debug!(
+                        "Querying play counts for {} files not yet loaded",
+                        missing.len()
+                    );
+                    self.metadata_manager.query_play_counts(missing, Vec::new());
+                }
+            }
+        }
         if self.metadata_query_frame_counter % 120 == 0 {
             // Query every ~2 seconds at 60fps
             if let Some(file_store) = &self.file_store {
@@ -870,6 +884,42 @@ impl VirtualBookApp {
             } else {
                 warn!("No file store available on first frame");
             }
+        }
+    }
+
+    /// Files whose play count has not been loaded yet, depth-first, capped.
+    fn collect_unqueried_file_paths(file_store: &FileStore, limit: usize) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        if let Some(view) = file_store.default_view.as_ref() {
+            Self::collect_unqueried_from_view(&mut paths, &view.root, limit);
+        }
+        paths
+    }
+
+    fn collect_unqueried_from_view(
+        paths: &mut Vec<PathBuf>,
+        node: &std::rc::Rc<std::cell::RefCell<crate::file_store::FileViewNode>>,
+        limit: usize,
+    ) {
+        if paths.len() >= limit {
+            return;
+        }
+        let view_node = node.borrow();
+        let file_node = view_node.node.borrow();
+        if !file_node.is_folder {
+            if file_node.play_count.is_none() {
+                paths.push(file_node.path.clone());
+            }
+            return;
+        }
+        drop(file_node);
+        let children = view_node.childs.clone();
+        drop(view_node);
+        for child in children {
+            if paths.len() >= limit {
+                break;
+            }
+            Self::collect_unqueried_from_view(paths, &child, limit);
         }
     }
 
