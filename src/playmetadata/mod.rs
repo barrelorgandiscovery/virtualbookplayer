@@ -681,6 +681,119 @@ impl PlayMetadataDatabase {
             }
         }
     }
+
+    /// Files ordered by the most recent play. Rows with no play event are omitted.
+    pub fn list_recent_plays(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<PlayHistoryRow>, Box<dyn std::error::Error>> {
+        self.query_history_list(HistorySort::Recent, limit)
+    }
+
+    /// Files ordered by the classement sort: stars, plays, or stars then plays.
+    pub fn list_ranked_plays(
+        &self,
+        limit: usize,
+        order: RankingOrder,
+    ) -> Result<Vec<PlayHistoryRow>, Box<dyn std::error::Error>> {
+        self.query_history_list(HistorySort::Ranked(order), limit)
+    }
+
+    fn query_history_list(
+        &self,
+        sort: HistorySort,
+        limit: usize,
+    ) -> Result<Vec<PlayHistoryRow>, Box<dyn std::error::Error>> {
+        let order = match sort {
+            HistorySort::Recent => "latest_play_time DESC",
+            HistorySort::Ranked(order) => order.sql_order(),
+        };
+        let sql = format!(
+            "SELECT \
+                s.relative_file_path, \
+                MAX(h.played_time) AS latest_play_time, \
+                COUNT(h.id) AS total_play_number, \
+                (SELECT COUNT(*) FROM played_file_stats_stars st \
+                 WHERE st.ref_played_file_stats_id = s.id) AS total_star_count \
+            FROM played_file_stats s \
+            INNER JOIN played_file_stats_history h \
+                ON h.ref_played_file_stats_id = s.id \
+            GROUP BY s.id, s.relative_file_path \
+            ORDER BY {order} \
+            LIMIT ?1"
+        );
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let mut stmt = self.connection.prepare(&sql).map_err(|e| {
+            error!("Failed to prepare history query ({order}): {e}");
+            Box::new(e) as Box<dyn std::error::Error>
+        })?;
+        let rows = stmt
+            .query_map([limit], |row| {
+                let relative_file_path: String = row.get(0)?;
+                let latest_play_time_str: String = row.get(1)?;
+                let total_play_number: i64 = row.get(2)?;
+                let total_star_count: i64 = row.get(3)?;
+                let latest_play_time =
+                    datetime_from_sqlite_date(&latest_play_time_str).map_err(|err| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            err,
+                        )
+                    })?;
+                Ok(PlayHistoryRow {
+                    relative_file_path,
+                    latest_play_time,
+                    total_play_number: total_play_number as u32,
+                    total_star_count: total_star_count as u32,
+                })
+            })
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+        let mut list = Vec::new();
+        for row in rows {
+            list.push(row.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?);
+        }
+        Ok(list)
+    }
+}
+
+/// One played file, with counts computed from the history and star tables.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayHistoryRow {
+    pub relative_file_path: String,
+    pub latest_play_time: DateTime<Utc>,
+    pub total_play_number: u32,
+    pub total_star_count: u32,
+}
+
+enum HistorySort {
+    Recent,
+    Ranked(RankingOrder),
+}
+
+/// How the classement list is ordered. Ties break on the latest play.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub enum RankingOrder {
+    /// Most stars, then most plays.
+    #[default]
+    StarsThenPlays,
+    /// Most stars.
+    Stars,
+    /// Most plays.
+    Plays,
+}
+
+impl RankingOrder {
+    fn sql_order(self) -> &'static str {
+        match self {
+            Self::StarsThenPlays => {
+                "total_star_count DESC, total_play_number DESC, latest_play_time DESC"
+            }
+            Self::Stars => "total_star_count DESC, latest_play_time DESC",
+            Self::Plays => "total_play_number DESC, latest_play_time DESC",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -851,12 +964,109 @@ mod tests {
             .expect("Stats not found");
 
         assert_eq!(retrieved.total_play_number, 5);
-        // Latest should be the last one (base_time + 4 hours)
         let expected_latest = base_time + chrono::Duration::seconds(4 * 3600);
         let diff = (expected_latest - retrieved.latest_play_time)
             .num_seconds()
             .abs();
         assert!(diff <= 1, "Latest play time should be the most recent");
+    }
+
+    #[test]
+    fn test_recent_and_ranked_play_lists() {
+        let db = create_test_db();
+        let t0 = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
+
+        let samples = [
+            ("old/few.mid", 1u32, 0u32, 0i64),
+            ("mid/popular.mid", 4, 1, 2),
+            ("new/fresh.mid", 2, 0, 5),
+            ("top/loved.mid", 3, 5, 3),
+        ];
+        for (path, plays, stars, last_offset_hours) in samples {
+            db.insert_or_update_played_file_stats(create_test_stats(path))
+                .unwrap();
+            for i in 0..plays {
+                let when = t0 + chrono::Duration::hours(last_offset_hours)
+                    - chrono::Duration::minutes(i64::from(i));
+                db.add_play_event(path.to_string(), when).unwrap();
+            }
+            for _ in 0..stars {
+                db.add_star_event(path.to_string(), t0).unwrap();
+            }
+        }
+        db.insert_or_update_played_file_stats(create_test_stats("never/played.mid"))
+            .unwrap();
+
+        let recent = db.list_recent_plays(10).unwrap();
+        let recent_paths: Vec<_> = recent
+            .iter()
+            .map(|row| row.relative_file_path.as_str())
+            .collect();
+        assert_eq!(
+            recent_paths,
+            vec![
+                "new/fresh.mid",
+                "top/loved.mid",
+                "mid/popular.mid",
+                "old/few.mid",
+            ]
+        );
+        assert_eq!(recent[0].total_play_number, 2);
+        assert!(recent
+            .iter()
+            .all(|row| row.relative_file_path != "never/played.mid"));
+
+        let ranked = db
+            .list_ranked_plays(10, RankingOrder::StarsThenPlays)
+            .unwrap();
+        let ranked_paths: Vec<_> = ranked
+            .iter()
+            .map(|row| row.relative_file_path.as_str())
+            .collect();
+        assert_eq!(
+            ranked_paths,
+            vec![
+                "top/loved.mid",
+                "mid/popular.mid",
+                "new/fresh.mid",
+                "old/few.mid",
+            ]
+        );
+        assert_eq!(ranked[0].total_star_count, 5);
+
+        let by_stars = db.list_ranked_plays(10, RankingOrder::Stars).unwrap();
+        let by_stars: Vec<_> = by_stars
+            .iter()
+            .map(|row| row.relative_file_path.as_str())
+            .collect();
+        assert_eq!(
+            by_stars,
+            vec![
+                "top/loved.mid",
+                "mid/popular.mid",
+                "new/fresh.mid",
+                "old/few.mid",
+            ]
+        );
+
+        let by_plays = db.list_ranked_plays(10, RankingOrder::Plays).unwrap();
+        let by_plays: Vec<_> = by_plays
+            .iter()
+            .map(|row| row.relative_file_path.as_str())
+            .collect();
+        assert_eq!(
+            by_plays,
+            vec![
+                "mid/popular.mid",
+                "top/loved.mid",
+                "new/fresh.mid",
+                "old/few.mid",
+            ]
+        );
+
+        let limited = db.list_recent_plays(1).unwrap();
+        assert_eq!(limited.len(), 1);
+        assert_eq!(limited[0].relative_file_path, "new/fresh.mid");
     }
 
     #[test]

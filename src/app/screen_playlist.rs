@@ -16,6 +16,7 @@ use egui::{epaint::Shadow, text::FontFamily, *};
 use egui_dnd::{dnd, DragDropConfig};
 use egui_extras::{Size, StripBuilder};
 
+use super::screen_history::{self, CatalogPane};
 use super::Screen;
 
 pub const BACKSPACE: &str = "<-";
@@ -711,11 +712,18 @@ fn display_tree(
 
 /// Render the file tree side panel
 fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
-    egui::Panel::left("tree_panel")
+    let history = app.catalog_pane == CatalogPane::History;
+    // History keeps its own width so the two columns are not stuck in the narrow catalog.
+    let (panel_id, default_size, min_size, max_size) = if history {
+        ("history_view", 640.0, 420.0, 1100.0)
+    } else {
+        ("tree_panel", 200.0, 80.0, 500.0)
+    };
+    egui::Panel::left(panel_id)
         .resizable(true)
-        .default_size(200.0)
-        .min_size(80.0)
-        .max_size(500.0)
+        .default_size(default_size)
+        .min_size(min_size)
+        .max_size(max_size)
         .frame(Frame {
             inner_margin: Margin::symmetric(5, 0),
             outer_margin: Margin::ZERO,
@@ -725,55 +733,61 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
             ..Default::default()
         })
         .show(ui, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                // The ScrollArea automatically constrains width, but we need to ensure
-                // the content inside respects it. Use available_width() inside the ScrollArea.
-                let available_width = ui.available_width();
-                ui.set_width(available_width);
+            screen_history::catalog_pane_switch(app, ui);
+            ui.separator();
+            if app.catalog_pane == CatalogPane::History {
+                screen_history::ui_side_by_side(app, ui);
+            } else {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    // The ScrollArea automatically constrains width, but we need to ensure
+                    // the content inside respects it. Use available_width() inside the ScrollArea.
+                    let available_width = ui.available_width();
+                    ui.set_width(available_width);
 
-                StripBuilder::new(ui)
-                    .size(Size::initial(6.0))
-                    .size(Size::remainder())
-                    .vertical(|mut strip| {
-                        strip.cell(|ui| {
-                            ui.set_width(available_width);
-                            ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
-                                if !app.current_typed_no.is_empty() {
-                                    let s = app.i18n.filter.clone()
-                                        + &format!(" : {}", app.current_typed_no);
-                                    ui.group(|ui| ui.label(s.as_str()));
+                    StripBuilder::new(ui)
+                        .size(Size::initial(6.0))
+                        .size(Size::remainder())
+                        .vertical(|mut strip| {
+                            strip.cell(|ui| {
+                                ui.set_width(available_width);
+                                ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
+                                    if !app.current_typed_no.is_empty() {
+                                        let s = app.i18n.filter.clone()
+                                            + &format!(" : {}", app.current_typed_no);
+                                        ui.group(|ui| ui.label(s.as_str()));
+                                    }
+                                });
+                            });
+                            strip.cell(|ui| {
+                                // Ensure the tree content respects the available width
+                                ui.set_width(available_width);
+                                if let Some(filestore) = &mut app.file_store {
+                                    let current_view = match app.current_typed_no.is_empty() {
+                                        true => &mut filestore.default_view,
+                                        false => &mut filestore.filtered_view,
+                                    };
+
+                                    if let Some(view) = current_view {
+                                        match display_tree(
+                                            &mut app.appplayer,
+                                            &mut app.current_typed_no,
+                                            &mut view.root,
+                                            ui,
+                                            &app.i18n,
+                                        ) {
+                                            Err(e) => {
+                                                error!("error in display tree: {}", e);
+                                            }
+                                            Ok(_returned_value) => {}
+                                        }
+                                    } else {
+                                        ui.label(&app.i18n.aucun_fichiers);
+                                    }
                                 }
                             });
                         });
-                        strip.cell(|ui| {
-                            // Ensure the tree content respects the available width
-                            ui.set_width(available_width);
-                            if let Some(filestore) = &mut app.file_store {
-                                let current_view = match app.current_typed_no.is_empty() {
-                                    true => &mut filestore.default_view,
-                                    false => &mut filestore.filtered_view,
-                                };
-
-                                if let Some(view) = current_view {
-                                    match display_tree(
-                                        &mut app.appplayer,
-                                        &mut app.current_typed_no,
-                                        &mut view.root,
-                                        ui,
-                                        &app.i18n,
-                                    ) {
-                                        Err(e) => {
-                                            error!("error in display tree: {}", e);
-                                        }
-                                        Ok(_returned_value) => {}
-                                    }
-                                } else {
-                                    ui.label(&app.i18n.aucun_fichiers);
-                                }
-                            }
-                        });
-                    });
-            });
+                });
+            }
         });
 }
 

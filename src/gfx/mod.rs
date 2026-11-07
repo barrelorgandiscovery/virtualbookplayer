@@ -5,5 +5,5 @@
 pub mod book_fx;
 pub mod effect;
 
-pub use book_fx::{BookFxState, init_book_fx_gpu};
+pub use book_fx::{init_book_fx_gpu, BookFxState};
 pub use effect::BookEffectKind;

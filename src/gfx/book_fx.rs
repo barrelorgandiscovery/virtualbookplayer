@@ -157,8 +157,7 @@ impl BookFxState {
         let mut new_particles = Vec::with_capacity(n);
         for _ in 0..n {
             // Warm bloom: mostly upward, little X drift.
-            let angle =
-                -std::f32::consts::FRAC_PI_2 + (self.next_rand_f32() - 0.5) * 0.9;
+            let angle = -std::f32::consts::FRAC_PI_2 + (self.next_rand_f32() - 0.5) * 0.9;
             let speed = (25.0 + self.next_rand_f32() * 85.0) * speed_mul;
             let life = (0.22 + self.next_rand_f32() * 0.38) * life_mul;
             let boost = 0.55 + self.next_rand_f32() * 0.45;
@@ -257,12 +256,7 @@ impl BookFxState {
             self.particles.push(Particle {
                 pos: at,
                 vel: egui::vec2(0.0, 0.0),
-                color: [
-                    0.35 + 0.25 * tint,
-                    0.75 + 0.2 * tint,
-                    1.0,
-                    0.85,
-                ],
+                color: [0.35 + 0.25 * tint, 0.75 + 0.2 * tint, 1.0, 0.85],
                 base_alpha: (0.55 + 0.25 * s).min(1.0),
                 life: life.max(0.25),
                 max_life: life.max(0.25),
@@ -331,8 +325,8 @@ impl BookFxState {
             let speed = 80.0 + self.next_rand_f32() * (160.0 * intensity);
             let life = 0.4 + self.next_rand_f32() * 0.55;
             let c = PALETTE[(self.next_rand_f32() * PALETTE.len() as f32) as usize % PALETTE.len()];
-            let size = (4.0 + self.next_rand_f32() * 6.0 * intensity)
-                * self.effect_scale.sqrt().max(0.35);
+            let size =
+                (4.0 + self.next_rand_f32() * 6.0 * intensity) * self.effect_scale.sqrt().max(0.35);
             let rotation = self.next_rand_f32() * std::f32::consts::TAU;
             let spin = (self.next_rand_f32() - 0.5) * 14.0;
             self.particles.push(Particle {
@@ -455,7 +449,11 @@ impl BookFxState {
                     count += 1;
                 }
                 if count > 0 {
-                    self.spawn_arcade_burst(at, w * 0.5, count.min((4.0 * s).ceil() as usize).max(1));
+                    self.spawn_arcade_burst(
+                        at,
+                        w * 0.5,
+                        count.min((4.0 * s).ceil() as usize).max(1),
+                    );
                 }
             }
             BookEffectKind::None => {}
@@ -555,7 +553,9 @@ impl BookFxGpu {
         if needed_verts <= self.vertex_capacity {
             return;
         }
-        let mut cap = self.vertex_capacity.max(INITIAL_QUAD_CAPACITY * VERTS_PER_QUAD);
+        let mut cap = self
+            .vertex_capacity
+            .max(INITIAL_QUAD_CAPACITY * VERTS_PER_QUAD);
         while cap < needed_verts {
             cap *= 2;
         }
@@ -591,8 +591,7 @@ impl egui_wgpu::CallbackTrait for BookFxCallback {
             return Vec::new();
         };
 
-        let total =
-            self.note_verts.len() + self.smoke_verts.len() + self.particle_verts.len();
+        let total = self.note_verts.len() + self.smoke_verts.len() + self.particle_verts.len();
         if total == 0 {
             return Vec::new();
         }
@@ -781,8 +780,12 @@ pub fn init_book_fx_gpu(cc: &eframe::CreationContext<'_>) -> bool {
         };
 
     let note_pipeline = make_pipeline("book_fx_notes", "fs_note", note_blend, &pipeline_layout);
-    let particle_pipeline =
-        make_pipeline("book_fx_particles", "fs_particle", fire_blend, &pipeline_layout);
+    let particle_pipeline = make_pipeline(
+        "book_fx_particles",
+        "fs_particle",
+        fire_blend,
+        &pipeline_layout,
+    );
     let sparkle_pipeline = make_pipeline(
         "book_fx_sparkle",
         "fs_sparkle",
@@ -916,7 +919,16 @@ fn points_to_clip(pos: Pos2, viewport: Rect) -> [f32; 2] {
 }
 
 fn push_quad(out: &mut Vec<GpuVertex>, rect: Rect, color: Color32, uv: Rect, viewport: Rect) {
-    push_quad_rotated(out, rect.center(), rect.width(), rect.height(), 0.0, color, uv, viewport);
+    push_quad_rotated(
+        out,
+        rect.center(),
+        rect.width(),
+        rect.height(),
+        0.0,
+        color,
+        uv,
+        viewport,
+    );
 }
 
 fn push_quad_rotated(

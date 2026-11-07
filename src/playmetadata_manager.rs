@@ -2,16 +2,16 @@
 //! and recording play events with low priority to not interfere with playback
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use log::{debug, error, info, warn};
 
-use crate::playmetadata::PlayMetadataDatabase;
+use crate::playmetadata::{PlayHistoryRow, PlayMetadataDatabase, RankingOrder};
 
 /// Commands sent to the background metadata thread
 #[derive(Debug, Clone)]
@@ -19,6 +19,12 @@ pub enum MetadataCommand {
     /// Request play counts for a list of file paths
     /// First Vec contains high-priority (visible) files, second Vec contains low-priority (all other) files
     QueryPlayCounts(Vec<PathBuf>, Vec<PathBuf>),
+    /// Recent plays and star ranking, with a workspace existence check.
+    QueryHistory {
+        recent_limit: usize,
+        ranked_limit: usize,
+        ranking_order: RankingOrder,
+    },
     /// Record a play event for a file
     RecordPlayEvent(PathBuf),
     /// Record a star event for a file
@@ -34,11 +40,58 @@ pub struct FileMetadata {
     pub star_count: u32,
 }
 
+/// One history or ranking row, after the workspace file has been checked.
+#[derive(Debug, Clone)]
+pub struct HistoryFile {
+    pub relative_path: String,
+    pub absolute_path: PathBuf,
+    pub play_count: u32,
+    pub star_count: u32,
+    pub latest_play_time: DateTime<Utc>,
+    /// False when the file is no longer in the workspace folder.
+    pub exists: bool,
+}
+
 /// Results sent back from the background thread
 #[derive(Debug, Clone)]
 pub enum MetadataResult {
     /// Play counts and star counts for files (path -> metadata)
     PlayCounts(HashMap<PathBuf, FileMetadata>),
+    /// Recent plays and the star / play-count ranking.
+    History {
+        recent: Vec<HistoryFile>,
+        ranked: Vec<HistoryFile>,
+        ranking_order: RankingOrder,
+    },
+}
+
+/// Join a database relative path (`a/b.mid`) onto the workspace folder.
+pub(crate) fn absolute_path_in_workspace(folder: &Path, relative: &str) -> PathBuf {
+    relative
+        .split(['/', '\\'])
+        .filter(|part| !part.is_empty() && *part != ".")
+        .fold(folder.to_path_buf(), |path, part| path.join(part))
+}
+
+/// Attach absolute paths and mark files that are no longer in the workspace.
+pub(crate) fn history_files_from_rows(
+    folder: &Path,
+    rows: Vec<PlayHistoryRow>,
+) -> Vec<HistoryFile> {
+    rows.into_iter()
+        .map(|row| {
+            let absolute_path = absolute_path_in_workspace(folder, &row.relative_file_path);
+            let exists = absolute_path.is_file();
+            HistoryFile {
+                relative_path: row.relative_file_path,
+                absolute_path,
+                play_count: row.total_play_number,
+                star_count: row.total_star_count,
+                latest_play_time: row.latest_play_time,
+                exists,
+            }
+        })
+        .collect()
 }
 
 /// Play metadata manager - coordinates background thread for metadata operations
@@ -261,6 +314,60 @@ impl PlayMetadataManager {
                                 // No database - return empty counts
                                 let _ =
                                     result_sender.send(MetadataResult::PlayCounts(HashMap::new()));
+                            }
+                        }
+                        MetadataCommand::QueryHistory {
+                            recent_limit,
+                            ranked_limit,
+                            ranking_order,
+                        } => {
+                            let Some(ref db) = database else {
+                                debug!(
+                                    "Background thread: history query skipped, database is not open"
+                                );
+                                let _ = result_sender.send(MetadataResult::History {
+                                    recent: Vec::new(),
+                                    ranked: Vec::new(),
+                                    ranking_order,
+                                });
+                                continue;
+                            };
+                            let Some(ref folder) = folder_path else {
+                                debug!(
+                                    "Background thread: history query skipped, workspace folder is unknown"
+                                );
+                                let _ = result_sender.send(MetadataResult::History {
+                                    recent: Vec::new(),
+                                    ranked: Vec::new(),
+                                    ranking_order,
+                                });
+                                continue;
+                            };
+                            let recent_rows = db.list_recent_plays(recent_limit);
+                            let ranked_rows = db.list_ranked_plays(ranked_limit, ranking_order);
+                            match (recent_rows, ranked_rows) {
+                                (Ok(recent_rows), Ok(ranked_rows)) => {
+                                    let recent = history_files_from_rows(folder, recent_rows);
+                                    let ranked = history_files_from_rows(folder, ranked_rows);
+                                    debug!(
+                                        "Background thread: history lists ready, recent={}, ranked={}, missing recent={}",
+                                        recent.len(),
+                                        ranked.len(),
+                                        recent.iter().filter(|file| !file.exists).count()
+                                    );
+                                    if let Err(e) = result_sender.send(MetadataResult::History {
+                                        recent,
+                                        ranked,
+                                        ranking_order,
+                                    }) {
+                                        warn!(
+                                            "Background thread: failed to send history lists: {e}"
+                                        );
+                                    }
+                                }
+                                (Err(e), _) | (_, Err(e)) => {
+                                    error!("Background thread: history query failed: {e}");
+                                }
                             }
                         }
                         MetadataCommand::RecordPlayEvent(path) => {
@@ -547,27 +654,95 @@ impl PlayMetadataManager {
         }
     }
 
-    /// Check for and process any results from background thread
-    /// Returns file metadata (play counts and star counts) if available
-    pub fn process_results(&self) -> Option<HashMap<PathBuf, FileMetadata>> {
-        // Use try_recv to avoid blocking
-        match self.result_receiver.try_recv() {
-            Ok(MetadataResult::PlayCounts(metadata)) => {
-                debug!(
-                    "MetadataManager: Received {} metadata results from background thread",
-                    metadata.len()
-                );
-                Some(metadata)
-            }
-            Err(std::sync::mpsc::TryRecvError::Empty) => {
-                // No results yet - this is normal
-                None
-            }
-            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                error!("MetadataManager: Result channel disconnected - background thread may have died");
-                None
+    /// Ask the worker for the recent-play list and the star ranking.
+    /// Missing workspace files are flagged on the worker, not on the UI thread.
+    pub fn query_history(
+        &self,
+        recent_limit: usize,
+        ranked_limit: usize,
+        ranking_order: RankingOrder,
+    ) {
+        debug!(
+            "MetadataManager: requesting history lists (recent={recent_limit}, ranked={ranked_limit}, order={ranking_order:?})"
+        );
+        if let Err(e) = self.command_sender.send(MetadataCommand::QueryHistory {
+            recent_limit,
+            ranked_limit,
+            ranking_order,
+        }) {
+            error!("MetadataManager: failed to send history query: {e}");
+        }
+    }
+
+    /// Drain every result waiting from the background thread.
+    pub fn process_results(&self) -> Vec<MetadataResult> {
+        let mut results = Vec::new();
+        loop {
+            match self.result_receiver.try_recv() {
+                Ok(result) => {
+                    if let MetadataResult::PlayCounts(metadata) = &result {
+                        debug!(
+                            "MetadataManager: Received {} metadata results from background thread",
+                            metadata.len()
+                        );
+                    }
+                    results.push(result);
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    error!("MetadataManager: Result channel disconnected - background thread may have died");
+                    break;
+                }
             }
         }
+        results
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{absolute_path_in_workspace, history_files_from_rows};
+    use crate::playmetadata::PlayHistoryRow;
+    use chrono::{TimeZone, Utc};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn history_rows_flag_files_missing_from_the_workspace() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let folder = std::env::temp_dir().join(format!("vbp-history-{stamp}"));
+        fs::create_dir_all(folder.join("kept")).unwrap();
+        fs::write(folder.join("kept/here.mid"), b"mid").unwrap();
+
+        let when = Utc.with_ymd_and_hms(2026, 1, 2, 3, 4, 5).unwrap();
+        let rows = vec![
+            PlayHistoryRow {
+                relative_file_path: "kept/here.mid".into(),
+                latest_play_time: when,
+                total_play_number: 2,
+                total_star_count: 1,
+            },
+            PlayHistoryRow {
+                relative_file_path: "gone/missing.mid".into(),
+                latest_play_time: when,
+                total_play_number: 4,
+                total_star_count: 0,
+            },
+        ];
+
+        let files = history_files_from_rows(&folder, rows);
+        assert!(files[0].exists);
+        assert_eq!(
+            files[0].absolute_path,
+            absolute_path_in_workspace(&folder, "kept/here.mid")
+        );
+        assert!(!files[1].exists);
+        assert_eq!(files[1].play_count, 4);
+
+        let _ = fs::remove_dir_all(&folder);
     }
 }
 

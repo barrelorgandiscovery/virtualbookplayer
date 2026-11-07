@@ -14,8 +14,9 @@ use player::midiio::{DeviceInformation, MidiPlayerFactory};
 use player::{PlayerFactory, Response};
 
 use crate::appplayer::AppPlayer;
-use crate::gfx::{BookEffectKind, BookFxState, init_book_fx_gpu};
-use crate::playmetadata_manager::PlayMetadataManager;
+use crate::gfx::{init_book_fx_gpu, BookEffectKind, BookFxState};
+use crate::playmetadata::RankingOrder;
+use crate::playmetadata_manager::{HistoryFile, MetadataResult, PlayMetadataManager};
 use crate::{duration_to_mm_ss, file_store::*};
 
 use log::{debug, error, info, warn};
@@ -23,6 +24,7 @@ use log::{debug, error, info, warn};
 use self::i18n::{create_i18n_message_with_lang, I18NMessages};
 
 mod i18n;
+mod screen_history;
 mod screen_playlist;
 mod screen_visu;
 
@@ -71,6 +73,20 @@ pub struct VirtualBookApp {
 
     #[serde(skip)]
     current_typed_no: String,
+
+    /// Folder tree, or the recent / ranking lists.
+    catalog_pane: screen_history::CatalogPane,
+
+    /// Latest plays from the metadata database. `None` until the worker answers.
+    #[serde(skip)]
+    history_recent: Option<Vec<HistoryFile>>,
+
+    /// Classement rows for [`Self::ranking_order`]. `None` until the worker answers.
+    #[serde(skip)]
+    history_ranked: Option<Vec<HistoryFile>>,
+
+    /// Classement sort: stars, plays, or stars then plays.
+    ranking_order: RankingOrder,
 
     #[serde(skip)]
     appplayer: AppPlayer,
@@ -180,6 +196,10 @@ impl Default for VirtualBookApp {
 
             // filter
             current_typed_no: "".into(),
+            catalog_pane: screen_history::CatalogPane::Files,
+            history_recent: None,
+            history_ranked: None,
+            ranking_order: RankingOrder::StarsThenPlays,
 
             file_path_dialog: im_native_dialog::ImNativeFileDialog::default(),
             file_store_path: None,
@@ -497,9 +517,10 @@ impl VirtualBookApp {
         visuals.widgets.open.bg_stroke = Stroke::new(1.0, reddish_brown);
         visuals.widgets.open.fg_stroke = Stroke::new(1.0, dark_blue);
 
-        // Selection colors with dark blue accent
-        visuals.selection.bg_fill = dark_blue_light;
-        visuals.selection.stroke = Stroke::new(1.0, dark_blue);
+        // Selected buttons and text selections. The stroke color is the text
+        // drawn on top of bg_fill, so it has to stay light on this dark blue.
+        visuals.selection.bg_fill = dark_blue;
+        visuals.selection.stroke = Stroke::new(1.0, warm_beige);
 
         // Text edit and code backgrounds
         visuals.extreme_bg_color = Color32::from_rgb(255, 250, 240);
@@ -655,6 +676,11 @@ impl VirtualBookApp {
                 let db_path = r.join(".playmetadata.db");
                 info!("Initializing metadata database for folder: {:?}", r);
                 self.metadata_manager.set_database_path(db_path);
+                self.history_recent = None;
+                self.history_ranked = None;
+                if self.catalog_pane == screen_history::CatalogPane::History {
+                    self.request_history_lists();
+                }
 
                 match FileStore::new(&r) {
                     Ok(fs) => {
@@ -700,10 +726,33 @@ impl VirtualBookApp {
         }
     }
 
+    /// Ask the metadata worker for the recent list and the classement.
+    pub(crate) fn request_history_lists(&self) {
+        self.metadata_manager.query_history(
+            screen_history::HISTORY_LIST_LIMIT,
+            screen_history::HISTORY_LIST_LIMIT,
+            self.ranking_order,
+        );
+    }
+
     /// Update metadata - query play counts and star counts for displayed files and process results
     fn update_metadata(&mut self) {
         // Process any results from background thread
-        if let Some(file_metadata) = self.metadata_manager.process_results() {
+        for result in self.metadata_manager.process_results() {
+            let file_metadata = match result {
+                MetadataResult::History {
+                    recent,
+                    ranked,
+                    ranking_order,
+                } => {
+                    self.history_recent = Some(recent);
+                    if ranking_order == self.ranking_order {
+                        self.history_ranked = Some(ranked);
+                    }
+                    continue;
+                }
+                MetadataResult::PlayCounts(file_metadata) => file_metadata,
+            };
             debug!(
                 "Received {} metadata results from background thread",
                 file_metadata.len()
@@ -773,6 +822,17 @@ impl VirtualBookApp {
         // Use frame count to throttle queries
         // Only fetch metadata for files that are actually visible (expanded folders)
         self.metadata_query_frame_counter += 1;
+        if self.catalog_pane == screen_history::CatalogPane::History
+            && self.file_store_path.is_some()
+        {
+            let waiting = self.history_recent.is_none();
+            let refresh_every = if waiting { 30 } else { 120 };
+            if self.metadata_query_frame_counter == 1
+                || self.metadata_query_frame_counter % refresh_every == 0
+            {
+                self.request_history_lists();
+            }
+        }
         if self.metadata_query_frame_counter % 120 == 0 {
             // Query every ~2 seconds at 60fps
             if let Some(file_store) = &self.file_store {
@@ -1480,6 +1540,17 @@ impl VirtualBookApp {
             // translate some special keys and call the screen accordingly
 
             if i.modifiers.alt || i.modifiers.command || i.modifiers.ctrl || i.modifiers.shift {
+                return;
+            }
+
+            // History replaces the catalog filter, so keystrokes stay out of the search pad.
+            if self.catalog_pane == screen_history::CatalogPane::History {
+                if i.events
+                    .iter()
+                    .any(|event| matches!(event, Event::Key { pressed: true, .. }))
+                {
+                    self.last_user_application_date = chrono::Local::now();
+                }
                 return;
             }
 

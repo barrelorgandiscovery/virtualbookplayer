@@ -269,10 +269,8 @@ impl VirtualBookComponent {
                     response.rect,
                 );
 
-                let book_background = to_screen.transform_rect(Rect::from_min_size(
-                    Pos2::ZERO,
-                    response.rect.size(),
-                ));
+                let book_background =
+                    to_screen.transform_rect(Rect::from_min_size(Pos2::ZERO, response.rect.size()));
 
                 // Parchment UV in the same paper-pixel space as note X:
                 //   paper_x(local_x) = (local_x - midx) + offset_us / xscale
@@ -363,8 +361,8 @@ impl VirtualBookComponent {
                     let uv_per_us = 1.0 / (*xscale as f32 * 80.0);
 
                     for (i, h) in visible.into_iter().enumerate() {
-                        let x0 = ((h.hole_ref.timestamp as f64 - offset_us) / *xscale
-                            + midx as f64) as f32;
+                        let x0 = ((h.hole_ref.timestamp as f64 - offset_us) / *xscale + midx as f64)
+                            as f32;
                         let x1 = (((h.hole_ref.timestamp + h.hole_ref.length) as f64 - offset_us)
                             / *xscale
                             + midx as f64) as f32;
@@ -381,8 +379,7 @@ impl VirtualBookComponent {
                                 * *yfactor,
                         );
 
-                        let points_in_screen =
-                            [to_screen * pos2(x0, y0), to_screen * pos2(x1, y1)];
+                        let points_in_screen = [to_screen * pos2(x0, y0), to_screen * pos2(x1, y1)];
                         let rect = Rect::from_points(&points_in_screen);
 
                         let mut color = Color32::from_rgb(90, 90, 95);
@@ -407,7 +404,8 @@ impl VirtualBookComponent {
                         let u0 = h.hole_ref.timestamp as f32 * uv_per_us;
                         let u1 = (h.hole_ref.timestamp + h.hole_ref.length) as f32 * uv_per_us;
                         let v0 = h.hole_ref.track as f32 * 0.17;
-                        let book_uv = Rect::from_min_max(Pos2::new(u0, v0), Pos2::new(u1, v0 + 0.12));
+                        let book_uv =
+                            Rect::from_min_max(Pos2::new(u0, v0), Pos2::new(u1, v0 + 0.12));
 
                         note_sparks.push((
                             h.hole_ref.timestamp,
