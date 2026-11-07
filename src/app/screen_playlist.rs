@@ -226,8 +226,8 @@ fn render_playlist_header(app: &mut VirtualBookApp, ui: &mut Ui) {
 
 /// Truncate display name if too long
 fn truncate_display_name(name: &str, max_length: usize) -> String {
-    if name.len() > max_length {
-        String::from(name.char_range(0..max_length)) + "..."
+    if name.chars().count() > max_length {
+        name.chars().take(max_length).collect::<String>() + "..."
     } else {
         name.to_string()
     }
@@ -288,7 +288,7 @@ fn render_playlist_items(app: &mut VirtualBookApp, ui: &mut Ui) {
 
     // see https://github.com/lucasmerlin/hello_egui/blob/main/fancy-example/src/main.rs
     // for dnd examples
-    let response = dnd(ui, "playlist_dnd")
+    let response = dnd(ui, Id::new("playlist_dnd"))
         .with_mouse_config(DragDropConfig::touch_scroll())
         .show_custom(|ui, iter| {
             working_list
@@ -296,19 +296,25 @@ fn render_playlist_items(app: &mut VirtualBookApp, ui: &mut Ui) {
                 .enumerate()
                 .for_each(|(index, item)| {
                     #[allow(clippy::needless_borrows_for_generic_args)]
-                    iter.next(ui, Id::new(&item), index, true, |ui, item_handle| {
-                        item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
-                            ui.vertical_centered_justified(|ui| {
-                                handle.ui_sized(ui, item_size, |ui| {
-                                    if render_playlist_item(ui, item, index, item_size, app) {
-                                        deleted = Some(index);
-                                    }
-                                    ui.end_row();
+                    iter.next(
+                        ui,
+                        Id::new(("playlist_item", &item.name, &item.path)),
+                        index,
+                        true,
+                        |ui, item_handle| {
+                            item_handle.ui_sized(ui, item_size, |ui, handle, _state| {
+                                ui.vertical_centered_justified(|ui| {
+                                    handle.ui_sized(ui, item_size, |ui| {
+                                        if render_playlist_item(ui, item, index, item_size, app) {
+                                            deleted = Some(index);
+                                        }
+                                        ui.end_row();
+                                    });
+                                    ui.separator();
                                 });
-                                ui.separator();
-                            });
-                        })
-                    });
+                            })
+                        },
+                    );
                 });
         });
 
@@ -427,7 +433,7 @@ fn display_folder(
     folder_job.append(&element_name, 0.0, regular_format);
 
     let r = CollapsingHeader::new(egui::WidgetText::from(folder_job))
-        .id_source(id_source_folder)
+        .id_salt(id_source_folder)
         .open(Some(expanded))
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
@@ -469,7 +475,7 @@ fn render_badge(ui: &mut Ui, text: String, text_color: egui::Color32, tooltip: &
 
     // Calculate badge size based on text
     let font = FontId::proportional(9.0); // Slightly smaller font
-    let text_width = ui.fonts(|f| {
+    let text_width = ui.fonts_mut(|f| {
         f.layout_no_wrap(text.clone(), font.clone(), text_color)
             .size()
             .x
@@ -480,10 +486,10 @@ fn render_badge(ui: &mut Ui, text: String, text_color: egui::Color32, tooltip: &
     let badge_height = 16.0; // Slightly smaller height
 
     // Create badge frame with subtle appearance
-    let badge_frame = Frame::none()
+    let badge_frame = Frame::NONE
         .fill(bg_color) // Faint background
         .stroke(Stroke::new(0.5, stroke_color)) // Very thin, subtle border
-        .rounding(Rounding::same(8.0)); // Rounded corners
+        .corner_radius(CornerRadius::same(8)); // Rounded corners
 
     // Create the badge with tooltip
     let badge_response = badge_frame.show(ui, |ui| {
@@ -705,19 +711,20 @@ fn display_tree(
 
 /// Render the file tree side panel
 fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
-    egui::SidePanel::left("tree_panel")
+    egui::Panel::left("tree_panel")
         .resizable(true)
-        .default_width(200.0)
-        .width_range(80.0..=500.0)
+        .default_size(200.0)
+        .min_size(80.0)
+        .max_size(500.0)
         .frame(Frame {
-            inner_margin: Margin::symmetric(5.0, 0.0),
+            inner_margin: Margin::symmetric(5, 0),
             outer_margin: Margin::ZERO,
-            rounding: Rounding::ZERO,
+            corner_radius: CornerRadius::ZERO,
             shadow: Shadow::NONE,
             fill: Color32::TRANSPARENT,
             ..Default::default()
         })
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 // The ScrollArea automatically constrains width, but we need to ensure
                 // the content inside respects it. Use available_width() inside the ScrollArea.
@@ -772,7 +779,7 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
 
 /// Render the virtual book preview component
 fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
-    let foffset: f64 = app.pid_regulated_offset_ms;
+    let foffset: f64 = app.display_offset_ms;
 
     // display virtualbook
     let c = VirtualBookComponent::from_some_indexedvirtualbook(
@@ -791,6 +798,7 @@ fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut U
                 magnification: TextureFilter::Nearest,
                 minification: TextureFilter::Linear,
                 wrap_mode: TextureWrapMode::Repeat,
+                mipmap_mode: None,
             },
         ));
         app.background_textureid = Some(TextureId::from(
@@ -816,12 +824,12 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
         .frame(Frame {
             inner_margin: Margin::ZERO,
             outer_margin: Margin::ZERO,
-            rounding: Rounding::ZERO,
+            corner_radius: CornerRadius::ZERO,
             shadow: Shadow::NONE,
             fill: Color32::TRANSPARENT,
             ..Default::default()
         })
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             StripBuilder::new(ui)
                 .size(Size::initial(100.0))
                 .size(Size::remainder())

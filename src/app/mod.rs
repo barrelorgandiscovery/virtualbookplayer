@@ -21,8 +21,6 @@ use log::{debug, error, info, warn};
 
 use self::i18n::{create_i18n_message_with_lang, I18NMessages};
 
-use pid_lite::Controller;
-
 mod i18n;
 mod screen_playlist;
 mod screen_visu;
@@ -44,14 +42,16 @@ pub struct VirtualBookApp {
 
     xscale: f64,
 
-    /// offset in the play (in seconds)
+    /// offset in the play (in milliseconds)
     #[serde(skip)]
     offset_ms: f64,
 
+    /// roll position drawn on screen, in milliseconds
     #[serde(skip)]
-    pid_regulated_offset_ms: f64,
+    display_offset_ms: f64,
+    /// previous frame time, used to detect a stalled restore
     #[serde(skip)]
-    pid_controller: Controller,
+    last_display_tick: Instant,
 
     #[serde(skip)]
     screen: Screen,
@@ -151,8 +151,8 @@ impl Default for VirtualBookApp {
             lang: None,
 
             offset_ms: 0.0,
-            pid_regulated_offset_ms: 0.0,
-            pid_controller: Controller::new(0.0, 0.30, 0.010, 0.05),
+            display_offset_ms: 0.0,
+            last_display_tick: Instant::now(),
 
             xscale: 3_000f64,
             screen: Screen::PlayListConstruction,
@@ -217,18 +217,18 @@ impl VirtualBookApp {
         // Install my own font (maybe supporting non-latin characters):
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../../fonts/Rubik-VariableFont_wght.ttf")),
+            FontData::from_static(include_bytes!("../../fonts/Rubik-VariableFont_wght.ttf")).into(),
         ); // .ttf and .otf supported
 
         // Install bold font - using Rubik-Bold.ttf
         fonts.font_data.insert(
             "rubik_bold".to_owned(),
-            FontData::from_static(include_bytes!("../../fonts/Rubik-Bold.ttf")),
+            FontData::from_static(include_bytes!("../../fonts/Rubik-Bold.ttf")).into(),
         );
 
         fonts.font_data.insert(
             "icon_font".to_owned(),
-            FontData::from_static(include_bytes!("../../fonts/fa-solid-900.ttf")),
+            FontData::from_static(include_bytes!("../../fonts/fa-solid-900.ttf")).into(),
         );
 
         // Put my font first (highest priority):
@@ -260,7 +260,7 @@ impl VirtualBookApp {
         // Add fill variant FIRST (higher priority) for filled icons (stars, folders)
         fonts.font_data.insert(
             "phosphor-fill".to_owned(),
-            egui_phosphor::Variant::Fill.font_data(),
+            egui_phosphor::Variant::Fill.font_data().into(),
         );
         // Insert fill variant BEFORE regular variant in Proportional font family
         // This ensures fill variant characters are found first when using fill:: constants
@@ -281,6 +281,33 @@ impl VirtualBookApp {
 
     /// Restore MIDI device from saved state
     fn restore_midi_device(app: &mut Self) {
+        let devices = match MidiPlayerFactory::list_all_devices() {
+            Ok(devices) => devices,
+            Err(e) => {
+                error!("fail to list MIDI devices: {}", e);
+                return;
+            }
+        };
+
+        if devices.is_empty() {
+            warn!("no MIDI output devices available on restore");
+            return;
+        }
+
+        app.current_devices = devices;
+        if !app
+            .current_devices
+            .iter()
+            .any(|device| device.no == app.selected_device)
+        {
+            let fallback = app.current_devices[0].no;
+            warn!(
+                "saved MIDI device {} is unavailable; falling back to {}",
+                app.selected_device, fallback
+            );
+            app.selected_device = fallback;
+        }
+
         let factory = MidiPlayerFactory {
             device_no: app.selected_device,
         };
@@ -462,33 +489,39 @@ impl VirtualBookApp {
         ctx.set_visuals(old);
 
         let mut style: Style = Style::default();
-        style.clone_from(&ctx.style());
+        style.clone_from(&ctx.global_style());
 
         // Make window_fill fully opaque (alpha 255) for menus and windows
         let mut c = style.visuals.window_fill;
         c = Color32::from_rgba_premultiplied(c.r(), c.g(), c.b(), 255);
         style.visuals.window_fill = c;
-        style.visuals.window_rounding = Rounding::same(0.0);
+        style.visuals.window_corner_radius = CornerRadius::ZERO;
 
-        ctx.set_style(style);
+        ctx.set_global_style(style);
     }
 
-    /// Update player state and PID controller
+    /// Update the playhead and the position drawn on the roll.
     fn update_player_state(&mut self) {
+        let now = Instant::now();
+        let dt = now
+            .saturating_duration_since(self.last_display_tick)
+            .as_secs_f64();
+        self.last_display_tick = now;
+
+        // Hold the last drawn position unless a book is actually playing.
+        let mut target_ms = self.display_offset_ms;
         if self.appplayer.is_playing()
-            && self.adjusted_start_time + Duration::from_millis(100) < Instant::now()
+            && self.adjusted_start_time + Duration::from_millis(100) < now
         {
-            let delta = Instant::now().duration_since(self.adjusted_start_time);
-            if let Some(_vb) = self.appplayer.virtual_book.read().as_deref() {
+            if self.appplayer.virtual_book.read().is_some() {
+                let delta = now.saturating_duration_since(self.adjusted_start_time);
                 self.current_duration = delta;
                 self.offset_ms = delta.as_millis() as f64;
-                self.pid_controller
-                    .set_target(self.offset_ms - self.play_lattency_ms as f64);
+                target_ms = self.offset_ms - self.play_lattency_ms as f64;
             }
         }
 
-        // compute smoothed values for nice display
-        self.pid_regulated_offset_ms = self.pid_controller.update(self.pid_regulated_offset_ms);
+        self.display_offset_ms = follow_display_offset(self.display_offset_ms, target_ms, dt);
     }
 
     /// Handle player response messages
@@ -510,15 +543,10 @@ impl VirtualBookApp {
                 }
                 Response::CurrentPlayTime(duration) => {
                     self.latest_duration_time = *duration;
+                    // Re-anchor the wall clock. Display latency is applied later,
+                    // when the roll target is computed, so a late message cannot
+                    // pull the view in the opposite direction.
                     self.adjusted_start_time = Instant::now() - *duration;
-
-                    // depending on the midi control, some may have a
-                    // time shift
-                    // accordingly,
-                    self.pid_controller.set_target(
-                        ((*duration).as_micros() as f64 + self.play_lattency_ms as f64 * 1000.0)
-                            / 1000.0,
-                    );
                 }
                 Response::FileCancelled => {
                     // Clear current playing file when cancelled
@@ -977,7 +1005,7 @@ impl VirtualBookApp {
                 debug!("dialog opened");
             }
 
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         if ui
@@ -1006,7 +1034,7 @@ impl VirtualBookApp {
                                         });
                 }
             }
-            ui.close_menu();
+            ui.close();
         };
     }
 
@@ -1080,7 +1108,7 @@ impl VirtualBookApp {
                     }
                 }
 
-                ui.close_menu();
+                ui.close();
             }
         }
     }
@@ -1100,13 +1128,13 @@ impl VirtualBookApp {
         // Use absolute screen coordinates to ensure it doesn't affect layout
         let button_size = 32.0;
         let margin = 8.0;
-        let screen_rect = ctx.screen_rect();
+        let screen_rect = ctx.content_rect();
         let button_pos = Pos2::new(
             screen_rect.right() - button_size - margin,
             top_panel_rect.top() + margin,
         );
 
-        let visuals = &ctx.style().visuals;
+        let visuals = &ctx.global_style().visuals;
         let button_fill = if play_mod {
             visuals.selection.bg_fill
         } else {
@@ -1140,12 +1168,16 @@ impl VirtualBookApp {
 
             // Draw the button background
             ui.painter()
-                .rect_filled(rect, Rounding::same(8.0), button_fill);
-            ui.painter()
-                .rect_stroke(rect, Rounding::same(8.0), button_stroke);
+                .rect_filled(rect, CornerRadius::same(8), button_fill);
+            ui.painter().rect_stroke(
+                rect,
+                CornerRadius::same(8),
+                button_stroke,
+                StrokeKind::Inside,
+            );
 
             // Draw the icon centered
-            let galley = ui.fonts(|f| {
+            let galley = ui.fonts_mut(|f| {
                 f.layout_no_wrap(icon.to_string(), FontId::proportional(20.0), icon_color)
             });
             let icon_pos = rect.center() - galley.size() / 2.0;
@@ -1265,19 +1297,24 @@ impl VirtualBookApp {
 
     /// Render top panel menu bar
     #[cfg(not(target_arch = "wasm32"))]
-    fn render_top_panel(&mut self, ctx: &egui::Context) -> egui::Response {
+    fn render_top_panel(&mut self, ui: &mut Ui) -> egui::Response {
         // Use inactive widget background for a subtle theme variant color
-        let theme_variant_color = ctx.style().visuals.widgets.inactive.weak_bg_fill;
-        let top_panel_response = egui::TopBottomPanel::top("top_panel")
+        let theme_variant_color = ui
+            .ctx()
+            .global_style()
+            .visuals
+            .widgets
+            .inactive
+            .weak_bg_fill;
+        let top_panel_response = egui::Panel::top("top_panel")
             .frame(
                 Frame::default()
                     .fill(theme_variant_color)
-                    .inner_margin(Margin::same(4.0))
-                    .outer_margin(Margin::same(0.0)),
+                    .inner_margin(Margin::same(4))
+                    .outer_margin(Margin::same(0)),
             )
-            .default_height(32.0)
-            .min_height(32.0)
-            .show(ctx, |ui| {
+            .exact_size(32.0)
+            .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     // Left: File menu
                     ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
@@ -1311,7 +1348,7 @@ impl VirtualBookApp {
                                     ui.separator();
 
                                     if ui.button(&self.i18n.quit).clicked() {
-                                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                                        ui.send_viewport_cmd(egui::ViewportCommand::Close);
                                     }
                                 },
                             )
@@ -1435,6 +1472,7 @@ impl VirtualBookApp {
                     magnification: TextureFilter::Nearest,
                     minification: TextureFilter::Linear,
                     wrap_mode: TextureWrapMode::Repeat,
+                    mipmap_mode: None,
                 },
             );
             self.texture_handle = Some(textureid);
@@ -1447,7 +1485,7 @@ impl VirtualBookApp {
 
         // Background should fill the entire area below the top panel
         // Since it's rendered at Background layer, use screen_rect and adjust for top panel
-        let mut displayed_image = ctx.screen_rect();
+        let mut displayed_image = ctx.content_rect();
         *displayed_image.top_mut() = top_panel_bottom;
 
         if let Some(t) = &self.texture_handle {
@@ -1457,10 +1495,8 @@ impl VirtualBookApp {
     }
 
     /// Render central panel content
-    fn render_central_panel(&mut self, ctx: &egui::Context, _top_panel_bottom: f32) {
-        // Central panel should use available_rect which already accounts for top panel
-        let mut rect = ctx.available_rect();
-        *rect.bottom_mut() -= 0.0; // Remove bottom spacing
+    fn render_central_panel(&mut self, ctx: &egui::Context, rect: Rect) {
+        // `rect` is the area left over below the top panel
 
         // windows is the only way to have a transparent overlap in egui
         Window::new("title")
@@ -1504,6 +1540,63 @@ impl VirtualBookApp {
     }
 }
 
+/// Time constant of the roll follow, in seconds.
+const DISPLAY_FOLLOW_TAU_SECS: f64 = 0.04;
+/// A playhead jump larger than this is a seek or a restore: draw it immediately.
+const DISPLAY_SNAP_ERROR_MS: f64 = 300.0;
+/// A frame gap larger than this means the window was not being drawn.
+const DISPLAY_SNAP_DT_SECS: f64 = 0.1;
+
+/// Move the drawn roll toward `target_ms`.
+///
+/// Continuous playback eases over a few frames. A skipped stretch of frames
+/// (window restored, machine woken) or a jump in the playhead snaps, so the
+/// roll is not animated in from the origin.
+fn follow_display_offset(displayed_ms: f64, target_ms: f64, dt_secs: f64) -> f64 {
+    let error = target_ms - displayed_ms;
+    if !dt_secs.is_finite()
+        || dt_secs >= DISPLAY_SNAP_DT_SECS
+        || error.abs() > DISPLAY_SNAP_ERROR_MS
+    {
+        target_ms
+    } else if dt_secs > 0.0 {
+        let alpha = 1.0 - (-dt_secs / DISPLAY_FOLLOW_TAU_SECS).exp();
+        displayed_ms + error * alpha
+    } else {
+        displayed_ms
+    }
+}
+
+#[cfg(test)]
+mod display_offset_tests {
+    use super::follow_display_offset;
+
+    #[test]
+    fn snaps_when_the_window_was_not_drawn() {
+        // Two seconds hidden, playhead only 200 ms ahead: still show it now.
+        assert_eq!(follow_display_offset(10_000.0, 10_200.0, 2.0), 10_200.0);
+    }
+
+    #[test]
+    fn snaps_from_the_origin_when_the_playhead_is_already_ahead() {
+        assert_eq!(follow_display_offset(0.0, 120_000.0, 0.016), 120_000.0);
+    }
+
+    #[test]
+    fn eases_one_frame_of_steady_playback() {
+        let shown = follow_display_offset(1_000.0, 1_016.0, 0.016);
+        assert!(
+            shown > 1_000.0 && shown < 1_016.0,
+            "steady playback should ease, shown = {shown}"
+        );
+    }
+
+    #[test]
+    fn holds_when_no_time_has_passed() {
+        assert_eq!(follow_display_offset(500.0, 800.0, 0.0), 500.0);
+    }
+}
+
 #[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl eframe::App for VirtualBookApp {
     /// Called by the frame work to save state before shutdown.
@@ -1514,49 +1607,48 @@ impl eframe::App for VirtualBookApp {
     #[cfg_attr(any(feature = "profiling"), profiling::function)]
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.setup_visuals_and_style(ctx);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
+        self.setup_visuals_and_style(&ctx);
 
         ctx.set_pixels_per_point(self.screen_zoom_factor);
 
-        self.update_player_state();
+        // Anchor the playhead from the latest player message before drawing,
+        // so a restored window shows the current position on the first frame.
         self.handle_player_responses();
+        self.update_player_state();
         self.handle_file_dialog();
         self.update_metadata();
 
         #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        let top_response = self.render_top_panel(ctx);
+        let top_panel_rect = self.render_top_panel(ui).rect;
         #[cfg(target_arch = "wasm32")]
-        let top_response = egui::Response::default();
+        let top_panel_rect = Rect::NOTHING;
 
         let top_panel_bottom = if cfg!(not(target_arch = "wasm32")) {
-            top_response.rect.bottom()
+            top_panel_rect.bottom()
         } else {
             0.0
-        };
-
-        let top_panel_rect = if cfg!(not(target_arch = "wasm32")) {
-            top_response.rect
-        } else {
-            Rect::NOTHING
         };
 
         // Render floating play button (not part of top panel layout)
         #[cfg(not(target_arch = "wasm32"))]
         if self.appplayer.player.is_some() {
-            self.render_floating_play_button(ctx, top_panel_rect);
+            self.render_floating_play_button(&ctx, top_panel_rect);
         }
 
         if self.appplayer.player.is_none() {
             // there is no player instanciated (because we need to define the output port)
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
                 ui.label("Choisissez un périphérique de sortie dans le menu Fichier");
             });
         } else {
-            egui::CentralPanel::default().show(ctx, |_ui| {
-                self.render_background(ctx, top_panel_bottom);
+            // area left below the top panel
+            let central_rect = ui.available_rect_before_wrap();
+            egui::CentralPanel::default().show(ui, |_ui| {
+                self.render_background(&ctx, top_panel_bottom);
             });
-            self.render_central_panel(ctx, top_panel_bottom);
+            self.render_central_panel(&ctx, central_rect);
         }
         ctx.request_repaint();
     }

@@ -224,9 +224,10 @@ where
 
             ui.painter().rect(
                 rect,
-                visuals.rounding,
+                visuals.corner_radius,
                 ui.style().visuals.extreme_bg_color,
                 visuals.fg_stroke,
+                egui::StrokeKind::Inside,
             );
 
             if let Some(buffer) = self.buffer {

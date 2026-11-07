@@ -233,7 +233,7 @@ impl VirtualBookComponent {
                 } else {
                     painter.add(RectShape::filled(
                         book_background,
-                        Rounding::default(),
+                        CornerRadius::default(),
                         Color32::from_rgb(255, 255, 255),
                     ));
                 }
@@ -378,10 +378,14 @@ impl VirtualBookComponent {
 
                     // draw the elements, for reactive elements
                     for (r, c) in rects.iter() {
-                        painter.add(RectShape::filled(*r, Rounding::from(1.0), *c));
+                        painter.add(RectShape::filled(*r, CornerRadius::same(1), *c));
                     }
 
-                    painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
+                    painter.add(RectShape::filled(
+                        bar,
+                        CornerRadius::default(),
+                        Color32::BLUE,
+                    ));
                 } else {
                     // no virtualbook
 
@@ -395,7 +399,7 @@ impl VirtualBookComponent {
 
                     painter.add(RectShape::filled(
                         book_background,
-                        Rounding::default(),
+                        CornerRadius::default(),
                         Color32::WHITE,
                     ));
 
@@ -404,7 +408,11 @@ impl VirtualBookComponent {
                         to_screen * pos2(midx + 1.0, maxy + 10.0),
                     ]);
 
-                    painter.add(RectShape::filled(bar, Rounding::default(), Color32::BLUE));
+                    painter.add(RectShape::filled(
+                        bar,
+                        CornerRadius::default(),
+                        Color32::BLUE,
+                    ));
                 }
                 ui.ctx().request_repaint();
                 ui.interact(response.rect, Id::new("area"), Sense::click())

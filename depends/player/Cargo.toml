@@ -16,7 +16,7 @@ thread-priority = "0.13.1"
 
 bookparsing = {path = "../book-lib-rs"}
 
-profiling = {version = "1.0.11"}
+profiling = { version = "1.0.18" }
 
 # for input / output conversions, configurations
 

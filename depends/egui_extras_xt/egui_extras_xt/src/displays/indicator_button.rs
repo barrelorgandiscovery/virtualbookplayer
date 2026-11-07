@@ -1,4 +1,6 @@
-use egui::{vec2, Align2, FontFamily, FontId, Key, Rect, Response, Sense, Stroke, Ui, Widget};
+use egui::{
+    vec2, Align2, FontFamily, FontId, Key, Rect, Response, Sense, Stroke, StrokeKind, Ui, Widget,
+};
 use strum::{Display, EnumIter};
 
 use crate::displays::{DisplayStyle, DisplayStylePreset};
@@ -145,7 +147,7 @@ impl<'a> Widget for IndicatorButton<'a> {
                 }
             }
             IndicatorButtonBehavior::Hold => {
-                if response.drag_started() || response.drag_released() {
+                if response.drag_started() || response.drag_stopped() {
                     set(&mut self.get_set_value, response.dragged());
                     response.mark_changed();
                 }
@@ -183,8 +185,13 @@ impl<'a> Widget for IndicatorButton<'a> {
                 }
             };
 
-            ui.painter()
-                .rect(rect, visuals.rounding, visuals.bg_fill, visuals.bg_stroke);
+            ui.painter().rect(
+                rect,
+                visuals.corner_radius,
+                visuals.bg_fill,
+                visuals.bg_stroke,
+                StrokeKind::Inside,
+            );
 
             let top_rect = Rect::from_min_max(rect.left_top(), rect.right_center());
             let bottom_rect = Rect::from_min_max(rect.left_center(), rect.right_bottom());
@@ -194,18 +201,16 @@ impl<'a> Widget for IndicatorButton<'a> {
             {
                 let indicator_rect = if self.label.is_some() { top_rect } else { rect };
 
-                ui.painter().rect(
+                ui.painter().rect_filled(
                     indicator_rect.shrink(margin),
                     4.0,
                     self.style.background_color,
-                    Stroke::NONE,
                 );
 
-                ui.painter().rect(
+                ui.painter().rect_filled(
                     indicator_rect.shrink(margin + 2.0),
                     4.0,
                     self.style.foreground_color_blend(value),
-                    Stroke::NONE,
                 );
             }
 

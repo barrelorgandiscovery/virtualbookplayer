@@ -81,11 +81,10 @@ impl Widget for LedDisplay {
                 0.0..=1.0,
             );
 
-            ui.painter().rect(
+            ui.painter().rect_filled(
                 rect,
-                ui.style().visuals.noninteractive().rounding,
+                ui.style().visuals.noninteractive().corner_radius,
                 self.style.background_color,
-                Stroke::NONE,
             );
 
             ui.painter().circle(

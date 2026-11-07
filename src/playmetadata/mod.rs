@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 /// this structure connect to a small sqlight database
 /// to store metadata about the play
 ///
@@ -77,16 +77,43 @@ impl PlayMetadataDatabase {
             info!("Creating new metadata database at: {:?}", db_file_path);
         }
 
-        let mut connection = Connection::open(&db_file_path).map_err(|e| {
+        match Self::open_and_initialize(&db_file_path) {
+            Ok(db) => Ok(db),
+            Err(e) => {
+                if db_exists && Self::is_corrupt_db_error(e.as_ref()) {
+                    warn!(
+                        "Metadata database at {:?} is corrupt ({}); recreating a fresh database",
+                        db_file_path, e
+                    );
+                    Self::quarantine_corrupt_database(&db_file_path)?;
+                    Self::open_and_initialize(&db_file_path)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn open_and_initialize(db_file_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let db_exists = std::path::Path::new(db_file_path).exists();
+
+        let mut connection = Connection::open(db_file_path).map_err(|e| {
             error!("Failed to open database at {:?}: {}", db_file_path, e);
-            Box::new(e)
+            Box::new(e) as Box<dyn std::error::Error>
         })?;
+
+        // Fail fast on already-corrupted files before mutating them.
+        let integrity: String =
+            connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+        if integrity != "ok" {
+            return Err(format!("database integrity check failed: {integrity}").into());
+        }
 
         // Optimize SQLite for better performance
         Self::optimize_connection(&mut connection)?;
 
         let play_metadata_database = Self {
-            db_file_path: db_file_path.clone(),
+            db_file_path: db_file_path.to_string(),
             connection,
         };
         play_metadata_database.create_tables()?;
@@ -102,6 +129,50 @@ impl PlayMetadataDatabase {
         }
 
         Ok(play_metadata_database)
+    }
+
+    fn is_corrupt_db_error(error: &dyn std::error::Error) -> bool {
+        let mut current: Option<&dyn std::error::Error> = Some(error);
+        while let Some(err) = current {
+            let message = err.to_string();
+            let message = message.to_ascii_lowercase();
+            if message.contains("malformed")
+                || message.contains("corrupt")
+                || message.contains("integrity check failed")
+            {
+                return true;
+            }
+            current = err.source();
+        }
+        false
+    }
+
+    fn quarantine_corrupt_database(db_file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        use std::path::Path;
+
+        let path = Path::new(db_file_path);
+        let stamp = Utc::now().format("%Y%m%d-%H%M%S");
+        let backup_path = path.with_file_name(format!(
+            "{}.corrupt-{}",
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(".playmetadata.db"),
+            stamp
+        ));
+
+        // Best-effort close of any leftover WAL/SHM sidecars after rename.
+        std::fs::rename(path, &backup_path)?;
+        for suffix in ["-wal", "-shm"] {
+            let sidecar_path = format!("{db_file_path}{suffix}");
+            let sidecar = Path::new(&sidecar_path);
+            if sidecar.exists() {
+                let sidecar_backup_path = format!("{}{}", backup_path.display(), suffix);
+                let _ = std::fs::rename(sidecar, Path::new(&sidecar_backup_path));
+            }
+        }
+
+        warn!("Quarantined corrupt metadata database as {:?}", backup_path);
+        Ok(())
     }
 
     /// Count total number of files in database (for debugging)

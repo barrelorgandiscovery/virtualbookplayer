@@ -108,11 +108,11 @@ fn main() -> eframe::Result<()> {
         VERSION_STRING,
         native_options,
         Box::new(move |cc| {
-            Box::new(virtualbookplayer::VirtualBookApp::new(
+            Ok(Box::new(virtualbookplayer::VirtualBookApp::new(
                 cc,
                 args.reset_preferences,
                 args.lang_code,
-            ))
+            )))
         }),
     )
 }
