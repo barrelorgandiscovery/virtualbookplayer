@@ -28,7 +28,7 @@ impl FileStoreError {
 
 impl Display for FileStoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("file store error : {}", &self.message))
+        f.write_fmt(format_args!("file store error : {}", self.message))
     }
 }
 
@@ -60,10 +60,10 @@ impl Display for FileNode {
         write!(
             f,
             "FileNode {} : isfolder ? {} , path ? {:?}, childs: {}",
-            &self.name.as_str(),
-            &self.is_folder,
-            &self.path,
-            &self.folder_files.len()
+            self.name.as_str(),
+            self.is_folder,
+            self.path,
+            self.folder_files.len()
         )
     }
 }
@@ -73,14 +73,14 @@ impl Debug for FileNode {
         write!(
             f,
             "FileNode {} : isfolder ? {:?} , path ? {:?} , childs: {} -> [",
-            &self.name.as_str(),
-            &self.is_folder,
-            &self.path,
-            &self.folder_files.len()
+            self.name.as_str(),
+            self.is_folder,
+            self.path,
+            self.folder_files.len()
         )
         .expect("error in formatting");
         for i in &self.folder_files {
-            write!(f, "{:?}", &i).expect("error in formatting");
+            write!(f, "{:?}", i).expect("error in formatting");
         }
         write!(f, "]")
     }
@@ -109,7 +109,7 @@ impl FileNode {
                 )),
             },
             None => Err(FileStoreError::new(
-                format!("Filename {:?} not found", &path).as_str(),
+                format!("Filename {:?} not found", path).as_str(),
             )),
         }
     }
@@ -153,9 +153,9 @@ impl FileStore {
         path: &PathBuf,
         parent: &Option<Rc<RefCell<FileNode>>>,
     ) -> Result<Rc<RefCell<FileNode>>, Box<dyn Error>> {
-        debug!("constructing for {:?}", &path);
+        debug!("constructing for {:?}", path);
         let file_node_result = FileNode::new(path);
-        debug!("file node constructed : {:?}", &file_node_result);
+        debug!("file node constructed : {:?}", file_node_result);
         match file_node_result {
             Ok(file_node) => {
                 let r_file_node = Rc::new(RefCell::new(file_node));
@@ -163,12 +163,12 @@ impl FileStore {
                 {
                     let mut bn = (r_file_node.as_ref()).borrow_mut();
                     if bn.folder() {
-                        debug!("path :{:?}", &path);
+                        debug!("path :{:?}", path);
                         if let Ok(path_dir) = path.read_dir() {
                             for r in path_dir {
                                 match r {
                                     Ok(dir_entry) => {
-                                        debug!("entry : {:?}", &dir_entry);
+                                        debug!("entry : {:?}", dir_entry);
                                         let p = dir_entry.path();
                                         if let Ok(child) = FileStore::recurse_construct(
                                             &p,
@@ -176,7 +176,7 @@ impl FileStore {
                                         ) {
                                             childs.push(child);
                                         } else {
-                                            error!("error in getting {:?}", &p);
+                                            error!("error in getting {:?}", p);
                                         }
                                     }
                                     Err(e) => {
@@ -221,12 +221,12 @@ impl FileStore {
                     Ok(Some(fs))
                 }
                 Err(e) => {
-                    error!("fail to create view {}", &e);
+                    error!("fail to create view {}", e);
                     Ok(None)
                 }
             }
         } else {
-            error!("error opening path {:?}", &path);
+            error!("error opening path {:?}", path);
             Ok(None)
         }
     }
@@ -249,7 +249,7 @@ impl FileStore {
 
             if let Some(f) = name_filter {
                 if !bn.name.to_lowercase().contains(&f.to_lowercase()) && !f.is_empty() {
-                    debug!("there is a filter, and the file is skipped because the file {} does not contains the filter element {}", &bn.name, &f.to_lowercase());
+                    debug!("there is a filter, and the file is skipped because the file {} does not contains the filter element {}", bn.name, f.to_lowercase());
                     return None;
                 }
             }
@@ -285,7 +285,7 @@ impl FileStore {
 
             // construct the folder view element, only IF there are childrens
             if v.is_empty() {
-                debug!("no childs for folder, {:?}, removed", &bn);
+                debug!("no childs for folder, {:?}, removed", bn);
                 None
             } else {
                 debug!("there are children, create the view");

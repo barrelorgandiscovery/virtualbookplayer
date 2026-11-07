@@ -399,7 +399,7 @@ impl VirtualBookApp {
                     app.file_store = storage_created;
                 }
                 Err(e) => {
-                    error!("error in opening the path {}", &e);
+                    error!("error in opening the path {}", e);
                     app.file_store = None;
                 }
             }
@@ -593,13 +593,12 @@ impl VirtualBookApp {
         if self.appplayer.is_playing()
             && !paused
             && self.adjusted_start_time + Duration::from_millis(100) < now
+            && self.appplayer.virtual_book.read().is_some()
         {
-            if self.appplayer.virtual_book.read().is_some() {
-                let delta = now.saturating_duration_since(self.adjusted_start_time);
-                self.current_duration = delta;
-                self.offset_ms = delta.as_millis() as f64;
-                target_ms = self.offset_ms;
-            }
+            let delta = now.saturating_duration_since(self.adjusted_start_time);
+            self.current_duration = delta;
+            self.offset_ms = delta.as_millis() as f64;
+            target_ms = self.offset_ms;
         }
 
         self.display_offset_ms = follow_display_offset(self.display_offset_ms, target_ms, dt);
@@ -828,12 +827,16 @@ impl VirtualBookApp {
             let waiting = self.history_recent.is_none();
             let refresh_every = if waiting { 30 } else { 120 };
             if self.metadata_query_frame_counter == 1
-                || self.metadata_query_frame_counter % refresh_every == 0
+                || self
+                    .metadata_query_frame_counter
+                    .is_multiple_of(refresh_every)
             {
                 self.request_history_lists();
             }
         }
-        if self.metadata_query_frame_counter % 120 == 0 || self.metadata_query_frame_counter == 1 {
+        if self.metadata_query_frame_counter.is_multiple_of(120)
+            || self.metadata_query_frame_counter == 1
+        {
             // Folder headers show played/total for collapsed subtrees too, so fill
             // play counts that the visible-file query has not reached yet.
             if let Some(file_store) = &self.file_store {
@@ -847,7 +850,7 @@ impl VirtualBookApp {
                 }
             }
         }
-        if self.metadata_query_frame_counter % 120 == 0 {
+        if self.metadata_query_frame_counter.is_multiple_of(120) {
             // Query every ~2 seconds at 60fps
             if let Some(file_store) = &self.file_store {
                 // Only collect visible files (from expanded folders) - don't fetch for collapsed folders
@@ -1156,7 +1159,7 @@ impl VirtualBookApp {
             .button(format!(
                 "{} {}",
                 egui_phosphor::regular::FOLDER_OPEN,
-                &self.i18n.open_folder
+                self.i18n.open_folder
             ))
             .clicked()
         {
@@ -1188,7 +1191,7 @@ impl VirtualBookApp {
             .button(format!(
                 "{} {}",
                 egui_phosphor::regular::RECYCLE,
-                &self.i18n.reload_folder
+                self.i18n.reload_folder
             ))
             .clicked()
         {
@@ -1347,7 +1350,7 @@ impl VirtualBookApp {
             };
             if show_transport_button(
                 ctx,
-                Id::new("tune_pause_button"),
+                Id::unique("tune_pause_button"),
                 Pos2::new(playlist_x - gap - button_size, y),
                 button_size,
                 tune_icon,
@@ -1367,7 +1370,7 @@ impl VirtualBookApp {
         let playlist_hover = self.i18n.hover_activate_the_play_of_the_playlist.clone();
         if show_transport_button(
             ctx,
-            Id::new("floating_play_button"),
+            Id::unique("floating_play_button"),
             Pos2::new(playlist_x, y),
             button_size,
             playlist_icon,
@@ -1506,7 +1509,7 @@ impl VirtualBookApp {
                                 format!(
                                     "{} {}",
                                     egui_phosphor::variants::regular::HOUSE_LINE,
-                                    &self.i18n.file
+                                    self.i18n.file
                                 ),
                                 |ui| {
                                     self.render_file_menu(ui);
@@ -1516,7 +1519,7 @@ impl VirtualBookApp {
                                         format!(
                                             "{} {}",
                                             egui_phosphor::variants::regular::GEAR_SIX,
-                                            &self.i18n.preferences
+                                            self.i18n.preferences
                                         ),
                                         |ui| {
                                             self.render_preferences_menu(ui);
@@ -1654,7 +1657,7 @@ impl VirtualBookApp {
     fn render_background(&mut self, ctx: &egui::Context, top_panel_bottom: f32) {
         let p = ctx.layer_painter(LayerId {
             order: Order::Background,
-            id: Id::new("source"),
+            id: Id::unique("source"),
         });
 
         if self.texture_handle.is_none() {

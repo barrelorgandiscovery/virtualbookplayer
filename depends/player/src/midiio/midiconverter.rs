@@ -8,13 +8,13 @@ use std::{
 use bookparsing::{Hole, ScaleDefinition};
 
 #[cfg(test)]
+use bookparsing::VirtualBook;
+#[cfg(test)]
 use std::{
     fs::File,
     io::{BufReader, BufWriter},
     time::Instant,
 };
-#[cfg(test)]
-use bookparsing::VirtualBook;
 
 use nodi::midly::{Header, MidiMessage, Smf, Track, TrackEvent};
 extern crate serde;

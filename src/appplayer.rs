@@ -193,7 +193,7 @@ impl AppPlayer {
                             } // this unlock the appplayer
 
                             if let Some(mut info_getter) = local_info_getter {
-                                info!("compute informations for {}", &p.path.display());
+                                info!("compute informations for {}", p.path.display());
 
                                 let mut computed_p = p.clone();
                                 if let Ok(result) = info_getter.compute(&p.path) {

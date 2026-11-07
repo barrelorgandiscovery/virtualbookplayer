@@ -142,11 +142,7 @@ impl Widget for SegmentedDisplayWidget {
 
         let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click());
 
-        let mut child_ui = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(rect)
-                .layout(*ui.layout()),
-        );
+        let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(*ui.layout()));
         child_ui.set_clip_rect(child_ui.clip_rect().intersect(rect));
 
         if child_ui.is_rect_visible(rect) {

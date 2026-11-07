@@ -138,6 +138,7 @@ impl BookFxState {
         (base * self.effect_scale.max(0.0)).round().clamp(0.0, 64.0) as usize
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn spawn_fire_particles(
         &mut self,
         at: Pos2,
@@ -931,6 +932,7 @@ fn push_quad(out: &mut Vec<GpuVertex>, rect: Rect, color: Color32, uv: Rect, vie
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn push_quad_rotated(
     out: &mut Vec<GpuVertex>,
     center: Pos2,
@@ -976,7 +978,6 @@ pub(crate) struct NoteDraw {
     pub rect: Rect,
     pub color: Color32,
     pub book_uv: Rect,
-    pub active: bool,
     /// Screen-space point on the playhead where this note is read (for FX).
     pub playhead_hit: Option<Pos2>,
 }
@@ -1055,7 +1056,7 @@ pub(crate) fn build_frame_meshes(
                             viewport,
                         );
                     }
-                    BookEffectKind::None | BookEffectKind::NeonLane => {}
+                    BookEffectKind::None => {}
                 }
             }
         }

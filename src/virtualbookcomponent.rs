@@ -418,7 +418,6 @@ impl VirtualBookComponent {
                             rect,
                             color,
                             book_uv,
-                            active,
                             playhead_hit,
                         });
                     }
@@ -479,7 +478,7 @@ impl VirtualBookComponent {
                     let playhead_x = (to_screen * pos2(midx, 0.0)).x;
                     paint_playhead(&painter, playhead_x, response.rect);
                 }
-                ui.interact(response.rect, Id::new("area"), Sense::click())
+                ui.interact(response.rect, Id::unique("area"), Sense::click())
             })
             .inner
     }

@@ -246,10 +246,7 @@ impl PlayMetadataDatabase {
             .query_row([], |row| row.get::<_, String>(0))
             .map_err(Box::new)?;
         if version != "1.0.0" {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Model version mismatch",
-            )));
+            return Err(Box::new(std::io::Error::other("Model version mismatch")));
         }
         Ok(())
     }

@@ -289,7 +289,7 @@ fn render_playlist_items(app: &mut VirtualBookApp, ui: &mut Ui) {
 
     // see https://github.com/lucasmerlin/hello_egui/blob/main/fancy-example/src/main.rs
     // for dnd examples
-    let response = dnd(ui, Id::new("playlist_dnd"))
+    let response = dnd(ui, Id::unique("playlist_dnd"))
         .with_mouse_config(DragDropConfig::touch_scroll())
         .show_custom(|ui, iter| {
             working_list
@@ -299,7 +299,7 @@ fn render_playlist_items(app: &mut VirtualBookApp, ui: &mut Ui) {
                     #[allow(clippy::needless_borrows_for_generic_args)]
                     iter.next(
                         ui,
-                        Id::new(("playlist_item", item.id)),
+                        Id::unique(("playlist_item", item.id)),
                         index,
                         true,
                         |ui, item_handle| {
