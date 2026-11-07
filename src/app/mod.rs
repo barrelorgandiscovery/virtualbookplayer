@@ -1479,7 +1479,26 @@ impl VirtualBookApp {
             });
         }
     }
+}
 
+/// Scroll a menu when zoom makes it taller than the window.
+///
+/// `popup_top` is the screen Y where the popup opens. The scroller is capped
+/// to the space under that edge, so the rows that would be clipped stay reachable.
+#[cfg(not(target_arch = "wasm32"))]
+fn show_scrollable_menu(ui: &mut Ui, popup_top: f32, add_contents: impl FnOnce(&mut Ui)) {
+    let screen = ui.ctx().content_rect();
+    // Popup frame (margin + stroke) and a small gap so the frame stays on screen.
+    let chrome = 20.0;
+    let room = (screen.height() - chrome).max(32.0);
+    let max_height = (screen.bottom() - popup_top - chrome).clamp(32.0, room);
+    ui.set_max_height(max_height);
+    ScrollArea::vertical()
+        .max_height(max_height)
+        .show(ui, add_contents);
+}
+
+impl VirtualBookApp {
     /// Render top panel menu bar
     #[cfg(not(target_arch = "wasm32"))]
     fn render_top_panel(&mut self, ui: &mut Ui) -> egui::Response {
@@ -1503,47 +1522,48 @@ impl VirtualBookApp {
                 ui.horizontal(|ui| {
                     // Left: File menu
                     ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        #[allow(clippy::blocks_in_conditions)]
-                        if ui
-                            .menu_button(
-                                format!(
-                                    "{} {}",
-                                    egui_phosphor::variants::regular::HOUSE_LINE,
-                                    self.i18n.file
-                                ),
-                                |ui| {
-                                    self.render_file_menu(ui);
-                                    ui.separator();
-                                    // preferences menu
-                                    ui.menu_button(
-                                        format!(
-                                            "{} {}",
-                                            egui_phosphor::variants::regular::GEAR_SIX,
-                                            self.i18n.preferences
-                                        ),
-                                        |ui| {
-                                            self.render_preferences_menu(ui);
-                                        },
-                                    );
-
-                                    ui.separator();
-
-                                    self.render_midi_devices(ui);
-
-                                    ui.separator();
-
-                                    if ui.button(&self.i18n.quit).clicked() {
-                                        ui.send_viewport_cmd(egui::ViewportCommand::Close);
-                                    }
-                                },
-                            )
-                            .response
-                            .clicked()
-                        {
+                        let file_response = ui.button(format!(
+                            "{} {}",
+                            egui_phosphor::variants::regular::HOUSE_LINE,
+                            self.i18n.file
+                        ));
+                        if file_response.clicked() {
                             if let Ok(devices) = MidiPlayerFactory::list_all_devices() {
                                 self.current_devices = devices;
                             }
                         }
+                        // Popup opens just under the button. Cap the menu to the
+                        // space below it so a high zoom can scroll instead of clipping.
+                        let file_popup_top = file_response.rect.bottom();
+                        Popup::menu(&file_response).show(|ui| {
+                            show_scrollable_menu(ui, file_popup_top, |ui| {
+                                self.render_file_menu(ui);
+                                ui.separator();
+                                let preferences_popup_top = ui.cursor().top();
+                                ui.menu_button(
+                                    format!(
+                                        "{} {}",
+                                        egui_phosphor::variants::regular::GEAR_SIX,
+                                        self.i18n.preferences
+                                    ),
+                                    |ui| {
+                                        show_scrollable_menu(ui, preferences_popup_top, |ui| {
+                                            self.render_preferences_menu(ui);
+                                        });
+                                    },
+                                );
+
+                                ui.separator();
+
+                                self.render_midi_devices(ui);
+
+                                ui.separator();
+
+                                if ui.button(&self.i18n.quit).clicked() {
+                                    ui.send_viewport_cmd(egui::ViewportCommand::Close);
+                                }
+                            });
+                        });
                     });
 
                     // Center: Play time and title (centered)

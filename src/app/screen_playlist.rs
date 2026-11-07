@@ -750,14 +750,37 @@ fn display_tree(
     Ok(file_selected)
 }
 
+/// Width limits that stay inside the zoomed window.
+///
+/// Sizes are in points. Raising the zoom shrinks the window in that space, so a
+/// fixed maximum (or a history minimum of several hundred points) ends up equal
+/// to the whole window and the splitter can no longer move.
+fn catalog_panel_limits(available: f32, history: bool) -> (f32, f32, f32) {
+    let available = available.max(120.0);
+    // Leave the book preview and the playlist a strip beside the catalog.
+    let room = (available * 0.72).max(96.0);
+    if history {
+        let max_size = room.min(1100.0);
+        let min_size = 140.0_f32.min(max_size);
+        let default_size = 640.0_f32.clamp(min_size, max_size);
+        (default_size, min_size, max_size)
+    } else {
+        let max_size = room.min(900.0);
+        let min_size = 72.0_f32.min(max_size);
+        let default_size = 240.0_f32.clamp(min_size, max_size);
+        (default_size, min_size, max_size)
+    }
+}
+
 /// Render the file tree side panel
 fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
     let history = app.catalog_pane == CatalogPane::History;
     // History keeps its own width so the two columns are not stuck in the narrow catalog.
-    let (panel_id, default_size, min_size, max_size) = if history {
-        ("history_view", 640.0, 420.0, 1100.0)
+    let (default_size, min_size, max_size) = catalog_panel_limits(ui.available_width(), history);
+    let panel_id = if history {
+        "history_view"
     } else {
-        ("tree_panel", 200.0, 80.0, 500.0)
+        "tree_panel"
     };
     egui::Panel::left(panel_id)
         .resizable(true)
@@ -773,23 +796,25 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
             ..Default::default()
         })
         .show(ui, |ui| {
+            // Long names must not widen the panel, or a zoomed window locks the splitter.
+            ui.style_mut().wrap_mode = Some(TextWrapMode::Truncate);
             screen_history::catalog_pane_switch(app, ui);
             ui.separator();
             if app.catalog_pane == CatalogPane::History {
                 screen_history::ui_side_by_side(app, ui);
             } else {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    // The ScrollArea automatically constrains width, but we need to ensure
-                    // the content inside respects it. Use available_width() inside the ScrollArea.
-                    let available_width = ui.available_width();
-                    ui.set_width(available_width);
+                    // Fill the panel width, and stop rows from reporting a larger one.
+                    let row_width = ui.available_width();
+                    ui.set_width(row_width);
+                    ui.style_mut().wrap_mode = Some(TextWrapMode::Truncate);
 
                     StripBuilder::new(ui)
                         .size(Size::initial(6.0))
                         .size(Size::remainder())
                         .vertical(|mut strip| {
                             strip.cell(|ui| {
-                                ui.set_width(available_width);
+                                ui.set_width(row_width);
                                 ui.with_layout(egui::Layout::right_to_left(Align::Max), |ui| {
                                     if !app.current_typed_no.is_empty() {
                                         let s = app.i18n.filter.clone()
@@ -800,7 +825,7 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
                             });
                             strip.cell(|ui| {
                                 // Ensure the tree content respects the available width
-                                ui.set_width(available_width);
+                                ui.set_width(row_width);
                                 if let Some(filestore) = &mut app.file_store {
                                     let current_view = match app.current_typed_no.is_empty() {
                                         true => &mut filestore.default_view,
@@ -902,6 +927,24 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                     });
                 });
         });
+}
+
+#[cfg(test)]
+mod catalog_panel_limit_tests {
+    use super::catalog_panel_limits;
+
+    #[test]
+    fn stays_resizable_when_zoom_shrinks_the_window() {
+        let (default, min_size, max_size) = catalog_panel_limits(220.0, false);
+        assert!(min_size < max_size);
+        assert!(default >= min_size && default <= max_size);
+        assert!(max_size < 220.0);
+
+        let (default, min_size, max_size) = catalog_panel_limits(220.0, true);
+        assert!(min_size < max_size);
+        assert!(default >= min_size && default <= max_size);
+        assert!(max_size < 220.0);
+    }
 }
 
 #[cfg(test)]
