@@ -24,6 +24,7 @@ pub struct I18NMessages {
     pub theme_console: String,
     pub theme_marquee: String,
     pub theme_parchment: String,
+    pub theme_butter: String,
     pub theme_loft: String,
     pub filter: String,
     pub catalog: String,
@@ -83,6 +84,7 @@ impl I18NMessages {
             ThemeId::Console => self.theme_console.as_str(),
             ThemeId::Marquee => self.theme_marquee.as_str(),
             ThemeId::Parchment => self.theme_parchment.as_str(),
+            ThemeId::Butter => self.theme_butter.as_str(),
             ThemeId::Loft => self.theme_loft.as_str(),
         }
     }
@@ -161,6 +163,7 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         theme_console: "Console".into(),
         theme_marquee: "Marquee".into(),
         theme_parchment: "Parchment".into(),
+        theme_butter: "Butter".into(),
         theme_loft: "Loft".into(),
         filter: "Search".into(),
         catalog: "Catalog".into(),
@@ -238,6 +241,7 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         theme_console: "Console".into(),
         theme_marquee: "Chapiteau".into(),
         theme_parchment: "Carton".into(),
+        theme_butter: "Beurre".into(),
         theme_loft: "Atelier".into(),
         filter: "Recherche".into(),
         catalog: "Catalogue".into(),

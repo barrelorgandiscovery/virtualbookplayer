@@ -20,7 +20,7 @@ pub(crate) fn bold_font(size: f32) -> FontId {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ThemeId {
-    /// Warm dark booth. Replaces the stock egui dark theme.
+    /// Black field with grey bars, buttons, and the playing-title chip.
     #[default]
     Night,
     /// Logo light theme: cream, amber pipes, dark-blue keys.
@@ -29,16 +29,19 @@ pub(crate) enum ThemeId {
     Marquee,
     /// Music-roll paper in daylight.
     Parchment,
+    /// Playback screen: butter-gold bar, cream field, navy type.
+    Butter,
     /// Cool rehearsal room, oxidized brass.
     Loft,
 }
 
 impl ThemeId {
-    pub(crate) const ALL: [ThemeId; 5] = [
+    pub(crate) const ALL: [ThemeId; 6] = [
         ThemeId::Night,
         ThemeId::Console,
         ThemeId::Marquee,
         ThemeId::Parchment,
+        ThemeId::Butter,
         ThemeId::Loft,
     ];
 
@@ -48,6 +51,7 @@ impl ThemeId {
             ThemeId::Console => console(),
             ThemeId::Marquee => marquee(),
             ThemeId::Parchment => parchment(),
+            ThemeId::Butter => butter(),
             ThemeId::Loft => loft(),
         }
     }
@@ -205,29 +209,34 @@ fn rgb(r: u8, g: u8, b: u8) -> Color32 {
     Color32::from_rgb(r, g, b)
 }
 
+/// Black field. Grey is the secondary surface: the bar, buttons, recesses, and title chip.
 fn night() -> Theme {
+    let black = rgb(0, 0, 0);
+    let grey = rgb(48, 48, 48);
+    let ink_white = rgb(236, 236, 236);
+
     paint(Ink {
         dark: true,
-        bg: rgb(26, 22, 20),
-        deep: rgb(16, 13, 12),
-        faint: rgb(40, 34, 30),
-        text: rgb(232, 214, 190),
-        text_strong: rgb(248, 236, 214),
-        line: rgb(92, 70, 52),
-        button: rgb(58, 46, 36),
-        hover: rgb(96, 70, 42),
-        hover_line: rgb(212, 160, 72),
-        active: rgb(140, 72, 42),
-        active_text: rgb(255, 244, 230),
-        open: rgb(48, 38, 30),
-        selection: rgb(120, 58, 40),
-        selection_text: rgb(255, 220, 180),
-        link: rgb(232, 177, 90),
-        warn: rgb(255, 160, 64),
+        bg: black,
+        deep: rgb(28, 28, 28),
+        faint: rgb(36, 36, 36),
+        text: rgb(210, 210, 210),
+        text_strong: ink_white,
+        line: rgb(110, 110, 110),
+        button: grey,
+        hover: rgb(72, 72, 72),
+        hover_line: rgb(180, 180, 180),
+        active: rgb(120, 120, 120),
+        active_text: rgb(255, 255, 255),
+        open: rgb(38, 38, 38),
+        selection: rgb(72, 72, 72),
+        selection_text: rgb(255, 255, 255),
+        link: rgb(190, 190, 190),
+        warn: rgb(255, 176, 64),
         star: rgb(240, 193, 74),
-        folder: rgb(126, 182, 217),
-        now_playing_bg: rgb(88, 42, 30),
-        now_playing_fg: rgb(255, 244, 230),
+        folder: rgb(176, 176, 176),
+        now_playing_bg: grey,
+        now_playing_fg: ink_white,
     })
 }
 
@@ -315,6 +324,41 @@ fn parchment() -> Theme {
         folder: rgb(46, 90, 86),
         now_playing_bg: rgb(90, 36, 30),
         now_playing_fg: rgb(252, 244, 230),
+    })
+}
+
+/// Gold bar and side rail, cream around the roll, navy labels and title.
+///
+/// Sampled from the playback screen: bar `(254, 218, 144)`, field `(251, 244, 234)`,
+/// type and the playing-title chip `(21, 36, 77)`.
+fn butter() -> Theme {
+    let gold = rgb(254, 218, 144);
+    let cream = rgb(251, 244, 234);
+    let navy = rgb(21, 36, 77);
+    let ivory = rgb(255, 250, 242);
+
+    paint(Ink {
+        dark: false,
+        bg: cream,
+        deep: ivory,
+        faint: rgb(255, 236, 196),
+        text: navy,
+        text_strong: navy,
+        line: rgb(186, 148, 78),
+        button: gold,
+        hover: rgb(242, 190, 96),
+        hover_line: navy,
+        active: navy,
+        active_text: ivory,
+        open: rgb(255, 228, 170),
+        selection: navy,
+        selection_text: ivory,
+        link: rgb(40, 64, 120),
+        warn: rgb(160, 90, 20),
+        star: navy,
+        folder: navy,
+        now_playing_bg: navy,
+        now_playing_fg: ivory,
     })
 }
 
