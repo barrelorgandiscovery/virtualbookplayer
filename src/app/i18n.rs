@@ -26,6 +26,11 @@ pub struct I18NMessages {
     pub book_effect: String,
     pub book_effect_none: String,
     pub book_effect_note_fire: String,
+    pub book_effect_sparkle: String,
+    pub book_effect_ripple: String,
+    pub book_effect_neon_lane: String,
+    pub book_effect_arcade_burst: String,
+    pub book_effect_scale: String,
     pub switch_auto: String,
 
     pub hover_click_to_enlarge_view: String,
@@ -42,6 +47,10 @@ impl I18NMessages {
         match kind {
             BookEffectKind::None => self.book_effect_none.as_str(),
             BookEffectKind::NoteFire => self.book_effect_note_fire.as_str(),
+            BookEffectKind::Sparkle => self.book_effect_sparkle.as_str(),
+            BookEffectKind::Ripple => self.book_effect_ripple.as_str(),
+            BookEffectKind::NeonLane => self.book_effect_neon_lane.as_str(),
+            BookEffectKind::ArcadeBurst => self.book_effect_arcade_burst.as_str(),
         }
     }
 }
@@ -113,6 +122,11 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         book_effect: "Book visual effect:".into(),
         book_effect_none: "No effect".into(),
         book_effect_note_fire: "Note fire".into(),
+        book_effect_sparkle: "Sparkle".into(),
+        book_effect_ripple: "Ripple".into(),
+        book_effect_neon_lane: "Neon lane".into(),
+        book_effect_arcade_burst: "Arcade burst".into(),
+        book_effect_scale: "Effect intensity:".into(),
         switch_auto: "Automatic Switch".into(),
 
         hover_click_to_enlarge_view: "Click to enlarge the view".into(),
@@ -152,6 +166,11 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         book_effect: "Effet visuel du carton :".into(),
         book_effect_none: "Aucun effet".into(),
         book_effect_note_fire: "Feu de notes".into(),
+        book_effect_sparkle: "Étincelles".into(),
+        book_effect_ripple: "Ondulations".into(),
+        book_effect_neon_lane: "Voie néon".into(),
+        book_effect_arcade_burst: "Explosion arcade".into(),
+        book_effect_scale: "Intensité de l'effet :".into(),
         switch_auto: "Bascule automatique".into(),
 
         hover_click_to_enlarge_view: "Clickez pour agrandir".into(),

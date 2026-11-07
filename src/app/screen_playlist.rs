@@ -783,6 +783,7 @@ fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut U
     let playing = app.appplayer.is_playing();
     let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
     let book_effect = app.book_effect;
+    let book_effect_scale = app.book_effect_scale;
 
     if app.background_texture_handle.is_none() {
         app.background_texture_handle = Some(ctx.load_texture(
@@ -809,6 +810,7 @@ fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut U
     .hide_scrollbar()
     .with_gpu_fx(gpu)
     .book_effect(book_effect)
+    .book_effect_scale(book_effect_scale)
     .playing(playing);
 
     let response_ui_component = component.ui_content_with_fx(ui, app.book_fx.as_mut());

@@ -97,6 +97,8 @@ pub struct VirtualBookComponent {
     use_gpu_fx: bool,
     /// Selected visual effect (preferences).
     book_effect: BookEffectKind,
+    /// Effect impact scale from preferences (count / size / strength).
+    book_effect_scale: f32,
     /// Playing → spawn particles on note starts.
     playing: bool,
 }
@@ -114,6 +116,7 @@ impl Default for VirtualBookComponent {
             virtual_book: None,
             use_gpu_fx: false,
             book_effect: BookEffectKind::None,
+            book_effect_scale: 1.0,
             playing: false,
         }
     }
@@ -207,6 +210,11 @@ impl VirtualBookComponent {
         self
     }
 
+    pub fn book_effect_scale(mut self, scale: f32) -> Self {
+        self.book_effect_scale = scale;
+        self
+    }
+
     pub fn playing(mut self, playing: bool) -> Self {
         self.playing = playing;
         self
@@ -241,6 +249,7 @@ impl VirtualBookComponent {
             && book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
         let playing = self.playing;
         let book_effect = self.book_effect;
+        let book_effect_scale = self.book_effect_scale;
         let background_texture_id = self.background_texture_id;
 
         egui::ScrollArea::horizontal()
@@ -419,18 +428,21 @@ impl VirtualBookComponent {
                     if use_gpu {
                         if let Some(fx) = book_fx.as_mut() {
                             fx.set_effect(book_effect);
+                            fx.set_effect_scale(book_effect_scale);
                             let dt = ui.input(|i| i.stable_dt);
                             let playhead_us = offset_us as i64;
                             fx.update_play(dt, playing, playhead_us, *xscale, &note_sparks);
 
                             // Viewport = paint callback rect (NDC ±1 on its edges).
-                            let (note_verts, particle_verts) =
+                            let (note_verts, smoke_verts, particle_verts) =
                                 book_fx::build_frame_meshes(&note_draws, fx, response.rect);
                             book_fx::paint_book_fx(
                                 &painter,
                                 response.rect,
                                 note_verts,
+                                smoke_verts,
                                 particle_verts,
+                                book_effect.particle_draw_style(),
                             );
 
                             if playing || fx.has_alive_particles() {

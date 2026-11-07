@@ -127,6 +127,9 @@ pub struct VirtualBookApp {
     /// Selected virtual-book visual effect (see [`BookEffectKind`]).
     book_effect: BookEffectKind,
 
+    /// Scales effect impact: particle count, size/radius, and strength (1.0 = default).
+    book_effect_scale: f32,
+
     /// display the number pad
     hidden_number_pad: bool,
 
@@ -196,6 +199,7 @@ impl Default for VirtualBookApp {
 
             play_lattency_ms: 0, // 0 ms lattency
             book_effect: BookEffectKind::NoteFire,
+            book_effect_scale: 1.0,
 
             i18n: create_i18n_message_with_lang(None),
 
@@ -431,6 +435,7 @@ impl VirtualBookApp {
         let mut fx = BookFxState::default();
         fx.set_gpu_ready(gpu_ready);
         fx.set_effect(app.book_effect);
+        fx.set_effect_scale(app.book_effect_scale);
         app.book_fx = Some(fx);
         app
     }
@@ -1126,8 +1131,22 @@ impl VirtualBookApp {
             let label = self.i18n.book_effect_label(*kind).to_owned();
             ui.radio_value(&mut self.book_effect, *kind, label);
         }
+        ui.add_enabled_ui(self.book_effect != BookEffectKind::None, |ui| {
+            ui.label(&self.i18n.book_effect_scale);
+            ui.add(
+                egui::Slider::new(&mut self.book_effect_scale, 0.0..=2.5)
+                    .suffix("×")
+                    .show_value(true),
+            )
+            .on_hover_text(
+                "Scales effect impact during play:\n\
+                 particle count, size / radius, and strength.\n\
+                 1.0 = default · 0 = muted · >1 = stronger",
+            );
+        });
         if let Some(fx) = self.book_fx.as_mut() {
             fx.set_effect(self.book_effect);
+            fx.set_effect_scale(self.book_effect_scale);
         }
     }
 
