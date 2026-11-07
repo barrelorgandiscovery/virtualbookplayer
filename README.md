@@ -24,7 +24,7 @@ This software is a simplier "Vanbasco player" alternative.
 - Send panic or note-off messages to all channels when starting/stopping playback.
 - Add stars to files to see your best midi files
 - Number of play of Midi file remembered
-- Dark and Light theme
+- Five themes: Night, Console, Marquee, Parchment, and Loft
 - Launchable with fullscreen mode to get rid of the windows
 - Available in en/fr/nl, translations may also be added 
 - Adjust zoom factor for touch and reading from far await.
@@ -87,4 +87,8 @@ if not detected english is taken
 
 codes are two char ISO country code in lower case
 feel free to create a pull request and provide other languages translations
+
+## Technical
+
+- [Translate a .book file to MIDI](doc/book-midi-translation.md) — how to write the YAML file that maps a Barrel Organ Discovery book scale to MIDI notes, drums, and registers.
 

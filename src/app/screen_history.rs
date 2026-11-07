@@ -212,7 +212,6 @@ fn render_history_row(ui: &mut Ui, file: &HistoryFile, app: &VirtualBookApp) -> 
         }
 
         ui.vertical(|ui| {
-            // `.strong()` uses the active-widget color, which is white in the light theme.
             let text_color = ui.visuals().text_color();
             let name_color = if file.exists {
                 text_color
@@ -224,11 +223,7 @@ fn render_history_row(ui: &mut Ui, file: &HistoryFile, app: &VirtualBookApp) -> 
 
             ui.horizontal(|ui| {
                 if file.star_count > 0 {
-                    let star_color = if ui.visuals().dark_mode {
-                        Color32::from_rgb(255, 215, 0)
-                    } else {
-                        Color32::from_rgb(146, 96, 0)
-                    };
+                    let star_color = super::theme::tokens(ui.ctx()).star;
                     ui.label(
                         RichText::new(format!("{} {}", egui_phosphor::fill::STAR, file.star_count))
                             .color(star_color)

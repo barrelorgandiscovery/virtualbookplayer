@@ -699,6 +699,12 @@ impl PlayMetadataManager {
     }
 }
 
+impl Default for PlayMetadataManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{absolute_path_in_workspace, history_files_from_rows};
@@ -743,11 +749,5 @@ mod tests {
         assert_eq!(files[1].play_count, 4);
 
         let _ = fs::remove_dir_all(&folder);
-    }
-}
-
-impl Default for PlayMetadataManager {
-    fn default() -> Self {
-        Self::new()
     }
 }

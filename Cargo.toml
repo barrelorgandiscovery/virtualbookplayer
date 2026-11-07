@@ -65,6 +65,10 @@ tracy-client = { version = "0.18", optional = true }
 default = []
 profiling = ["dep:tracy-client", "dep:profiling"]
 
+[dev-dependencies]
+# GUI tests: drive the eframe app through AccessKit, and compare rendered frames.
+egui_kittest = { version = "0.37", features = ["eframe", "snapshot", "wgpu"] }
+
 
 [profile.release]
 opt-level = 2

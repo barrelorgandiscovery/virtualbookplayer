@@ -12,7 +12,7 @@ use crate::{
     virtualbookcomponent::VirtualBookComponent,
     VirtualBookApp,
 };
-use egui::{epaint::Shadow, text::FontFamily, *};
+use egui::{epaint::Shadow, *};
 use egui_dnd::{dnd, DragDropConfig};
 use egui_extras::{Size, StripBuilder};
 
@@ -416,8 +416,7 @@ fn display_folder(
         .unwrap()
         .clone();
 
-    // Icon format - use Proportional font (which has fill variant as fallback) for filled folder icon and blue color
-    let icon_color = egui::Color32::from_rgb(0, 100, 200); // Blue color for folder icon
+    let icon_color = super::theme::tokens(ui.ctx()).folder;
     let icon_format = TextFormat::simple(FontId::proportional(body_font.size), icon_color);
 
     // Regular format for folder name (non-bold)
@@ -561,8 +560,7 @@ fn render_play_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18
 fn render_star_count_badge(ui: &mut Ui, count: u32, i18n: &crate::app::i18n::I18NMessages) {
     // Repeat the star symbol 'count' times (using fill variant for filled stars)
     let badge_text = egui_phosphor::fill::STAR.repeat(count as usize);
-    // Use plain yellow for stars
-    let star_color = egui::Color32::from_rgb(255, 215, 0); // Gold/yellow color
+    let star_color = super::theme::tokens(ui.ctx()).star;
     render_badge(ui, badge_text, star_color, &i18n.star_count_tooltip);
 }
 
@@ -609,7 +607,7 @@ fn display_file(
             .clone();
 
         // Bold format for filename - use the separate bold font family
-        let bold_font = FontId::new(body_font.size, FontFamily::Name("rubik_bold".into()));
+        let bold_font = super::theme::bold_font(body_font.size);
         let bold_format = TextFormat::simple(bold_font, ui.style().visuals.text_color());
 
         let _default_format =
@@ -617,12 +615,11 @@ fn display_file(
         // Smaller font for play count and stars
         let small_font = FontId::proportional(body_font.size * 0.65); // 65% of body size
         let small_format = TextFormat::simple(small_font.clone(), ui.style().visuals.text_color());
-        let star_color = egui::Color32::from_rgb(255, 215, 0); // Yellow for stars
-                                                               // Note: star_format is not used anymore, we use star_fill_format below
+        let marks = super::theme::tokens(ui.ctx());
+        let star_color = marks.star;
 
-        // Add folder icon if it's a folder - use Proportional font (which has fill variant as fallback) for filled icon and blue color
         if is_folder {
-            let icon_color = egui::Color32::from_rgb(0, 100, 200); // Blue color for folder icon
+            let icon_color = marks.folder;
             let icon_format = TextFormat::simple(FontId::proportional(body_font.size), icon_color);
             job.append(
                 &format!("{} ", egui_phosphor::fill::FOLDER),
@@ -641,7 +638,7 @@ fn display_file(
             }
         }
 
-        // Add stars with yellow color if available (with smaller font, using fill variant)
+        // Add stars in the theme star color (smaller, filled glyph)
         if let Some(count) = star_count {
             if count > 0 {
                 let stars = egui_phosphor::fill::STAR.repeat(count as usize);

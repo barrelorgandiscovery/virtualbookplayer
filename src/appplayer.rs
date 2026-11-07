@@ -65,12 +65,15 @@ enum AppPlayerBackgroundThreadCommands {
     PlayerChanged(Arc<Mutex<Box<dyn Player>>>),
 }
 
+/// Player instance shared by the window and the playback thread.
+type SharedPlayer = Arc<Mutex<Box<dyn Player>>>;
+
 /// Playlist transport used both by the UI and by the player-response thread.
 struct FollowState {
     playlist: Arc<Mutex<PlayList>>,
     play_mod: AtomicBool,
     wait_secs: Mutex<f32>,
-    player: Mutex<Option<Arc<Mutex<Box<dyn Player>>>>>,
+    player: Mutex<Option<SharedPlayer>>,
     /// One transport change at a time: play, stop, skip, or automatic advance.
     transport: Mutex<()>,
 }
@@ -105,13 +108,13 @@ impl FollowState {
         }
     }
 
-    fn set_player(&self, player: Option<Arc<Mutex<Box<dyn Player>>>>) {
+    fn set_player(&self, player: Option<SharedPlayer>) {
         if let Ok(mut slot) = self.player.lock() {
             *slot = player;
         }
     }
 
-    fn current_player(&self) -> Option<Arc<Mutex<Box<dyn Player>>>> {
+    fn current_player(&self) -> Option<SharedPlayer> {
         self.player.lock().ok().and_then(|slot| slot.clone())
     }
 

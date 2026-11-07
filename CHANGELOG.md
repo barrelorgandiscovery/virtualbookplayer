@@ -1,5 +1,8 @@
 # Changelog
 
+### Unreleased
+- named themes in preferences (Night, Console, Marquee, Parchment, Loft); a saved light theme opens as Console
+
 ### 2026-11-07: v0.0.60
 - draw the book on the GPU, and keep the previous rectangle drawing when effects are off or wgpu is unavailable
 - book effects in preferences: note fire, sparkle, ripple, neon lane, arcade burst, with an intensity control

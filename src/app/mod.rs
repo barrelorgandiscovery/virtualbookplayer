@@ -27,6 +27,10 @@ mod i18n;
 mod screen_history;
 mod screen_playlist;
 mod screen_visu;
+mod theme;
+
+#[cfg(test)]
+mod gui_kittest;
 
 /// activated screen
 #[derive(PartialEq)]
@@ -137,7 +141,18 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     i18n: Box<I18NMessages>,
 
-    islight: bool,
+    /// Selected interface theme. See [`theme::ThemeId`].
+    #[serde(default)]
+    theme: theme::ThemeId,
+
+    /// False on saves from before named themes. Those saves are read once
+    /// from [`Self::legacy_islight`], then this becomes true.
+    #[serde(default)]
+    theme_set: bool,
+
+    /// Previous light/dark checkbox. Not written back.
+    #[serde(default, rename = "islight", skip_serializing)]
+    legacy_islight: bool,
 
     /// Compensates MIDI / instrument lag behind the player clock.
     /// Positive = audio late → hold the roll / FX back so the blue bar matches what you hear.
@@ -227,7 +242,9 @@ impl Default for VirtualBookApp {
 
             i18n: create_i18n_message_with_lang(None),
 
-            islight: false,
+            theme: theme::ThemeId::Night,
+            theme_set: true,
+            legacy_islight: false,
 
             hidden_number_pad: false,
 
@@ -413,6 +430,13 @@ impl VirtualBookApp {
         Self::restore_midi_device(&mut old_storage);
         Self::restore_file_store(&mut old_storage);
 
+        old_storage.theme = theme::resolve_saved_theme(
+            old_storage.theme,
+            old_storage.theme_set,
+            old_storage.legacy_islight,
+        );
+        old_storage.theme_set = true;
+
         old_storage.lang.clone_from(&lang);
         old_storage.i18n = create_i18n_message_with_lang(lang);
 
@@ -464,95 +488,9 @@ impl VirtualBookApp {
         app
     }
 
-    /// Create a custom light theme matching the logo colors
-    /// Logo colors: golden yellow/orange pipes, reddish-brown console, dark blue accents
-    fn create_logo_light_theme() -> Visuals {
-        let mut visuals = Visuals::light();
-
-        // Warm beige/cream background (inspired by logo background)
-        let warm_beige = Color32::from_rgb(250, 245, 235);
-
-        // Golden/amber tones (inspired by organ pipes)
-        let golden_amber = Color32::from_rgb(255, 200, 100);
-        let golden_amber_light = Color32::from_rgb(255, 220, 150);
-
-        // Reddish-brown tones (inspired by organ console)
-        let reddish_brown = Color32::from_rgb(180, 100, 60);
-        let reddish_brown_light = Color32::from_rgb(200, 120, 80);
-
-        // Dark brown (for outlines/strokes)
-        let dark_brown = Color32::from_rgb(80, 50, 30);
-
-        // Dark blue (inspired by keys and film reel)
-        let dark_blue = Color32::from_rgb(30, 50, 90);
-        let dark_blue_light = Color32::from_rgb(50, 70, 120);
-
-        // Update window and panel colors with warm tones
-        visuals.window_fill = warm_beige;
-        visuals.panel_fill = warm_beige;
-        visuals.window_stroke = Stroke::new(1.0, dark_brown);
-
-        // Update widget colors with golden/amber tones
-        visuals.widgets.noninteractive.bg_fill = warm_beige;
-        visuals.widgets.noninteractive.weak_bg_fill = warm_beige;
-        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, dark_brown);
-        visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, dark_blue);
-
-        visuals.widgets.inactive.bg_fill = golden_amber_light;
-        visuals.widgets.inactive.weak_bg_fill = golden_amber_light;
-        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, dark_blue);
-
-        visuals.widgets.hovered.bg_fill = golden_amber;
-        visuals.widgets.hovered.weak_bg_fill = golden_amber;
-        visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, reddish_brown);
-        visuals.widgets.hovered.fg_stroke = Stroke::new(1.5, dark_blue);
-
-        visuals.widgets.active.bg_fill = reddish_brown_light;
-        visuals.widgets.active.weak_bg_fill = reddish_brown_light;
-        visuals.widgets.active.bg_stroke = Stroke::new(1.0, dark_brown);
-        visuals.widgets.active.fg_stroke = Stroke::new(2.0, Color32::WHITE);
-
-        visuals.widgets.open.bg_fill = golden_amber_light;
-        visuals.widgets.open.weak_bg_fill = golden_amber_light;
-        visuals.widgets.open.bg_stroke = Stroke::new(1.0, reddish_brown);
-        visuals.widgets.open.fg_stroke = Stroke::new(1.0, dark_blue);
-
-        // Selected buttons and text selections. The stroke color is the text
-        // drawn on top of bg_fill, so it has to stay light on this dark blue.
-        visuals.selection.bg_fill = dark_blue;
-        visuals.selection.stroke = Stroke::new(1.0, warm_beige);
-
-        // Text edit and code backgrounds
-        visuals.extreme_bg_color = Color32::from_rgb(255, 250, 240);
-        visuals.code_bg_color = Color32::from_rgb(255, 245, 230);
-        visuals.faint_bg_color = Color32::from_rgb(250, 240, 225);
-
-        // Hyperlink color using dark blue
-        visuals.hyperlink_color = dark_blue_light;
-
-        visuals
-    }
-
-    /// Setup visuals and style for the UI
+    /// Install the selected theme. Skips the work when it is already current.
     fn setup_visuals_and_style(&self, ctx: &egui::Context) {
-        let old = if self.islight {
-            Self::create_logo_light_theme()
-        } else {
-            Visuals::dark()
-        };
-
-        ctx.set_visuals(old);
-
-        let mut style: Style = Style::default();
-        style.clone_from(&ctx.global_style());
-
-        // Make window_fill fully opaque (alpha 255) for menus and windows
-        let mut c = style.visuals.window_fill;
-        c = Color32::from_rgba_premultiplied(c.r(), c.g(), c.b(), 255);
-        style.visuals.window_fill = c;
-        style.visuals.window_corner_radius = CornerRadius::ZERO;
-
-        ctx.set_global_style(style);
+        theme::apply(ctx, self.theme);
     }
 
     /// Book time under the blue bar (and for note-hit FX), in milliseconds.
@@ -1231,7 +1169,16 @@ impl VirtualBookApp {
         };
 
         ui.checkbox(&mut self.hidden_number_pad, &self.i18n.hide_num_pad);
-        ui.checkbox(&mut self.islight, &self.i18n.dark_light);
+        // A submenu keeps this menu short enough to reach the controls below.
+        let theme_label = format!("{}: {}", self.i18n.theme, self.i18n.theme_name(self.theme));
+        ui.menu_button(theme_label, |ui| {
+            for id in theme::ThemeId::ALL {
+                let label = self.i18n.theme_name(id).to_owned();
+                if ui.radio_value(&mut self.theme, id, label).changed() {
+                    self.theme_set = true;
+                }
+            }
+        });
         ui.label(&self.i18n.time_between_file);
         let time_slider = egui::Slider::new(&mut self.play_wait, 0.0..=30.0);
         if time_slider.ui(ui).changed() {
@@ -1435,21 +1382,10 @@ impl VirtualBookApp {
 
                     ui.add_space(12.0);
 
-                    // Title with simple separators - enhanced visibility with high contrast
-                    let visuals = &ui.style().visuals;
-                    // Use a darker background for better contrast - use the selection stroke color (dark blue) as base
-                    // and make it darker for the background
-                    let title_bg_color = if visuals.dark_mode {
-                        visuals.selection.bg_fill
-                    } else {
-                        // In light mode, use a darker blue for better contrast with white text
-                        Color32::from_rgb(30, 50, 90) // Dark blue - darker than selection.bg_fill
-                    };
-                    // Always use white text for maximum contrast against the dark background
-                    let title_text_color = Color32::WHITE;
-
-                    // Use bold font family (rubik_bold) for better visibility
-                    let bold_font = FontId::new(16.0, FontFamily::Name("rubik_bold".into()));
+                    let marks = theme::tokens(ui.ctx());
+                    let title_bg_color = marks.now_playing_bg;
+                    let title_text_color = marks.now_playing_fg;
+                    let bold_font = theme::bold_font(16.0);
                     // Use simple ASCII characters that will render reliably: " > " and " < "
                     let mut rt = RichText::new(format!(" > {} < ", name));
                     rt = rt.font(bold_font); // Uses Rubik-Bold font for better visibility
@@ -1923,36 +1859,6 @@ fn follow_display_offset(displayed_ms: f64, target_ms: f64, dt_secs: f64) -> f64
     }
 }
 
-#[cfg(test)]
-mod display_offset_tests {
-    use super::follow_display_offset;
-
-    #[test]
-    fn snaps_when_the_window_was_not_drawn() {
-        // Two seconds hidden, playhead only 200 ms ahead: still show it now.
-        assert_eq!(follow_display_offset(10_000.0, 10_200.0, 2.0), 10_200.0);
-    }
-
-    #[test]
-    fn snaps_from_the_origin_when_the_playhead_is_already_ahead() {
-        assert_eq!(follow_display_offset(0.0, 120_000.0, 0.016), 120_000.0);
-    }
-
-    #[test]
-    fn eases_one_frame_of_steady_playback() {
-        let shown = follow_display_offset(1_000.0, 1_016.0, 0.016);
-        assert!(
-            shown > 1_000.0 && shown < 1_016.0,
-            "steady playback should ease, shown = {shown}"
-        );
-    }
-
-    #[test]
-    fn holds_when_no_time_has_passed() {
-        assert_eq!(follow_display_offset(500.0, 800.0, 0.0), 500.0);
-    }
-}
-
 #[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl eframe::App for VirtualBookApp {
     /// Called by the frame work to save state before shutdown.
@@ -2007,5 +1913,35 @@ impl eframe::App for VirtualBookApp {
             self.render_central_panel(&ctx, central_rect);
         }
         ctx.request_repaint();
+    }
+}
+
+#[cfg(test)]
+mod display_offset_tests {
+    use super::follow_display_offset;
+
+    #[test]
+    fn snaps_when_the_window_was_not_drawn() {
+        // Two seconds hidden, playhead only 200 ms ahead: still show it now.
+        assert_eq!(follow_display_offset(10_000.0, 10_200.0, 2.0), 10_200.0);
+    }
+
+    #[test]
+    fn snaps_from_the_origin_when_the_playhead_is_already_ahead() {
+        assert_eq!(follow_display_offset(0.0, 120_000.0, 0.016), 120_000.0);
+    }
+
+    #[test]
+    fn eases_one_frame_of_steady_playback() {
+        let shown = follow_display_offset(1_000.0, 1_016.0, 0.016);
+        assert!(
+            shown > 1_000.0 && shown < 1_016.0,
+            "steady playback should ease, shown = {shown}"
+        );
+    }
+
+    #[test]
+    fn holds_when_no_time_has_passed() {
+        assert_eq!(follow_display_offset(500.0, 800.0, 0.0), 500.0);
     }
 }

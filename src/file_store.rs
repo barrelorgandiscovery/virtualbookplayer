@@ -329,7 +329,7 @@ fn test_file_node() {
 
     let f = FileStore::recurse_construct(&PathBuf::from("/home/use/tmp/t"), &None);
     // cannot display the file node
-    println!("{:?}", &f);
+    println!("{:?}", f);
 }
 
 #[test]
@@ -345,9 +345,9 @@ fn test_file_store_and_view() {
 
     if let Some(fstore) = FileStore::new(&path).unwrap() {
         let fv1 = &fstore.view(&None, &None).unwrap();
-        println!("{:?}", &fv1);
+        println!("{:?}", fv1);
         let fv2 = &fstore.view(&Some("hello".into()), &None).unwrap();
-        println!("{:?}", &fv2);
+        println!("{:?}", fv2);
     }
 }
 

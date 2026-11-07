@@ -2,6 +2,8 @@
 
 use crate::gfx::BookEffectKind;
 
+use super::theme::ThemeId;
+
 pub struct I18NMessages {
     pub play: String,
     pub next: String,
@@ -17,7 +19,12 @@ pub struct I18NMessages {
     pub enter: String,
     pub aucun_fichiers: String,
     pub hide_num_pad: String,
-    pub dark_light: String,
+    pub theme: String,
+    pub theme_night: String,
+    pub theme_console: String,
+    pub theme_marquee: String,
+    pub theme_parchment: String,
+    pub theme_loft: String,
     pub filter: String,
     pub catalog: String,
     pub history: String,
@@ -70,6 +77,16 @@ pub struct I18NMessages {
 }
 
 impl I18NMessages {
+    pub fn theme_name(&self, id: ThemeId) -> &str {
+        match id {
+            ThemeId::Night => self.theme_night.as_str(),
+            ThemeId::Console => self.theme_console.as_str(),
+            ThemeId::Marquee => self.theme_marquee.as_str(),
+            ThemeId::Parchment => self.theme_parchment.as_str(),
+            ThemeId::Loft => self.theme_loft.as_str(),
+        }
+    }
+
     pub fn book_effect_label(&self, kind: BookEffectKind) -> &str {
         match kind {
             BookEffectKind::None => self.book_effect_none.as_str(),
@@ -139,7 +156,12 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         enter: "Enter".into(),
         aucun_fichiers: "No files".into(),
         hide_num_pad: "Hide numpad".into(),
-        dark_light: "Light theme".into(),
+        theme: "Theme".into(),
+        theme_night: "Night".into(),
+        theme_console: "Console".into(),
+        theme_marquee: "Marquee".into(),
+        theme_parchment: "Parchment".into(),
+        theme_loft: "Loft".into(),
         filter: "Search".into(),
         catalog: "Catalog".into(),
         history: "History".into(),
@@ -211,7 +233,12 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         enter: "Valider".into(),
         aucun_fichiers: "Aucun fichier".into(),
         hide_num_pad: "Masquer le pavé numérique".into(),
-        dark_light: "Thème clair".into(),
+        theme: "Thème".into(),
+        theme_night: "Nuit".into(),
+        theme_console: "Console".into(),
+        theme_marquee: "Chapiteau".into(),
+        theme_parchment: "Carton".into(),
+        theme_loft: "Atelier".into(),
         filter: "Recherche".into(),
         catalog: "Catalogue".into(),
         history: "Historique".into(),

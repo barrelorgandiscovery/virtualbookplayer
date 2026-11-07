@@ -1,2 +1,6 @@
 /target
 /dist
+
+# egui_kittest writes these beside a snapshot when a frame does not match.
+**/tests/snapshots/**/*.diff.png
+**/tests/snapshots/**/*.new.png
