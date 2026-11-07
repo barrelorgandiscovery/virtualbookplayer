@@ -14,6 +14,7 @@ use player::midiio::{DeviceInformation, MidiPlayerFactory};
 use player::{PlayerFactory, Response};
 
 use crate::appplayer::AppPlayer;
+use crate::gfx::{BookFxState, init_book_fx_gpu};
 use crate::playmetadata_manager::PlayMetadataManager;
 use crate::{duration_to_mm_ss, file_store::*};
 
@@ -42,11 +43,12 @@ pub struct VirtualBookApp {
 
     xscale: f64,
 
-    /// offset in the play (in milliseconds)
+    /// Player clock (MIDI send time), in milliseconds.
     #[serde(skip)]
     offset_ms: f64,
 
-    /// roll position drawn on screen, in milliseconds
+    /// Smoothed player clock drawn toward by the roll follow filter (no latency).
+    /// Visual playhead / FX use [`Self::visual_offset_ms`].
     #[serde(skip)]
     display_offset_ms: f64,
     /// previous frame time, used to detect a stalled restore
@@ -94,6 +96,10 @@ pub struct VirtualBookApp {
     #[serde(skip)]
     background_texture_image: ColorImage,
 
+    /// GPU particle / glow state for the virtual-book canvas (None = CPU shapes only).
+    #[serde(skip)]
+    book_fx: Option<BookFxState>,
+
     selected_device: usize,
 
     #[serde(skip)]
@@ -114,6 +120,8 @@ pub struct VirtualBookApp {
 
     islight: bool,
 
+    /// Compensates MIDI / instrument lag behind the player clock.
+    /// Positive = audio late → hold the roll / FX back so the blue bar matches what you hear.
     play_lattency_ms: i64,
 
     /// display the number pad
@@ -198,6 +206,7 @@ impl Default for VirtualBookApp {
             metadata_manager: PlayMetadataManager::new(),
             metadata_query_frame_counter: 0,
             current_playing_file: None,
+            book_fx: None,
         }
     }
 }
@@ -390,24 +399,33 @@ impl VirtualBookApp {
 
         Self::setup_fonts(&cc.egui_ctx);
 
-        if !reset {
-            // user ask to reset the stored values
+        // Register book GPU pipelines once (Windows/Linux/macOS via wgpu).
+        let gpu_ready = init_book_fx_gpu(cc);
 
+        let mut app = if !reset {
             // Load previous app state (if any).
             // Note that you must enable the `persistence` feature for this to work.
             if let Some(storage) = cc.storage {
-                if let Some(restored_state) = Self::restore_state(storage, lang.clone()) {
-                    return restored_state;
-                }
+                Self::restore_state(storage, lang.clone())
+            } else {
+                None
             }
+        } else {
+            None
         }
+        .unwrap_or_else(|| {
+            let lang_clone = lang.clone();
+            VirtualBookApp {
+                lang: lang_clone.clone(),
+                i18n: create_i18n_message_with_lang(lang_clone),
+                ..Default::default()
+            }
+        });
 
-        let lang_clone = lang.clone();
-        VirtualBookApp {
-            lang: lang_clone.clone(),
-            i18n: create_i18n_message_with_lang(lang_clone),
-            ..Default::default()
-        }
+        let mut fx = BookFxState::default();
+        fx.set_gpu_ready(gpu_ready);
+        app.book_fx = Some(fx);
+        app
     }
 
     /// Create a custom light theme matching the logo colors
@@ -500,7 +518,16 @@ impl VirtualBookApp {
         ctx.set_global_style(style);
     }
 
-    /// Update the playhead and the position drawn on the roll.
+    /// Book time under the blue bar (and for note-hit FX), in milliseconds.
+    ///
+    /// Latency is applied here — not inside the follow filter — so the slider
+    /// immediately shifts the roll and sparks relative to MIDI without fighting
+    /// the smoother, including while paused.
+    pub(crate) fn visual_offset_ms(&self) -> f64 {
+        self.display_offset_ms - self.play_lattency_ms as f64
+    }
+
+    /// Update the smoothed player clock used as the basis for the visual playhead.
     fn update_player_state(&mut self) {
         let now = Instant::now();
         let dt = now
@@ -508,7 +535,8 @@ impl VirtualBookApp {
             .as_secs_f64();
         self.last_display_tick = now;
 
-        // Hold the last drawn position unless a book is actually playing.
+        // Hold the last player position unless a book is actually playing.
+        // Latency is NOT folded into this target; see `visual_offset_ms`.
         let mut target_ms = self.display_offset_ms;
         if self.appplayer.is_playing()
             && self.adjusted_start_time + Duration::from_millis(100) < now
@@ -517,7 +545,7 @@ impl VirtualBookApp {
                 let delta = now.saturating_duration_since(self.adjusted_start_time);
                 self.current_duration = delta;
                 self.offset_ms = delta.as_millis() as f64;
-                target_ms = self.offset_ms - self.play_lattency_ms as f64;
+                target_ms = self.offset_ms;
             }
         }
 
@@ -543,9 +571,8 @@ impl VirtualBookApp {
                 }
                 Response::CurrentPlayTime(duration) => {
                     self.latest_duration_time = *duration;
-                    // Re-anchor the wall clock. Display latency is applied later,
-                    // when the roll target is computed, so a late message cannot
-                    // pull the view in the opposite direction.
+                    // Re-anchor the wall clock to the MIDI player's reported time.
+                    // Visual latency is applied in `visual_offset_ms`, not here.
                     self.adjusted_start_time = Instant::now() - *duration;
                 }
                 Response::FileCancelled => {
@@ -553,6 +580,9 @@ impl VirtualBookApp {
                     self.current_playing_file = None;
                 }
                 Response::FilePlayStarted((filename, _notes)) => {
+                    if let Some(fx) = self.book_fx.as_mut() {
+                        fx.on_book_changed();
+                    }
                     // Record play event in background thread (low priority)
                     // The filename might be relative or absolute, so we need to handle both cases
                     if let Some(file_path) = &self.file_store_path {
@@ -1076,7 +1106,11 @@ impl VirtualBookApp {
 
         ui.label(&self.i18n.lattence_jeu);
         let play_lattency_slider = egui::Slider::new(&mut self.play_lattency_ms, -1000..=4_000);
-        ui.add(play_lattency_slider);
+        ui.add(play_lattency_slider).on_hover_text(
+            "Shifts the roll and play FX relative to MIDI.\n\
+             Positive: audio/MIDI late — delay the blue-bar hit to match what you hear.\n\
+             Negative: visuals late — advance the blue-bar hit.",
+        );
     }
 
     /// Render MIDI device selection

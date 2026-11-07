@@ -7,16 +7,11 @@ use egui_extras::{Size, StripBuilder};
 
 use crate::{virtualbookcomponent::VirtualBookComponent, VirtualBookApp};
 
-pub(crate) fn ui_content(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mut Ui) {
-    // egui::warn_if_debug_build(ui);
-    let VirtualBookApp {
-        display_offset_ms,
-        xscale,
-        appplayer,
-        ..
-    } = app;
+pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
+    let playing = app.appplayer.is_playing();
+    let opt_vb = app.appplayer.virtual_book.read().clone();
+    let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
 
-    let opt_vb = appplayer.virtual_book.read().clone();
     if let Some(vbc) = opt_vb {
         // draw canvas
         ui.horizontal(|ui| {
@@ -33,30 +28,54 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, _ctx: &egui::Context, ui: &mu
                     strip.cell(|ui| {
                         ui.horizontal_centered(|ui| {
                             // Display next file name if available
-                            if let Some(name) = appplayer.next_file_name() {
+                            if let Some(name) = app.appplayer.next_file_name() {
                                 ui.label(name);
                             }
 
                             if ui.button(egui_phosphor::regular::FAST_FORWARD).clicked() {
-                                appplayer.next();
+                                app.appplayer.next();
                             }
                         });
                     });
                     strip.cell(|ui| {
-                        ui.add(egui::Slider::new(xscale, 1000.0..=30_000.0).show_value(false));
+                        ui.add(
+                            egui::Slider::new(&mut app.xscale, 1000.0..=30_000.0).show_value(false),
+                        );
                     });
                 });
         });
-        //ui.add(egui::Slider::new(offset, 0.0..=100000.0));
 
-        let foffset: f64 = *display_offset_ms;
+        // Latency-compensated playhead: blue bar + note FX track what you hear.
+        let display_offset_ms = app.visual_offset_ms();
+        let xscale = app.xscale;
 
-        ui.add(
-            VirtualBookComponent::from_some_indexedvirtualbook(Some(Arc::clone(&vbc)))
-                .offset_ms(foffset)
-                .xscale(*xscale)
-                .scrollbar_width(32.0)
-                .set_background_texture_id(app.background_textureid),
-        );
+        if app.background_texture_handle.is_none() {
+            app.background_texture_handle = Some(ctx.load_texture(
+                "bgbookimage",
+                app.background_texture_image.clone(),
+                egui::TextureOptions {
+                    magnification: egui::TextureFilter::Nearest,
+                    minification: egui::TextureFilter::Linear,
+                    wrap_mode: egui::TextureWrapMode::Repeat,
+                    mipmap_mode: None,
+                },
+            ));
+            app.background_textureid = Some(egui::TextureId::from(
+                app.background_texture_handle.as_ref().unwrap(),
+            ));
+        }
+        let background_textureid = app.background_textureid;
+
+        let mut component = VirtualBookComponent::from_some_indexedvirtualbook(Some(Arc::clone(
+            &vbc,
+        )))
+        .offset_ms(display_offset_ms)
+        .xscale(xscale)
+        .scrollbar_width(32.0)
+        .set_background_texture_id(background_textureid)
+        .with_gpu_fx(gpu)
+        .playing(playing);
+
+        component.ui_content_with_fx(ui, app.book_fx.as_mut());
     }
 }

@@ -5,6 +5,7 @@
 mod app;
 pub mod appplayer;
 pub mod file_store;
+pub mod gfx;
 pub mod playlist;
 pub mod playmetadata;
 pub mod playmetadata_manager;

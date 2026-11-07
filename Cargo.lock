@@ -3553,6 +3553,7 @@ name = "virtualbookplayer"
 version = "0.0.59"
 dependencies = [
  "bookparsing",
+ "bytemuck",
  "chrono",
  "clap",
  "eframe",

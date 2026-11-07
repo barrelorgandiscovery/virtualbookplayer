@@ -1,6 +1,6 @@
-//! Display component for the book / midi file
-//! using egui rendering
-//!
+//! Display component for the book / midi file.
+//! Uses egui shapes by default, or a wgpu PaintCallback when GPU FX is available.
+
 use std::collections::BTreeSet;
 use std::{io::Cursor, sync::Arc};
 
@@ -10,6 +10,8 @@ use egui::epaint::*;
 use egui::*;
 
 use bookparsing::{read_book_stream, Hole, VirtualBook};
+
+use crate::gfx::book_fx::{self, BookFxState};
 
 pub struct IndexedVirtualBook {
     pub virtualbook: Arc<VirtualBook>,
@@ -89,6 +91,11 @@ pub struct VirtualBookComponent {
     background_texture_id: Option<egui::TextureId>,
 
     virtual_book: Option<Arc<IndexedVirtualBook>>,
+
+    /// When true and `BookFxState::gpu_ready`, notes/particles use wgpu.
+    use_gpu_fx: bool,
+    /// Playing → spawn particles on note starts.
+    playing: bool,
 }
 
 impl Default for VirtualBookComponent {
@@ -102,9 +109,12 @@ impl Default for VirtualBookComponent {
             scrollbats_width: 12.0,
             background_texture_id: None,
             virtual_book: None,
+            use_gpu_fx: false,
+            playing: false,
         }
     }
 }
+
 #[cfg_attr(any(feature = "profiling"), profiling::all_functions)]
 impl VirtualBookComponent {
     /// create the component state from the virtual book
@@ -183,7 +193,25 @@ impl VirtualBookComponent {
         self
     }
 
+    pub fn with_gpu_fx(mut self, enabled: bool) -> Self {
+        self.use_gpu_fx = enabled;
+        self
+    }
+
+    pub fn playing(mut self, playing: bool) -> Self {
+        self.playing = playing;
+        self
+    }
+
     pub fn ui_content(&mut self, ui: &mut Ui) -> egui::Response {
+        self.ui_content_with_fx(ui, None)
+    }
+
+    pub fn ui_content_with_fx(
+        &mut self,
+        ui: &mut Ui,
+        mut book_fx: Option<&mut BookFxState>,
+    ) -> egui::Response {
         let Self {
             offset_ms: offset_in_millis,
             xscale,
@@ -199,16 +227,20 @@ impl VirtualBookComponent {
         ui.set_style(style);
 
         let width_container = ui.available_width();
+        let use_gpu = self.use_gpu_fx && book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
+        let playing = self.playing;
+        let background_texture_id = self.background_texture_id;
 
         egui::ScrollArea::horizontal()
-            //.hscroll(*scrollbars_visible)
             .show(ui, |ui| {
                 let (response, painter) = ui.allocate_painter(
                     Vec2::new(width_container, ui.available_height()),
                     Sense::hover(),
                 );
 
-                let midx = width_container / 2.0f32;
+                // Single width for notes + parchment so they share one book-space X.
+                let book_w = response.rect.width().max(1.0);
+                let midx = book_w / 2.0;
                 let maxy = response.rect.height();
 
                 let to_screen = emath::RectTransform::from_to(
@@ -216,25 +248,37 @@ impl VirtualBookComponent {
                     response.rect,
                 );
 
-                // background draw
-                let book_background = Rect::from_points(&[
-                    pos2(0.0, 0.0),
-                    to_screen * pos2(width_container, response.rect.size().y),
-                ]);
+                let book_background = to_screen.transform_rect(Rect::from_min_size(
+                    Pos2::ZERO,
+                    response.rect.size(),
+                ));
 
-                if let Some(texture_id) = self.background_texture_id {
+                // Parchment UV in the same paper-pixel space as note X:
+                //   paper_x(local_x) = (local_x - midx) + offset_us / xscale
+                // so the texture translates exactly with the holes (no parallax).
+                let offset_us = *offset_in_millis * 1000.0;
+                // Tile size in points — independent of widget width so zoom/xscale
+                // only change how much paper is visible, not the lock to notes.
+                const PAPER_TILE_PTS: f64 = 480.0;
+                let paper_x0 = -midx as f64 + offset_us / *xscale;
+                let paper_x1 = (book_w - midx) as f64 + offset_us / *xscale;
+                let u0 = (paper_x0 / PAPER_TILE_PTS) as f32;
+                let u1 = (paper_x1 / PAPER_TILE_PTS) as f32;
+                let v1 = (maxy as f64 / PAPER_TILE_PTS) as f32;
+
+                if let Some(texture_id) = background_texture_id {
                     let mut mesh = Mesh::with_texture(texture_id);
                     let uv = Rect {
-                        min: Pos2::new(0.0, 0.0),
-                        max: Pos2::new(1.0, 1.0),
+                        min: Pos2::new(u0, 0.0),
+                        max: Pos2::new(u1, v1.max(0.01)),
                     };
-                    mesh.add_rect_with_uv(book_background, uv, Color32::from_rgb(255, 255, 255));
+                    mesh.add_rect_with_uv(book_background, uv, Color32::WHITE);
                     painter.add(Shape::mesh(mesh));
                 } else {
                     painter.add(RectShape::filled(
                         book_background,
                         CornerRadius::default(),
-                        Color32::from_rgb(255, 255, 255),
+                        Color32::WHITE,
                     ));
                 }
 
@@ -253,9 +297,7 @@ impl VirtualBookComponent {
                         .range(std::ops::Range {
                             start: OrdHole {
                                 hole_ref: Hole {
-                                    timestamp: (*offset_in_millis * 1000.0_f64
-                                        - (2.0 * width_container) as f64 / 2.0_f64 * *xscale)
-                                        as i64,
+                                    timestamp: (offset_us - book_w as f64 * *xscale) as i64,
                                     track: 0,
                                     length: 0,
                                 },
@@ -263,9 +305,7 @@ impl VirtualBookComponent {
 
                             end: OrdHole {
                                 hole_ref: Hole {
-                                    timestamp: (*offset_in_millis * 1000.0_f64
-                                        + width_container as f64 / 2.0_f64 * *xscale)
-                                        as i64,
+                                    timestamp: (offset_us + book_w as f64 / 2.0 * *xscale) as i64,
                                     track: 0,
                                     length: 0,
                                 },
@@ -286,7 +326,9 @@ impl VirtualBookComponent {
                         }
                     };
 
-                    // blue bar
+                    // blue bar (playhead) — notes are "read" exactly on this line
+                    let playhead_x = to_screen * pos2(midx, 0.0);
+                    let playhead_x = playhead_x.x;
                     let bar = Rect::from_points(&[
                         to_screen * pos2(midx - 1.0, 0.0),
                         to_screen * pos2(midx + 1.0, maxy + 10.0),
@@ -294,91 +336,108 @@ impl VirtualBookComponent {
 
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Display Holes");
-                    // notes draw
-                    let rects: Vec<(Rect, Color32)> = visible
-                        .into_iter()
-                        .map(|h| {
-                            [
-                                pos2(
-                                    (((h.hole_ref.timestamp as f64 - *offset_in_millis * 1000.0)
-                                        / *xscale)
-                                        + width_container as f64 / 2.0)
-                                        as f32,
-                                    mappingy(
-                                        (h.hole_ref.track as f32
-                                            * current_vb
-                                                .virtualbook
-                                                .scale
-                                                .definition
-                                                .intertrackdistance
-                                            + current_vb
-                                                .virtualbook
-                                                .scale
-                                                .definition
-                                                .firsttrackdistance
-                                            - current_vb
-                                                .virtualbook
-                                                .scale
-                                                .definition
-                                                .defaulttrackheight
-                                                / 2.0)
-                                            * *yfactor,
-                                    ),
-                                ),
-                                pos2(
-                                    ((((h.hole_ref.timestamp + h.hole_ref.length) as f64
-                                        - *offset_in_millis * 1000.0)
-                                        / *xscale)
-                                        + (width_container as f64 / 2.0))
-                                        as f32,
-                                    mappingy(
-                                        (h.hole_ref.track as f32
-                                            * current_vb
-                                                .virtualbook
-                                                .scale
-                                                .definition
-                                                .intertrackdistance
-                                            + current_vb
-                                                .virtualbook
-                                                .scale
-                                                .definition
-                                                .firsttrackdistance
-                                            + current_vb
-                                                .virtualbook
-                                                .scale
-                                                .definition
-                                                .defaulttrackheight
-                                                / 2.0)
-                                            * *yfactor,
-                                    ),
-                                ),
-                            ]
-                        })
-                        .enumerate()
-                        .map(|(i, h)| {
-                            let points_in_screen: Vec<Pos2> =
-                                h.iter().map(|p| to_screen * (*p)).collect();
 
-                            let rect = Rect::from_points(&points_in_screen);
+                    let scale = &current_vb.virtualbook.scale.definition;
+                    let mut note_starts: Vec<(i64, Pos2, Color32)> = Vec::new();
+                    let mut note_draws: Vec<book_fx::NoteDraw> = Vec::with_capacity(visible.len());
+
+                    // UV scale: book microseconds → texture repeats along the roll
+                    let uv_per_us = 1.0 / (*xscale as f32 * 80.0);
+
+                    for (i, h) in visible.into_iter().enumerate() {
+                        let x0 = ((h.hole_ref.timestamp as f64 - offset_us) / *xscale
+                            + midx as f64) as f32;
+                        let x1 = (((h.hole_ref.timestamp + h.hole_ref.length) as f64 - offset_us)
+                            / *xscale
+                            + midx as f64) as f32;
+                        let y0 = mappingy(
+                            (h.hole_ref.track as f32 * scale.intertrackdistance
+                                + scale.firsttrackdistance
+                                - scale.defaulttrackheight / 2.0)
+                                * *yfactor,
+                        );
+                        let y1 = mappingy(
+                            (h.hole_ref.track as f32 * scale.intertrackdistance
+                                + scale.firsttrackdistance
+                                + scale.defaulttrackheight / 2.0)
+                                * *yfactor,
+                        );
+
+                        let points_in_screen =
+                            [to_screen * pos2(x0, y0), to_screen * pos2(x1, y1)];
+                        let rect = Rect::from_points(&points_in_screen);
+
+                        let mut color = Color32::from_rgb(90, 90, 95);
+                        if !use_gpu {
                             let point_response =
                                 ui.interact(rect, response.id.with(i), Sense::hover());
-
-                            let mut color = Color32::from_rgb(100, 100, 100);
                             if point_response.hovered() {
                                 color = Color32::from_rgb(50, 0, 0);
                             }
+                        }
 
-                            if rect.x_range().intersects(bar.x_range()) {
-                                color = Color32::from_rgb(255, 0, 0);
+                        // Active only while the playhead line sits inside the note.
+                        let active = rect.min.x <= playhead_x && rect.max.x >= playhead_x;
+                        let playhead_hit = if active {
+                            color = Color32::from_rgb(255, 55, 40);
+                            Some(Pos2::new(playhead_x, rect.center().y))
+                        } else {
+                            None
+                        };
+
+                        // Book-space UVs so the note texture scrolls with carton offset.
+                        let u0 = h.hole_ref.timestamp as f32 * uv_per_us;
+                        let u1 = (h.hole_ref.timestamp + h.hole_ref.length) as f32 * uv_per_us;
+                        let v0 = h.hole_ref.track as f32 * 0.17;
+                        let book_uv = Rect::from_min_max(Pos2::new(u0, v0), Pos2::new(u1, v0 + 0.12));
+
+                        // Spawn sparks on the vertical bar when the note *starts* (left edge crosses).
+                        note_starts.push((
+                            h.hole_ref.timestamp,
+                            Pos2::new(playhead_x, rect.center().y),
+                            Color32::from_rgb(255, 180, 60),
+                        ));
+
+                        note_draws.push(book_fx::NoteDraw {
+                            rect,
+                            color,
+                            book_uv,
+                            active,
+                            playhead_hit,
+                        });
+                    }
+
+                    if use_gpu {
+                        if let Some(fx) = book_fx.as_mut() {
+                            let dt = ui.input(|i| i.stable_dt);
+                            let playhead_us = offset_us as i64;
+                            fx.update_play(dt, playing, playhead_us, &note_starts);
+
+                            // Viewport = paint callback rect (NDC ±1 on its edges).
+                            let (note_verts, particle_verts) =
+                                book_fx::build_frame_meshes(&note_draws, fx, response.rect);
+                            book_fx::paint_book_fx(
+                                &painter,
+                                response.rect,
+                                note_verts,
+                                particle_verts,
+                            );
+
+                            if playing || fx.has_alive_particles() {
+                                ui.ctx().request_repaint();
                             }
-
-                            (rect, color)
-                        })
-                        .collect();
-
-                    // draw the elements, for reactive elements
-                    for (r, c) in rects.iter() {
-                        painter.add(RectShape::filled(*r, CornerRadius::same(1), *c));
+                        }
+                    } else {
+                        for note in &note_draws {
+                            painter.add(RectShape::filled(
+                                note.rect,
+                                CornerRadius::same(1),
+                                note.color,
+                            ));
+                        }
+                        if playing {
+                            ui.ctx().request_repaint();
+                        }
                     }
 
                     painter.add(RectShape::filled(
@@ -387,13 +446,10 @@ impl VirtualBookComponent {
                         Color32::BLUE,
                     ));
                 } else {
-                    // no virtualbook
-
                     let to_screen = emath::RectTransform::from_to(
                         Rect::from_min_size(Pos2::ZERO, response.rect.size()),
                         response.rect,
                     );
-                    // draw an empty
                     let book_background = to_screen
                         .transform_rect(Rect::from_min_size(Pos2::ZERO, response.rect.size()));
 
@@ -414,15 +470,13 @@ impl VirtualBookComponent {
                         Color32::BLUE,
                     ));
                 }
-                ui.ctx().request_repaint();
                 ui.interact(response.rect, Id::new("area"), Sense::click())
-                //response from the area
             })
             .inner
     }
 }
 
-/// widget implementation
+/// widget implementation (CPU path only — no FX state).
 impl Widget for VirtualBookComponent {
     #[cfg_attr(any(feature = "profiling"), profiling::function)]
     fn ui(mut self, ui: &mut Ui) -> Response {

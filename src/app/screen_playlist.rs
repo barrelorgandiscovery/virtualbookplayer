@@ -779,16 +779,9 @@ fn render_file_tree_panel(app: &mut VirtualBookApp, ui: &mut Ui) {
 
 /// Render the virtual book preview component
 fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut Ui) {
-    let foffset: f64 = app.display_offset_ms;
-
-    // display virtualbook
-    let c = VirtualBookComponent::from_some_indexedvirtualbook(
-        app.appplayer.virtual_book.read().clone(),
-    )
-    .offset_ms(foffset)
-    .xscale(app.xscale)
-    .set_background_texture_id(app.background_textureid)
-    .hide_scrollbar();
+    let foffset: f64 = app.visual_offset_ms();
+    let playing = app.appplayer.is_playing();
+    let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
 
     if app.background_texture_handle.is_none() {
         app.background_texture_handle = Some(ctx.load_texture(
@@ -806,9 +799,17 @@ fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut U
         ));
     }
 
-    let response_ui_component = c
-        .set_background_texture_id(app.background_textureid)
-        .ui_content(ui);
+    let mut component = VirtualBookComponent::from_some_indexedvirtualbook(
+        app.appplayer.virtual_book.read().clone(),
+    )
+    .offset_ms(foffset)
+    .xscale(app.xscale)
+    .set_background_texture_id(app.background_textureid)
+    .hide_scrollbar()
+    .with_gpu_fx(gpu)
+    .playing(playing);
+
+    let response_ui_component = component.ui_content_with_fx(ui, app.book_fx.as_mut());
 
     if response_ui_component.clicked() {
         app.screen = Screen::Display;

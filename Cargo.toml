@@ -36,6 +36,8 @@ egui = { version = "0.37", features = ["default_fonts"] }
 
 egui_extras = { version = "0.37", features = ["image"] }
 
+bytemuck = { version = "1", features = ["derive"] }
+
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 egui-phosphor = { version = "0.4.0", features = ["fill"] }
