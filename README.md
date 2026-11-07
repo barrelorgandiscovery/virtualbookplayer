@@ -4,7 +4,9 @@ A cross-platform MIDI and virtual book jukebox player. It only includes the nece
 
 This software is a simplier "Vanbasco player" alternative.
 
-[![Playback demo](doc/playback.jpg)](doc/playback.mp4)
+[![Playback trailer](doc/playback.gif)](https://raw.githubusercontent.com/barrelorgandiscovery/virtualbookplayer/main/doc/playback.mp4)
+
+[Watch the full video](https://raw.githubusercontent.com/barrelorgandiscovery/virtualbookplayer/main/doc/playback.mp4)
 
 ![](doc/tablet.png)
 
