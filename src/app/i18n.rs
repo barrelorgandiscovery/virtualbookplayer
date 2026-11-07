@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use crate::gfx::BookEffectKind;
+
 pub struct I18NMessages {
     pub play: String,
     pub next: String,
@@ -21,6 +23,9 @@ pub struct I18NMessages {
     pub button_remove: String,
     pub go_to_next_file: String,
     pub lattence_jeu: String,
+    pub book_effect: String,
+    pub book_effect_none: String,
+    pub book_effect_note_fire: String,
     pub switch_auto: String,
 
     pub hover_click_to_enlarge_view: String,
@@ -30,6 +35,15 @@ pub struct I18NMessages {
     pub star_file_tooltip: String,
     pub star_count_tooltip: String,
     pub panel_title: String,
+}
+
+impl I18NMessages {
+    pub fn book_effect_label(&self, kind: BookEffectKind) -> &str {
+        match kind {
+            BookEffectKind::None => self.book_effect_none.as_str(),
+            BookEffectKind::NoteFire => self.book_effect_note_fire.as_str(),
+        }
+    }
 }
 
 fn _create_i18n_message_with_lang(language: Option<String>) -> Box<I18NMessages> {
@@ -96,6 +110,9 @@ pub fn create_i18n_message() -> Box<I18NMessages> {
         go_to_next_file: "Go to next file".into(),
         time_between_file: "Additional Time at the beginning (s):".into(),
         lattence_jeu: "Play lattency (ms):".into(),
+        book_effect: "Book visual effect:".into(),
+        book_effect_none: "No effect".into(),
+        book_effect_note_fire: "Note fire".into(),
         switch_auto: "Automatic Switch".into(),
 
         hover_click_to_enlarge_view: "Click to enlarge the view".into(),
@@ -132,6 +149,9 @@ pub fn create_i18n_fr_message() -> Box<I18NMessages> {
         remove_file_from_list: "Enlever le fichier de la liste".into(),
         go_to_next_file: "Lire le fichier suivant".into(),
         lattence_jeu: "Lattence (ms):".into(),
+        book_effect: "Effet visuel du carton :".into(),
+        book_effect_none: "Aucun effet".into(),
+        book_effect_note_fire: "Feu de notes".into(),
         switch_auto: "Bascule automatique".into(),
 
         hover_click_to_enlarge_view: "Clickez pour agrandir".into(),

@@ -12,6 +12,7 @@ use egui::*;
 use bookparsing::{read_book_stream, Hole, VirtualBook};
 
 use crate::gfx::book_fx::{self, BookFxState};
+use crate::gfx::BookEffectKind;
 
 pub struct IndexedVirtualBook {
     pub virtualbook: Arc<VirtualBook>,
@@ -94,6 +95,8 @@ pub struct VirtualBookComponent {
 
     /// When true and `BookFxState::gpu_ready`, notes/particles use wgpu.
     use_gpu_fx: bool,
+    /// Selected visual effect (preferences).
+    book_effect: BookEffectKind,
     /// Playing → spawn particles on note starts.
     playing: bool,
 }
@@ -110,6 +113,7 @@ impl Default for VirtualBookComponent {
             background_texture_id: None,
             virtual_book: None,
             use_gpu_fx: false,
+            book_effect: BookEffectKind::None,
             playing: false,
         }
     }
@@ -198,6 +202,11 @@ impl VirtualBookComponent {
         self
     }
 
+    pub fn book_effect(mut self, effect: BookEffectKind) -> Self {
+        self.book_effect = effect;
+        self
+    }
+
     pub fn playing(mut self, playing: bool) -> Self {
         self.playing = playing;
         self
@@ -227,8 +236,11 @@ impl VirtualBookComponent {
         ui.set_style(style);
 
         let width_container = ui.available_width();
-        let use_gpu = self.use_gpu_fx && book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
+        let use_gpu = self.use_gpu_fx
+            && self.book_effect.uses_gpu_fx()
+            && book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
         let playing = self.playing;
+        let book_effect = self.book_effect;
         let background_texture_id = self.background_texture_id;
 
         egui::ScrollArea::horizontal()
@@ -257,9 +269,9 @@ impl VirtualBookComponent {
                 //   paper_x(local_x) = (local_x - midx) + offset_us / xscale
                 // so the texture translates exactly with the holes (no parallax).
                 let offset_us = *offset_in_millis * 1000.0;
-                // Tile size in points — independent of widget width so zoom/xscale
-                // only change how much paper is visible, not the lock to notes.
-                const PAPER_TILE_PTS: f64 = 480.0;
+                // Tile size in points — larger than before so junctions are rarer;
+                // the uploaded craft texture is edge-blended for seamless Repeat.
+                const PAPER_TILE_PTS: f64 = 900.0;
                 let paper_x0 = -midx as f64 + offset_us / *xscale;
                 let paper_x1 = (book_w - midx) as f64 + offset_us / *xscale;
                 let u0 = (paper_x0 / PAPER_TILE_PTS) as f32;
@@ -326,19 +338,16 @@ impl VirtualBookComponent {
                         }
                     };
 
-                    // blue bar (playhead) — notes are "read" exactly on this line
-                    let playhead_x = to_screen * pos2(midx, 0.0);
-                    let playhead_x = playhead_x.x;
-                    let bar = Rect::from_points(&[
-                        to_screen * pos2(midx - 1.0, 0.0),
-                        to_screen * pos2(midx + 1.0, maxy + 10.0),
-                    ]);
+                    // Playhead X — holes are "read" on this exact screen column.
+                    let playhead_x = (to_screen * pos2(midx, 0.0)).x;
 
                     #[cfg(feature = "profiling")]
                     profiling::scope!("Display Holes");
 
                     let scale = &current_vb.virtualbook.scale.definition;
-                    let mut note_starts: Vec<(i64, Pos2, Color32)> = Vec::new();
+                    // (start_us, length_us, playhead hit, color) for particle FX
+                    let mut note_sparks: Vec<(i64, i64, Pos2, Color32)> =
+                        Vec::with_capacity(visible.len());
                     let mut note_draws: Vec<book_fx::NoteDraw> = Vec::with_capacity(visible.len());
 
                     // UV scale: book microseconds → texture repeats along the roll
@@ -391,9 +400,9 @@ impl VirtualBookComponent {
                         let v0 = h.hole_ref.track as f32 * 0.17;
                         let book_uv = Rect::from_min_max(Pos2::new(u0, v0), Pos2::new(u1, v0 + 0.12));
 
-                        // Spawn sparks on the vertical bar when the note *starts* (left edge crosses).
-                        note_starts.push((
+                        note_sparks.push((
                             h.hole_ref.timestamp,
+                            h.hole_ref.length,
                             Pos2::new(playhead_x, rect.center().y),
                             Color32::from_rgb(255, 180, 60),
                         ));
@@ -409,9 +418,10 @@ impl VirtualBookComponent {
 
                     if use_gpu {
                         if let Some(fx) = book_fx.as_mut() {
+                            fx.set_effect(book_effect);
                             let dt = ui.input(|i| i.stable_dt);
                             let playhead_us = offset_us as i64;
-                            fx.update_play(dt, playing, playhead_us, &note_starts);
+                            fx.update_play(dt, playing, playhead_us, *xscale, &note_sparks);
 
                             // Viewport = paint callback rect (NDC ±1 on its edges).
                             let (note_verts, particle_verts) =
@@ -440,11 +450,8 @@ impl VirtualBookComponent {
                         }
                     }
 
-                    painter.add(RectShape::filled(
-                        bar,
-                        CornerRadius::default(),
-                        Color32::BLUE,
-                    ));
+                    // Quiet read line on top: precise "now", soft enough for the fire.
+                    paint_playhead(&painter, playhead_x, response.rect);
                 } else {
                     let to_screen = emath::RectTransform::from_to(
                         Rect::from_min_size(Pos2::ZERO, response.rect.size()),
@@ -459,21 +466,41 @@ impl VirtualBookComponent {
                         Color32::WHITE,
                     ));
 
-                    let bar = Rect::from_points(&[
-                        to_screen * pos2(midx - 1.0, 0.0),
-                        to_screen * pos2(midx + 1.0, maxy + 10.0),
-                    ]);
-
-                    painter.add(RectShape::filled(
-                        bar,
-                        CornerRadius::default(),
-                        Color32::BLUE,
-                    ));
+                    let playhead_x = (to_screen * pos2(midx, 0.0)).x;
+                    paint_playhead(&painter, playhead_x, response.rect);
                 }
                 ui.interact(response.rect, Id::new("area"), Sense::click())
             })
             .inner
     }
+}
+
+/// Quiet, precise vertical read line: soft veil + 1px hairline.
+///
+/// Drawn muted so particle fire stays the visual focus, while the column of
+/// "now" remains easy to track on the parchment.
+fn paint_playhead(painter: &Painter, x: f32, book: Rect) {
+    let top = book.top();
+    let bottom = book.bottom();
+
+    // Wide, very transparent veil — presence without a hard slab of color.
+    painter.rect_filled(
+        Rect::from_min_max(pos2(x - 5.0, top), pos2(x + 5.0, bottom)),
+        CornerRadius::ZERO,
+        Color32::from_rgba_unmultiplied(40, 55, 70, 28),
+    );
+    painter.rect_filled(
+        Rect::from_min_max(pos2(x - 2.0, top), pos2(x + 2.0, bottom)),
+        CornerRadius::ZERO,
+        Color32::from_rgba_unmultiplied(55, 75, 95, 40),
+    );
+
+    // Crisp 1px core for the exact play time (pixel-snapped).
+    let x_px = painter.round_to_pixel_center(x);
+    painter.line_segment(
+        [pos2(x_px, top), pos2(x_px, bottom)],
+        Stroke::new(1.0, Color32::from_rgba_unmultiplied(70, 95, 120, 160)),
+    );
 }
 
 /// widget implementation (CPU path only — no FX state).

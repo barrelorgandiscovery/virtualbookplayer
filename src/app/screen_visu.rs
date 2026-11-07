@@ -11,6 +11,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
     let playing = app.appplayer.is_playing();
     let opt_vb = app.appplayer.virtual_book.read().clone();
     let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
+    let book_effect = app.book_effect;
 
     if let Some(vbc) = opt_vb {
         // draw canvas
@@ -54,7 +55,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
                 "bgbookimage",
                 app.background_texture_image.clone(),
                 egui::TextureOptions {
-                    magnification: egui::TextureFilter::Nearest,
+                    magnification: egui::TextureFilter::Linear,
                     minification: egui::TextureFilter::Linear,
                     wrap_mode: egui::TextureWrapMode::Repeat,
                     mipmap_mode: None,
@@ -74,6 +75,7 @@ pub(crate) fn ui_content(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut
         .scrollbar_width(32.0)
         .set_background_texture_id(background_textureid)
         .with_gpu_fx(gpu)
+        .book_effect(book_effect)
         .playing(playing);
 
         component.ui_content_with_fx(ui, app.book_fx.as_mut());

@@ -3,5 +3,7 @@
 //! Only the book viewport uses this path; the rest of the UI stays on egui.
 
 pub mod book_fx;
+pub mod effect;
 
 pub use book_fx::{BookFxState, init_book_fx_gpu};
+pub use effect::BookEffectKind;

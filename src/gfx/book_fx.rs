@@ -7,9 +7,13 @@ use eframe::egui_wgpu::{self, wgpu};
 use egui::{Color32, Pos2, Rect};
 use log::{info, warn};
 
+use super::effect::BookEffectKind;
+
 const MAX_PARTICLES: usize = 1024;
 const VERTS_PER_QUAD: usize = 6;
 const INITIAL_QUAD_CAPACITY: usize = 2048;
+/// Reference hole length (µs) for a "medium" note — scales bursts around this.
+const REF_NOTE_LENGTH_US: f32 = 350_000.0;
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -24,6 +28,7 @@ struct Particle {
     pos: Pos2,
     vel: egui::Vec2,
     color: [f32; 4],
+    base_alpha: f32,
     life: f32,
     max_life: f32,
     size: f32,
@@ -37,6 +42,8 @@ pub struct BookFxState {
     rng_state: u32,
     /// True after GPU pipelines were registered in egui-wgpu callback resources.
     gpu_ready: bool,
+    /// Active effect from preferences.
+    effect: BookEffectKind,
 }
 
 impl Default for BookFxState {
@@ -47,6 +54,7 @@ impl Default for BookFxState {
             book_generation: 0,
             rng_state: 0xA5A5_1234,
             gpu_ready: false,
+            effect: BookEffectKind::None,
         }
     }
 }
@@ -58,6 +66,19 @@ impl BookFxState {
 
     pub fn gpu_ready(&self) -> bool {
         self.gpu_ready
+    }
+
+    pub fn effect(&self) -> BookEffectKind {
+        self.effect
+    }
+
+    /// Apply the preference selection; clears particles when leaving a particle effect.
+    pub fn set_effect(&mut self, effect: BookEffectKind) {
+        if self.effect != effect {
+            self.particles.clear();
+            self.last_playhead_us = None;
+            self.effect = effect;
+        }
     }
 
     pub fn has_alive_particles(&self) -> bool {
@@ -81,23 +102,37 @@ impl BookFxState {
         (self.rng_state as f32) / (u32::MAX as f32)
     }
 
-    fn spawn_burst(&mut self, at: Pos2, base: Color32) {
-        if self.particles.len() >= MAX_PARTICLES {
+    /// Soft scale from hole length: short notes stay crisp, long ones bloom more.
+    fn length_weight(length_us: i64) -> f32 {
+        let ratio = (length_us.max(1) as f32 / REF_NOTE_LENGTH_US).sqrt();
+        ratio.clamp(0.35, 2.6)
+    }
+
+    fn spawn_particles(
+        &mut self,
+        at: Pos2,
+        base: Color32,
+        count: usize,
+        size_mul: f32,
+        life_mul: f32,
+        speed_mul: f32,
+        alpha: f32,
+    ) {
+        if count == 0 || self.particles.len() >= MAX_PARTICLES {
             return;
         }
-        let count = 10;
         let room = MAX_PARTICLES - self.particles.len();
         let n = count.min(room);
         let (r, g, b, _) = base.to_tuple();
         let mut new_particles = Vec::with_capacity(n);
         for _ in 0..n {
             // Keep sparks near the blue bar: mostly vertical burst, little X drift.
-            let angle = -std::f32::consts::FRAC_PI_2
-                + (self.next_rand_f32() - 0.5) * 0.9;
-            let speed = 30.0 + self.next_rand_f32() * 90.0;
-            let life = 0.28 + self.next_rand_f32() * 0.40;
+            let angle =
+                -std::f32::consts::FRAC_PI_2 + (self.next_rand_f32() - 0.5) * 0.9;
+            let speed = (25.0 + self.next_rand_f32() * 85.0) * speed_mul;
+            let life = (0.22 + self.next_rand_f32() * 0.38) * life_mul;
             let boost = 0.55 + self.next_rand_f32() * 0.45;
-            let size = 8.0 + self.next_rand_f32() * 12.0;
+            let size = (6.0 + self.next_rand_f32() * 11.0) * size_mul;
             new_particles.push(Particle {
                 pos: at,
                 vel: egui::vec2(angle.cos() * speed * 0.25, angle.sin() * speed),
@@ -105,8 +140,9 @@ impl BookFxState {
                     (r as f32 / 255.0) * boost + 0.2,
                     (g as f32 / 255.0) * boost + 0.05,
                     (b as f32 / 255.0) * boost,
-                    0.95,
+                    alpha,
                 ],
+                base_alpha: alpha,
                 life,
                 max_life: life,
                 size,
@@ -115,24 +151,81 @@ impl BookFxState {
         self.particles.extend(new_particles);
     }
 
-    /// Advance particles and detect holes that crossed the playhead since last frame.
+    /// Attack spark when the hole's leading edge crosses the playhead.
+    fn spawn_note_attack(&mut self, at: Pos2, base: Color32, length_us: i64) {
+        let w = Self::length_weight(length_us);
+        let count = (6.0 * w).round().clamp(3.0, 22.0) as usize;
+        self.spawn_particles(at, base, count, 0.85 + 0.35 * w, 0.85 + 0.4 * w, w, 0.95);
+    }
+
+    /// Soft trail while the playhead sits inside a hole — denser for longer notes.
+    fn spawn_note_sustain(&mut self, at: Pos2, base: Color32, length_us: i64, dt: f32) {
+        let w = Self::length_weight(length_us);
+        // Expected particles per second grows with length; short notes barely trail.
+        let rate = 4.0 * w * w; // ~1.5/s short … ~25/s very long
+        let expected = rate * dt;
+        let mut count = expected.floor() as usize;
+        if self.next_rand_f32() < expected.fract() {
+            count += 1;
+        }
+        if count == 0 {
+            return;
+        }
+        self.spawn_particles(
+            at,
+            base,
+            count.min(4),
+            0.55 + 0.2 * w,
+            0.7 + 0.25 * w,
+            0.55 + 0.2 * w,
+            0.55,
+        );
+    }
+
+    /// Advance particles and spawn FX for notes crossing / under the playhead.
+    ///
+    /// `notes` entries are `(start_us, length_us, hit_pos, color)`.
+    /// `xscale` is µs per screen point — used so sparks scroll left with the carton.
     pub fn update_play(
         &mut self,
         dt: f32,
         playing: bool,
         playhead_us: i64,
-        note_starts: &[(i64, Pos2, Color32)],
+        xscale: f64,
+        notes: &[(i64, i64, Pos2, Color32)],
     ) {
-        if !playing {
+        let dt = dt.clamp(0.0, 0.05);
+
+        if !self.effect.emits_particles() {
+            self.particles.clear();
             self.last_playhead_us = Some(playhead_us);
-            // Still age particles so they fade out after stop.
-        } else {
+            return;
+        }
+
+        // Carton motion: as playhead time advances, paper (and sparks) move left.
+        let scroll_dx = match self.last_playhead_us {
+            Some(prev) if playhead_us >= prev && xscale > 0.0 => {
+                -((playhead_us - prev) as f64 / xscale) as f32
+            }
+            _ => 0.0,
+        };
+
+        for p in &mut self.particles {
+            p.pos.x += scroll_dx;
+        }
+
+        if playing {
             match self.last_playhead_us {
                 Some(prev) if playhead_us >= prev => {
-                    // Spawn for holes whose start lies in (prev, playhead].
-                    for &(ts, pos, color) in note_starts {
+                    for &(ts, length_us, pos, color) in notes {
+                        let end = ts.saturating_add(length_us);
+                        // Attack: leading edge crossed since last frame.
                         if ts > prev && ts <= playhead_us {
-                            self.spawn_burst(pos, color);
+                            self.spawn_note_attack(pos, color, length_us);
+                        }
+                        // Sustain: playhead currently inside the hole.
+                        if playhead_us > ts && playhead_us <= end {
+                            self.spawn_note_sustain(pos, color, length_us, dt);
                         }
                     }
                 }
@@ -140,20 +233,20 @@ impl BookFxState {
                     // Seek / first frame: don't explode every on-screen note.
                 }
             }
-            self.last_playhead_us = Some(playhead_us);
         }
+        self.last_playhead_us = Some(playhead_us);
 
-        let dt = dt.clamp(0.0, 0.05);
         self.particles.retain_mut(|p| {
             p.life -= dt;
             if p.life <= 0.0 {
                 return false;
             }
-            p.vel.y += 90.0 * dt; // gravity-ish
+            // Local motion on top of book scroll (mostly vertical bloom).
+            p.vel.y += 90.0 * dt;
             p.pos += p.vel * dt;
             p.vel *= 0.98;
             let t = (p.life / p.max_life).clamp(0.0, 1.0);
-            p.color[3] = t * t;
+            p.color[3] = p.base_alpha * t * t;
             true
         });
     }
@@ -427,22 +520,26 @@ pub(crate) fn build_frame_meshes(
     let mut notes = Vec::with_capacity(notes_in.len() * VERTS_PER_QUAD);
     let mut particles = Vec::with_capacity(fx.particles.len() * VERTS_PER_QUAD + 8);
 
+    let emit = fx.effect().emits_particles();
+
     for note in notes_in {
         push_quad(&mut notes, note.rect, note.color, note.book_uv, viewport);
 
-        // Thin additive focus centered on the blue bar.
-        if let Some(hit) = note.playhead_hit {
-            let focus = Rect::from_center_size(
-                hit,
-                egui::vec2(4.0, (note.rect.height() + 4.0).max(8.0)),
-            );
-            push_quad(
-                &mut particles,
-                focus,
-                Color32::from_rgba_unmultiplied(255, 140, 50, 180),
-                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                viewport,
-            );
+        // Thin additive focus centered on the blue bar (particle effects only).
+        if emit {
+            if let Some(hit) = note.playhead_hit {
+                let focus = Rect::from_center_size(
+                    hit,
+                    egui::vec2(4.0, (note.rect.height() + 4.0).max(8.0)),
+                );
+                push_quad(
+                    &mut particles,
+                    focus,
+                    Color32::from_rgba_unmultiplied(255, 140, 50, 180),
+                    Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                    viewport,
+                );
+            }
         }
     }
 

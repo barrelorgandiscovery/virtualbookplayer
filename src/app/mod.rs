@@ -14,7 +14,7 @@ use player::midiio::{DeviceInformation, MidiPlayerFactory};
 use player::{PlayerFactory, Response};
 
 use crate::appplayer::AppPlayer;
-use crate::gfx::{BookFxState, init_book_fx_gpu};
+use crate::gfx::{BookEffectKind, BookFxState, init_book_fx_gpu};
 use crate::playmetadata_manager::PlayMetadataManager;
 use crate::{duration_to_mm_ss, file_store::*};
 
@@ -124,6 +124,9 @@ pub struct VirtualBookApp {
     /// Positive = audio late → hold the roll / FX back so the blue bar matches what you hear.
     play_lattency_ms: i64,
 
+    /// Selected virtual-book visual effect (see [`BookEffectKind`]).
+    book_effect: BookEffectKind,
+
     /// display the number pad
     hidden_number_pad: bool,
 
@@ -153,7 +156,9 @@ impl Default for VirtualBookApp {
         appplayer.player(None);
 
         let img: ColorImage = load_image_bytes(include_bytes!("bg2.png")).unwrap();
-        let imgbackground = load_image_bytes(include_bytes!("../../assets/craft.png")).unwrap();
+        let imgbackground = make_seamless_parchment(
+            load_image_bytes(include_bytes!("../../assets/craft.png")).unwrap(),
+        );
 
         Self {
             lang: None,
@@ -190,6 +195,7 @@ impl Default for VirtualBookApp {
             adjusted_start_time: Instant::now(), // start time since we start the play
 
             play_lattency_ms: 0, // 0 ms lattency
+            book_effect: BookEffectKind::NoteFire,
 
             i18n: create_i18n_message_with_lang(None),
 
@@ -424,6 +430,7 @@ impl VirtualBookApp {
 
         let mut fx = BookFxState::default();
         fx.set_gpu_ready(gpu_ready);
+        fx.set_effect(app.book_effect);
         app.book_fx = Some(fx);
         app
     }
@@ -1111,6 +1118,17 @@ impl VirtualBookApp {
              Positive: audio/MIDI late — delay the blue-bar hit to match what you hear.\n\
              Negative: visuals late — advance the blue-bar hit.",
         );
+
+        ui.separator();
+        ui.label(&self.i18n.book_effect);
+        // Radios work reliably inside egui menus (ComboBox popups often close with the menu).
+        for kind in BookEffectKind::all() {
+            let label = self.i18n.book_effect_label(*kind).to_owned();
+            ui.radio_value(&mut self.book_effect, *kind, label);
+        }
+        if let Some(fx) = self.book_fx.as_mut() {
+            fx.set_effect(self.book_effect);
+        }
     }
 
     /// Render MIDI device selection
@@ -1571,6 +1589,89 @@ impl VirtualBookApp {
                         });
                 }
             });
+    }
+}
+
+/// Turn a photo of craft paper into a tileable parchment texture.
+///
+/// Center-crops, downsamples, then crossfades opposite edges so `Repeat`
+/// wrap no longer shows hard rectangular junctions.
+fn make_seamless_parchment(src: ColorImage) -> ColorImage {
+    let sw = src.width();
+    let sh = src.height();
+    if sw < 16 || sh < 16 {
+        return src;
+    }
+
+    let side = sw.min(sh);
+    let x0 = (sw - side) / 2;
+    let y0 = (sh - side) / 2;
+
+    const TILE: usize = 1024;
+    let mut pixels = Vec::with_capacity(TILE * TILE);
+    for ty in 0..TILE {
+        let sy = y0 + ty * side / TILE;
+        for tx in 0..TILE {
+            let sx = x0 + tx * side / TILE;
+            pixels.push(src.pixels[sy * sw + sx]);
+        }
+    }
+    let mut img = ColorImage::new([TILE, TILE], pixels);
+
+    let feather = (TILE / 7).max(32);
+    crossfade_tile_edges(&mut img, feather);
+    img
+}
+
+fn lerp_color32(a: Color32, b: Color32, t: f32) -> Color32 {
+    let t = t.clamp(0.0, 1.0);
+    let u = 1.0 - t;
+    Color32::from_rgba_unmultiplied(
+        (a.r() as f32 * u + b.r() as f32 * t).round() as u8,
+        (a.g() as f32 * u + b.g() as f32 * t).round() as u8,
+        (a.b() as f32 * u + b.b() as f32 * t).round() as u8,
+        (a.a() as f32 * u + b.a() as f32 * t).round() as u8,
+    )
+}
+
+fn crossfade_tile_edges(img: &mut ColorImage, feather: usize) {
+    let w = img.width();
+    let h = img.height();
+    let f = feather.min(w / 3).min(h / 3).max(1);
+
+    // Smoothstep-ish weight: 0 on the outer edge, 1 inward past `f`.
+    let fade = |d: usize| -> f32 {
+        let t = (d as f32 + 0.5) / f as f32;
+        let t = t.clamp(0.0, 1.0);
+        0.5 - 0.5 * (std::f32::consts::PI * t).cos()
+    };
+
+    // Horizontal: force left/right edges to meet, then restore inward detail.
+    for y in 0..h {
+        for d in 0..f {
+            let wgt = fade(d);
+            let i0 = y * w + d;
+            let i1 = y * w + (w - 1 - d);
+            let p0 = img.pixels[i0];
+            let p1 = img.pixels[i1];
+            let avg = lerp_color32(p0, p1, 0.5);
+            img.pixels[i0] = lerp_color32(avg, p0, wgt);
+            img.pixels[i1] = lerp_color32(avg, p1, wgt);
+        }
+    }
+
+    // Vertical: same treatment (reads the already-blended horizontal edges).
+    for x in 0..w {
+        for d in 0..f {
+            let wgt = fade(d);
+            let i0 = d * w + x;
+            let i1 = (h - 1 - d) * w + x;
+            let p0 = img.pixels[i0];
+            let p1 = img.pixels[i1];
+            let avg = lerp_color32(p0, p1, 0.5);
+            img.pixels[i0] = lerp_color32(avg, p0, wgt);
+            img.pixels[i1] = lerp_color32(avg, p1, wgt);
+        }
     }
 }
 

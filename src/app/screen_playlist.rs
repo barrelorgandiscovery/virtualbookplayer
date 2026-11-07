@@ -782,13 +782,14 @@ fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut U
     let foffset: f64 = app.visual_offset_ms();
     let playing = app.appplayer.is_playing();
     let gpu = app.book_fx.as_ref().is_some_and(|fx| fx.gpu_ready());
+    let book_effect = app.book_effect;
 
     if app.background_texture_handle.is_none() {
         app.background_texture_handle = Some(ctx.load_texture(
             "bgbookimage",
             app.background_texture_image.clone(),
             TextureOptions {
-                magnification: TextureFilter::Nearest,
+                magnification: TextureFilter::Linear,
                 minification: TextureFilter::Linear,
                 wrap_mode: TextureWrapMode::Repeat,
                 mipmap_mode: None,
@@ -807,6 +808,7 @@ fn render_book_preview(app: &mut VirtualBookApp, ctx: &egui::Context, ui: &mut U
     .set_background_texture_id(app.background_textureid)
     .hide_scrollbar()
     .with_gpu_fx(gpu)
+    .book_effect(book_effect)
     .playing(playing);
 
     let response_ui_component = component.ui_content_with_fx(ui, app.book_fx.as_mut());
