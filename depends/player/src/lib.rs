@@ -117,6 +117,14 @@ pub trait Player: Send {
     fn create_information_getter(
         &self,
     ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>>;
+
+    /// Id of the play begun by the latest [`Self::start_play`].
+    ///
+    /// [`Response::EndOfFile`] carries the same id. A late end from an older
+    /// play (the listener skipped, or a new file already started) does not match.
+    fn current_play_serial(&self) -> u64 {
+        0
+    }
 }
 
 /// Factory for file information creator, using the compute function this compute the
@@ -129,7 +137,9 @@ pub trait FileInformationsConstructor: Send {
 /// messages from the player
 #[derive(Debug)]
 pub enum Response {
-    EndOfFile,
+    /// The file finished by itself. The id is [`Player::current_play_serial`]
+    /// from the moment that play started.
+    EndOfFile(u64),
     FileCancelled,
     CurrentPlayTime(Duration),
     FilePlayStarted((String, Arc<NotesInformations>)),

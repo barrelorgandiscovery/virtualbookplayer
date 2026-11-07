@@ -41,7 +41,7 @@ pub fn test_player() {
 
     loop {
         match receiver.recv().expect("error getting message") {
-            player::Response::EndOfFile => {
+            player::Response::EndOfFile(_) => {
                 println!("End of file received, stopping");
                 break;
             }

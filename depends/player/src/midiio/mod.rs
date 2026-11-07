@@ -73,6 +73,7 @@ impl PlayerFactory for MidiPlayerFactory {
             ispaused: Arc::new(Mutex::new(false)),
             isplaying: Arc::new(Mutex::new(false)),
             notes: Arc::new(Mutex::new(Arc::new(NotesInformations::default()))),
+            play_serial: 0,
         }))
     }
 
@@ -188,6 +189,9 @@ pub struct MidiPlayer {
     /// note representation for the display
     // shared between threads
     notes: Arc<Mutex<Arc<NotesInformations>>>,
+
+    /// Bumped on every `start_play`. Sent back with `EndOfFile`.
+    play_serial: u64,
 }
 
 impl Drop for MidiPlayer {
@@ -568,6 +572,9 @@ impl Player for MidiPlayer {
 
         let commands = Arc::clone(&self.commands);
 
+        self.play_serial = self.play_serial.wrapping_add(1);
+        let play_serial = self.play_serial;
+
         let ispaused = Arc::new(Mutex::new(false));
         self.ispaused = ispaused.clone();
 
@@ -604,6 +611,11 @@ impl Player for MidiPlayer {
                 match read_result {
                     Err(e) => {
                         error!("error in reading file : {:?}", e);
+                        // Still report the end, so the playlist can move on
+                        // without waiting for a window redraw.
+                        if let Ok(output_locked) = output_reference.lock() {
+                            let _ = output_locked.send(Response::EndOfFile(play_serial));
+                        }
                     }
 
                     Ok((notes_informations, mut timer, midi_sheet)) => {
@@ -801,7 +813,7 @@ impl Player for MidiPlayer {
 
                         if let Ok(output_locked) = output_reference.lock() {
                             if let Err(err_send_end_of_file) =
-                                output_locked.send(Response::EndOfFile)
+                                output_locked.send(Response::EndOfFile(play_serial))
                             {
                                 error!("error sending end of file : {:?}", err_send_end_of_file);
                             }
@@ -854,6 +866,10 @@ impl Player for MidiPlayer {
     ) -> Result<Box<dyn FileInformationsConstructor>, Box<dyn Error>> {
         Ok(Box::new(MidiFileInformationsConstructor {}))
     }
+
+    fn current_play_serial(&self) -> u64 {
+        self.play_serial
+    }
 }
 
 #[profiling::all_functions]
@@ -877,6 +893,7 @@ impl MidiPlayer {
             isplaying: Arc::new(Mutex::new(false)),
             ispaused: Arc::new(Mutex::new(false)),
             notes: Arc::new(Mutex::new(Arc::new(NotesInformations::default()))),
+            play_serial: 0,
         }
     }
 

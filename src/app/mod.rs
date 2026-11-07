@@ -604,22 +604,24 @@ impl VirtualBookApp {
         self.display_offset_ms = follow_display_offset(self.display_offset_ms, target_ms, dt);
     }
 
-    /// Handle player response messages
+    /// Handle player response messages.
+    ///
+    /// Playlist advance already happened on the player thread. This only
+    /// catches the UI up: play counts, the open file, and the clock.
     fn handle_player_responses(&mut self) {
-        let response = {
-            if let Ok(mut opt_last_response) = self.appplayer.last_response.lock() {
-                opt_last_response.take()
+        let responses = {
+            if let Ok(mut queued) = self.appplayer.last_response.lock() {
+                std::mem::take(&mut *queued)
             } else {
                 return;
             }
         };
 
-        if let Some(last_response) = response {
-            match &last_response {
-                Response::EndOfFile => {
-                    // Clear current playing file when file ends
+        for last_response in &responses {
+            match last_response {
+                Response::EndOfFile(_) => {
+                    // The next file, if any, was already started off this thread.
                     self.current_playing_file = None;
-                    self.appplayer.next();
                 }
                 Response::CurrentPlayTime(duration) => {
                     self.latest_duration_time = *duration;
@@ -1326,7 +1328,7 @@ impl VirtualBookApp {
     /// Playlist play/stop cancels the file and leaves the queue. Tune pause
     /// freezes that file and keeps playlist play mode.
     fn render_floating_play_button(&mut self, ctx: &egui::Context, top_panel_rect: Rect) {
-        let play_mod = self.appplayer.play_mod;
+        let play_mod = self.appplayer.play_mod();
         let tune_open = self.appplayer.is_playing();
         let tune_paused = tune_open && self.appplayer.is_paused();
 
@@ -1379,10 +1381,10 @@ impl VirtualBookApp {
         ) {
             if play_mod {
                 self.appplayer.stop();
-                self.appplayer.play_mod = false;
             } else {
-                self.appplayer.play_mod = true;
-                self.appplayer.play_file_on_top();
+                // Stay in play mode even when the playlist is still empty,
+                // so the first file added later starts on its own.
+                self.appplayer.begin_playlist();
             }
             ctx.request_repaint();
         }

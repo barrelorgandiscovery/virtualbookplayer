@@ -50,7 +50,7 @@ fn handle_enter_key(
 
                     locked_playlist.add_from_path_and_expand_playlists(&file_node.borrow().path);
                 }
-                if was_empty && appplayer.play_mod {
+                if was_empty && appplayer.play_mod() {
                     appplayer.play_file_on_top();
                 }
 
@@ -182,8 +182,8 @@ fn render_playlist_header(app: &mut VirtualBookApp, ui: &mut Ui) {
                 .heading(),
             );
 
-            let play_mod = &appplayer.play_mod;
-            if !*play_mod
+            let play_mod = appplayer.play_mod();
+            if !play_mod
                 && ui
                     .button(egui_phosphor::regular::PLAY)
                     .on_hover_text_at_pointer(&app.i18n.go_to_next_file)
@@ -698,7 +698,7 @@ fn display_file(
         }
 
         // when just added and play is active, play it
-        if appplayer.play_mod && !appplayer.is_playing() {
+        if appplayer.play_mod() && !appplayer.is_playing() {
             appplayer.play_file_on_top();
         }
 

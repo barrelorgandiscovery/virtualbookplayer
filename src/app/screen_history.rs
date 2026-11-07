@@ -279,7 +279,7 @@ fn add_history_file(app: &mut VirtualBookApp, path: &Path) {
         locked_playlist.add_from_path_and_expand_playlists(&path_buf);
         was_empty
     };
-    if was_empty && app.appplayer.play_mod {
+    if was_empty && app.appplayer.play_mod() {
         app.appplayer.play_file_on_top();
     }
 }
